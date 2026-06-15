@@ -1,0 +1,1 @@
+<x-app-layout><div class="mx-auto max-w-7xl space-y-6"><div><p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Administrativo</p><h1 class="mt-1 text-2xl font-bold text-slate-950">Reposição Estoque Interno</h1></div>@include('panels.administrativo.partials._estoque-interno')</div></x-app-layout>

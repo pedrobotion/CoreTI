@@ -1,0 +1,178 @@
+# Registro de Atualizações
+
+## Regra de manutenção
+- Toda nova alteração deve ser documentada neste arquivo no mesmo dia da mudança.
+- Registrar por data (formato `AAAA-MM-DD`), sem horário.
+- Em cada data, separar em:
+  - `Sistema` (backend, banco, config, segurança, rotas)
+  - `Site` (telas, navegação, layout, conteúdo visível)
+
+> Observação: este histórico foi consolidado a partir das datas de modificação dos arquivos do projeto (mtime), pois não há histórico Git disponível neste diretório.
+
+## Histórico (cronológico)
+
+### 2025-08-29
+- Sistema:
+  - Estrutura inicial do projeto Laravel criada (bootstrap, configs base, migrations iniciais e testes padrão).
+  - Arquivos essenciais do projeto adicionados (`artisan`, `config/*`, `database/*`, `public/index.php`).
+- Site:
+  - Estrutura pública inicial disponibilizada (`public/index.php`, `.htaccess`, `robots.txt`).
+  - Sem módulos funcionais específicos de negócio nesta data.
+
+### 2025-09-24
+- Sistema:
+  - Dependências PHP e JS configuradas/atualizadas (`composer.json`, `composer.lock`, `package.json`, `package-lock.json`).
+  - Ambiente de frontend configurado (`vite`, `tailwind`, `postcss`) e build gerada (`public/build/*`).
+  - Banco SQLite local criado/atualizado (`database/database.sqlite`).
+  - Controladores e requests de autenticação/perfil atualizados (fluxo Breeze).
+- Site:
+  - Páginas de autenticação ativas/ajustadas: login, registro, recuperação e redefinição de senha, verificação de e-mail.
+  - Componentes visuais base atualizados (inputs, botões, dropdowns, modal, navegação responsiva).
+  - Identidade visual inicial aplicada (logo e imagem de fundo de login em `public/images/*`).
+  - Favicon do site adicionado/atualizado (`public/favicon.ico`).
+
+### 2025-09-25
+- Sistema:
+  - Middleware de usuário ativo implementado (`EnsureUserIsActive`).
+  - Fluxo de cadastro ajustado (`RegisteredUserController`).
+  - Migrações para controle de ativação de usuário adicionadas.
+- Site:
+  - Comportamento de acesso ajustado para usuários inativos (impacto no login/uso da aplicação).
+
+### 2025-12-10
+- Sistema:
+  - Rotas de autenticação atualizadas (`routes/auth.php`).
+- Site:
+  - Layouts principais (`app` e `guest`) ajustados, com impacto visual/estrutural nas páginas autenticadas e públicas.
+
+### 2025-12-12
+- Sistema:
+  - Ajustes no processo de login e autenticação (`LoginRequest`, `User`).
+- Site:
+  - Telas de circuitos atualizadas (`ligga`, `embratel`, `oi`).
+  - Parciais de perfil (dados, senha, exclusão de conta) atualizadas.
+
+### 2026-01-29
+- Sistema:
+  - Configuração de aplicação e banco ajustada (`config/app.php`, `config/database.php`, `bootstrap/app.php`, `.env`).
+  - Controle de acesso por perfil implementado com middleware admin e coluna de role em usuários.
+  - Modelos e migrações de circuitos/unidades adicionados.
+  - Arquivos de idioma pt-BR adicionados/atualizados.
+- Site:
+  - Estrutura principal da área logada expandida (`home` e navegação de painéis).
+  - Novos módulos/painéis com subpáginas: Administrativo, Governança, Indicadores, Monitoramento e Unidade Digital.
+  - Telas de circuitos e unidades criadas/atualizadas (listagem, criação, edição).
+  - Página de erro 403 e personalização de paginação adicionadas/ajustadas.
+
+### 2026-02-09
+- Sistema:
+  - Rotas web atualizadas (`routes/web.php`).
+  - Controladores de administração e circuitos atualizados (`AdminController`, `CircuitController`).
+- Site:
+  - Dashboard administrativo atualizado (`resources/views/admin/dashboard.blade.php`).
+  - Navegação principal ajustada (`resources/views/layouts/navigation.blade.php`).
+  - Página/painel de Bancada de Serviços adicionada/atualizada.
+
+### 2026-02-17
+- Sistema:
+  - Layout base de páginas autenticadas ajustado para suportar navegação lateral fixa (`resources/views/layouts/app.blade.php`).
+  - Componente de navegação reestruturado para sidebar esquerda no desktop e drawer lateral no mobile (`resources/views/layouts/navigation.blade.php`).
+  - Comportamento do menu melhorado com seções colapsáveis, estados ativos e suporte a `x-cloak` no CSS global (`resources/css/app.css`).
+  - Barra superior fixa incorporada ao layout de navegação com controle de perfil por dropdown e reposicionamento do conteúdo para evitar sobreposição (`resources/views/layouts/navigation.blade.php`, `resources/views/layouts/app.blade.php`).
+  - Arquivos de logo `cocari_black.png` e `cocari_white.png` movidos da raiz para `public/images/` e integrados ao cabeçalho com troca automática por tema claro/escuro (`resources/views/layouts/navigation.blade.php`, `resources/css/app.css`).
+  - Assets reorganizados para padrão profissional: logos em `public/images/branding/` e avatar em `public/images/ui/`, com nomes padronizados (`cocari-logo-black.png`, `cocari-logo-white.png`, `profile-avatar.png`).
+  - Referências legadas substituídas para o novo padrão de marca, incluindo o componente global de logo (`resources/views/components/application-logo.blade.php`).
+  - Asset antigo sem uso removido (`public/images/coreti-logo.png`).
+  - Correção de renderização no cabeçalho com dimensões fixas para logo e avatar, removendo dependência de classes utilitárias para evitar estouro visual em cenários sem rebuild recente de assets (`resources/views/layouts/navigation.blade.php`).
+  - Remoção do botão de menu (3 barras) e de toda a lógica de abertura/fechamento associada ao estado `open` no cabeçalho/sidebar (`resources/views/layouts/navigation.blade.php`).
+  - Correção de erro 500 (`Undefined variable $user`) após restauração do template `resources/views/layouts/navigation.blade.php` que havia sido corrompido em linha única; cache de views limpo com `php artisan view:clear`.
+  - Reposicionamento do botão de perfil para o canto superior direito da tela com posicionamento fixo e independente de utilitários CSS (`resources/views/layouts/navigation.blade.php`).
+  - Ajuste fino visual: logo Cocari rebaixada no cabeçalho para melhor alinhamento vertical (`resources/views/layouts/navigation.blade.php`).
+  - Remoção da barra de cabeçalho secundária na página inicial ao retirar `x-slot header` de `home`, eliminando a linha horizontal indesejada nessa tela (`resources/views/home.blade.php`).
+  - Rebaixamento adicional do conteúdo principal e da sidebar para melhorar respiro visual na Home (`resources/views/layouts/app.blade.php`, `resources/views/layouts/navigation.blade.php`).
+  - Navegação administrativa reorganizada: `Indicadores`, `Bancada de Serviços`, `Unidade Digital`, `Monitoramento` e `Gestão de Usuários` removidos de dentro de `Administração` e promovidos para campos-pai no mesmo nível de `Circuitos` (`resources/views/layouts/navigation.blade.php`).
+  - Ajustes de usabilidade na navegação: removido `Visão geral` do grupo `Circuitos`, removido o título/separador `Navegação` da sidebar e corrigido posicionamento do dropdown de perfil para abrir alinhado ao botão no topo direito (`resources/views/layouts/navigation.blade.php`).
+  - Remoção global do cabeçalho de título de página no layout autenticado para não exibir nome da seção no canto esquerdo ao navegar (`resources/views/layouts/app.blade.php`).
+  - Botão `Início` no menu lateral ajustado para aparecer somente fora da Home (oculto quando rota atual é `dashboard`/`home`) (`resources/views/layouts/navigation.blade.php`).
+  - Linha inferior do cabeçalho superior ajustada para ocupar 100% da largura da página com estilo explícito no header (`resources/views/layouts/navigation.blade.php`).
+  - Menu lateral refinado: remoção do botão `Meu Perfil`, organização por títulos de área com links abaixo e melhorias visuais de usabilidade (leve arredondamento, espaçamento entre blocos e estados ativos mais claros) (`resources/views/layouts/navigation.blade.php`).
+  - Refinamento visual corporativo aplicado ao menu lateral: cartões mais sóbrios, hierarquia tipográfica mais limpa e destaque de item ativo em estilo institucional (`resources/views/layouts/navigation.blade.php`).
+  - Navegação lateral reestruturada com componentes visuais corporativos reutilizáveis (`corp-section`, `corp-toggle`, `corp-link`) para organização mais profissional e apresentação comercial do produto (`resources/views/layouts/navigation.blade.php`).
+  - Navegação global adaptada para responsividade com sidebar fixa no desktop e drawer no mobile (com botão `Menu`, overlay e fechamento por clique externo), reutilizando partial de menu para manter consistência entre dispositivos (`resources/views/layouts/navigation.blade.php`, `resources/views/layouts/partials/sidebar-menu.blade.php`).
+  - Correção de visibilidade do painel lateral: ajuste da lógica responsiva para CSS explícito (`desktop-sidebar`/`mobile-sidebar`) evitando dependência de classes utilitárias para exibir menu em desktop e mobile (`resources/views/layouts/navigation.blade.php`).
+  - Documento de atualização mantido e sincronizado com as novas mudanças (`update.txt`).
+- Site:
+  - Menu de navegação principal movido para o canto esquerdo.
+  - Links organizados em seções na lateral, com estrutura mais limpa e profissional.
+  - Circuitos e Administração agora possuem grupos colapsáveis para facilitar uso diário.
+  - Navegação mobile ajustada com abertura/fechamento de menu lateral e overlay.
+  - Logo no canto superior esquerdo aplicada em preto e branco.
+  - Logo da Cocari agora alterna automaticamente: `cocari_black` no modo claro e `cocari_white` no modo escuro.
+  - Avatar no canto superior direito com menu de opções de perfil (perfil, administração quando aplicável, sair).
+  - Botão de perfil atualizado para usar ícone dedicado (`profile-avatar.png`) e fixado no canto superior direito da tela.
+  - Correção de espaçamento para impedir que campos/conteúdo fiquem cobertos pela barra superior e sidebar.
+  - Correção do problema de ícones/branding desproporcionais no topo; logo e avatar agora exibem tamanho estável e alinhamento correto.
+  - Ícone de perfil mantido no topo, no canto direito da página, sem o ícone de 3 barrinhas.
+  - Ícone de perfil alinhado ao extremo direito do cabeçalho, conforme referência visual.
+
+### 2026-02-20
+- Sistema:
+  - Segurança de administração reforçada: reset de senha por admin migrou de senha fixa para fluxo com token/link de redefinição, com invalidação da senha anterior e exigência de troca (`must_change_password`).
+  - Nova policy de usuários (`UserPolicy`) registrada no provider e aplicada nas ações críticas do `AdminController` (aprovar, rejeitar, resetar senha, alterar perfil e excluir), com bloqueio de auto-gestão sensível.
+  - Middleware `active` aplicado às rotas autenticadas principais (`web` e rotas de auth protegidas), evitando uso da área logada por conta inativa.
+  - Fluxo de autenticação ajustado para bloquear login quando `must_change_password` estiver ativo e orientar redefinição.
+  - Fluxo de redefinição e troca de senha ajustado para limpar `must_change_password` após atualização da senha.
+  - Banco de dados reforçado com nova migration para `must_change_password` e outra migration com índices de pesquisa em `circuitos_unidades` + FK para `unidades` (quando o driver suportar).
+  - Listagem de circuitos aprimorada com filtros estruturados (operadora, UF, serviço, unidade, busca livre e itens por página) e validações adicionais.
+  - Rotas duplicadas de cadastro removidas para simplificação e manutenção.
+  - Testes de negócio adicionados para gestão administrativa e CRUD/filtros de circuitos.
+  - README do projeto substituído por documentação funcional do CoreTI (setup, perfis, fluxos e testes).
+- Site:
+  - Tela administrativa de usuários atualizada para exibir link seguro de reset no lugar de senha em texto.
+  - Interface de circuitos ganhou filtros avançados e controle de quantidade de itens por página.
+  - Acessibilidade melhorada na tabela de circuitos com ações em SVG + `aria-label`/texto oculto para leitores de tela.
+  - Ajustes de layout: remoção de meta `theme-color` duplicada e centralização de estilos da navegação no CSS global, reduzindo estilo inline.
+
+### 2026-05-05
+- Sistema:
+  - Página inicial (`/home`) alterada de view estática para controller dedicado (`HomeController`), com agregações de usuários, unidades, circuitos, operadoras, UFs e registros recentes.
+  - Novo módulo ServiceDesk criado com controller dedicado, rotas próprias (`service-desk.*`) e dashboard operacional inicial.
+  - ServiceDesk integrado à tabela `jiras` do banco `intranet_infra` por meio do model `JiraIssue`, usando dados reais de chamados, SLA, status, prioridades, filas e responsáveis.
+  - Rotas do ServiceDesk ajustadas: removida a rota de abertura de novo chamado e adicionadas páginas para e-mails da Sede, Unidades e Cerrado.
+  - Cadastro local de e-mails do ServiceDesk criado (`service_desk_emails`) com vínculo por matrícula, status, datas, observação e separação por Sede, Unidades e Cerrado.
+  - Nova conexão `intranet_cocari` configurada somente para consulta em tempo real de `gasUsuario`/`cadColaborador`, preenchendo colaborador, matrícula, e-mail e `IdPessoa` sem importar ou gravar dados desse banco.
+  - Cadastro de e-mails do ServiceDesk passou a consultar automaticamente matrícula, nome, e-mail e centro de custo no `intranet_cocari`, além de buscar Unicoop e Área nas tabelas locais do `intranet_infra` conforme a Sede, Unidade ou Cerrado selecionado.
+  - Dados de centro/unidade e e-mails antigos migrados para tabelas locais no `intranet_infra`, com relacionamento por FK entre `service_desk_emails` e `service_desk_email_cost_centers`.
+  - ServiceDesk ajustado para consultar Unicoop/Área a partir do `intranet_infra`, sem dependências externas no fluxo web.
+  - Matrícula dos e-mails do ServiceDesk tornou-se opcional, preservando vazio quando o dado não existir na origem.
+  - Módulo Aplicativos criado com tabela local `applications`, controller de listagem/download e comando `applications:import` para importar instaladores e imagens do `plataforma_chamado`.
+  - Módulo Aplicativos ajustado para não depender da extensão PHP `intl` na formatação de tamanho e para suportar kits com múltiplos arquivos em ZIP.
+  - Cadastro manual de aplicativos adicionado para administradores, com foto obrigatória e suporte a múltiplos arquivos por aplicação.
+  - Módulo Bancada de Serviços separado do menu principal, com rotas próprias (`bancada-servicos.*`) e navegação lateral contextual no mesmo padrão do ServiceDesk.
+  - Fluxo de redefinição de senha ajustado para tratar falhas de envio e gerar link local quando o mailer estiver configurado como `log`, evitando dependência de escrita no arquivo de log para recuperar acesso.
+- Site:
+  - Item ServiceDesk adicionado ao menu principal; ao acessar o módulo, a sidebar troca para opções específicas de atendimento.
+  - Dashboard do ServiceDesk criado com indicadores de chamados, filas de atendimento e tabela de chamados recentes vindos da base Jira.
+  - Tela de consulta de chamados adicionada com busca, filtros por status/prioridade e paginação.
+  - Menu do ServiceDesk atualizado para remover “Novo chamado” e incluir seção “E-mails” com as opções Sede, Unidades e Cerrado.
+  - Telas de e-mails do ServiceDesk implementadas com busca de colaborador por nome/matrícula, cadastro, listagem, filtro, edição, ativação/desativação e exclusão.
+  - Formulários de e-mails atualizados para preencher colaborador ao informar a matrícula e completar Unicoop/Área automaticamente ao escolher centro de custo ou unidade; observação permanece opcional.
+  - Base inicial de e-mails importada para o CoreTI: Sede, Unidades e Cerrado agora aparecem a partir das tabelas locais do ServiceDesk.
+  - Tabela de gerenciamento de e-mails ajustada para manter a coluna de ações visível e exibir matrícula em branco quando não informada.
+  - Item Aplicativos adicionado ao menu lateral e ao dashboard inicial, com busca, filtros por categoria, cards com imagem e botão de download.
+  - Downloads agrupados adicionados para VPN Kit, Zebra Kit e Serial Driver Kit, equivalentes aos downloads simultâneos do site antigo.
+  - Tela de Aplicativos ganhou botão “Adicionar aplicativo” para administradores e formulário de upload de imagem + arquivos.
+  - Acesso “Bancada” do menu principal passou a abrir o novo módulo dedicado da bancada, com dashboard inicial e seções internas preparadas (Chamados, Equipamentos, SLA e Relatórios).
+  - Menu desktop reposicionado como sidebar lateral fixa à esquerda, mantendo a barra superior apenas para logo, tema, perfil e botão mobile.
+  - Sidebar lateral redesenhada em estilo escuro com logo no topo, bloco do usuário, item Dashboard destacado, grupos de navegação, ícones e ação de saída no rodapé.
+  - Home substituída por dashboard geral do CoreTI com cards de indicadores, tabela de circuitos recentes, distribuição por operadora/UF e lista de usuários pendentes para administradores.
+  - Ajuste visual no dashboard para estabilizar o espaçamento entre cards superiores e blocos de conteúdo, evitando artefatos de sombra/overflow.
+  - Tela “Esqueceu sua senha?” agora exibe o link gerado quando o ambiente usa mailer de log.
+
+## Modelo para novas entradas
+
+### AAAA-MM-DD
+- Sistema:
+  - Descrever alterações técnicas realizadas.
+- Site:
+  - Descrever o que mudou para o usuário (telas, navegação, conteúdo, comportamento).
