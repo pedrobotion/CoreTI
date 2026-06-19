@@ -97,6 +97,10 @@
                                                             <input type="checkbox" name="administrativo" value="1" @checked((bool) ($perm->administrativo ?? false))>
                                                             Administrativo/Jira
                                                         </label>
+                                                        <label class="inline-flex items-center gap-2 text-xs">
+                                                            <input type="checkbox" name="network_datacenter" value="1" @checked((bool) ($perm->network_datacenter ?? false))>
+                                                            Network &amp; DataCenter
+                                                        </label>
                                                     </div>
                                                     <button type="submit" class="btn-coreti-secondary text-xs">
                                                         Salvar módulos

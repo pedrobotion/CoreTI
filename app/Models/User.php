@@ -53,7 +53,7 @@ class User extends Authenticatable
             return true;
         }
 
-        $allowedModules = ['servicedesk', 'unidades', 'aplicativos', 'bancada', 'administrativo'];
+        $allowedModules = ['servicedesk', 'unidades', 'aplicativos', 'bancada', 'administrativo', 'network_datacenter'];
         if (! in_array($module, $allowedModules, true)) {
             return false;
         }

@@ -2,11 +2,13 @@
     $isServiceDesk = request()->routeIs('service-desk.*') || request()->routeIs('jira-projects.*');
     $isBancadaServicos = request()->routeIs('bancada-servicos.*');
     $isAdministrativo = request()->routeIs('administrativo*');
+    $isNetworkDatacenter = request()->routeIs('network-datacenter.*');
     $canServiceDesk = $user->hasModuleAccess('servicedesk');
     $canUnidades = $user->hasModuleAccess('unidades');
     $canAplicativos = $user->hasModuleAccess('aplicativos');
     $canBancada = $user->hasModuleAccess('bancada');
     $canAdministrativo = $user->hasModuleAccess('administrativo');
+    $canNetworkDatacenter = $user->hasModuleAccess('network_datacenter');
 @endphp
 
 <div class="{{ $containerClass ?? 'coreti-sidebar-shell' }}">
@@ -34,7 +36,7 @@
 
     <div class="coreti-sidebar-divider"></div>
 
-    <nav class="coreti-sidebar-nav" aria-label="{{ $isServiceDesk ? 'Menu ServiceDesk' : ($isBancadaServicos ? 'Menu Bancada de Serviços' : 'Menu principal') }}">
+    <nav class="coreti-sidebar-nav" aria-label="{{ $isServiceDesk ? 'Menu ServiceDesk' : ($isBancadaServicos ? 'Menu Bancada de Serviços' : ($isAdministrativo ? 'Menu Administrativo' : ($isNetworkDatacenter ? 'Menu Network & DataCenter' : 'Menu principal'))) }}">
         @if ($isServiceDesk)
             <a href="{{ route('home') }}" class="coreti-sidebar-link">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -346,6 +348,16 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM13 13h6v6h-6z" />
                 </svg>
                 <span>Aplicativos</span>
+                <span class="coreti-sidebar-chevron">‹</span>
+            </a>
+            @endif
+
+            @if ($canNetworkDatacenter)
+            <a href="{{ route('network-datacenter.dashboard') }}" class="coreti-sidebar-link {{ request()->routeIs('network-datacenter.*') ? 'coreti-sidebar-link-active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16v12H4zM7 10h10M7 14h6" />
+                </svg>
+                <span>Network &amp; DataCenter</span>
                 <span class="coreti-sidebar-chevron">‹</span>
             </a>
             @endif

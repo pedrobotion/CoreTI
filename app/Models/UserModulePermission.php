@@ -17,6 +17,7 @@ class UserModulePermission extends Model
         'aplicativos',
         'bancada',
         'administrativo',
+        'network_datacenter',
     ];
 
     protected function casts(): array
@@ -27,6 +28,7 @@ class UserModulePermission extends Model
             'aplicativos' => 'boolean',
             'bancada' => 'boolean',
             'administrativo' => 'boolean',
+            'network_datacenter' => 'boolean',
         ];
     }
 
@@ -35,4 +37,3 @@ class UserModulePermission extends Model
         return $this->belongsTo(User::class);
     }
 }
-

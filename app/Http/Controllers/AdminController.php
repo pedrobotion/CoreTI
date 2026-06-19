@@ -39,6 +39,7 @@ class AdminController extends Controller
             'aplicativos' => ['nullable', 'boolean'],
             'bancada' => ['nullable', 'boolean'],
             'administrativo' => ['nullable', 'boolean'],
+            'network_datacenter' => ['nullable', 'boolean'],
         ]);
 
         $permissions = UserModulePermission::firstOrCreate(
@@ -49,6 +50,7 @@ class AdminController extends Controller
                 'aplicativos' => false,
                 'bancada' => false,
                 'administrativo' => false,
+                'network_datacenter' => false,
             ]
         );
 
@@ -58,6 +60,7 @@ class AdminController extends Controller
             'aplicativos' => (bool) ($data['aplicativos'] ?? false),
             'bancada' => (bool) ($data['bancada'] ?? false),
             'administrativo' => (bool) ($data['administrativo'] ?? false),
+            'network_datacenter' => (bool) ($data['network_datacenter'] ?? false),
         ]);
 
         return redirect()->route('admin.dashboard')

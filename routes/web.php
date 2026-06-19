@@ -9,6 +9,10 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ServiceDeskController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\BancadaServicosController;
+use App\Http\Controllers\NetworkContratanteController;
+use App\Http\Controllers\NetworkDatacenterController;
+use App\Http\Controllers\NetworkProdutoController;
+use App\Http\Controllers\NetworkServicoConectividadeController;
 use App\Http\Controllers\JiraProjectController;
 use App\Http\Controllers\LicensingController;
 use App\Http\Controllers\UnidadeDigitalController;
@@ -58,6 +62,30 @@ Route::middleware(['auth', 'active'])->group(function () {
         });
     });
     Route::get('/aplicativos/{application}/download', [ApplicationController::class, 'download'])->middleware('module_access:aplicativos')->name('applications.download');
+
+    Route::prefix('network-datacenter')->name('network-datacenter.')->middleware('module_access:network_datacenter')->group(function () {
+        Route::get('/', [NetworkDatacenterController::class, 'dashboard'])->name('dashboard');
+        Route::get('/servicos', [NetworkServicoConectividadeController::class, 'index'])->name('servicos.index');
+        Route::get('/servicos/create', [NetworkServicoConectividadeController::class, 'create'])->name('servicos.create');
+        Route::post('/servicos', [NetworkServicoConectividadeController::class, 'store'])->name('servicos.store');
+        Route::get('/servicos/{servico}', [NetworkServicoConectividadeController::class, 'show'])->name('servicos.show');
+        Route::get('/servicos/{servico}/edit', [NetworkServicoConectividadeController::class, 'edit'])->name('servicos.edit');
+        Route::put('/servicos/{servico}', [NetworkServicoConectividadeController::class, 'update'])->name('servicos.update');
+        Route::post('/servicos/{servico}/ficha', [NetworkServicoConectividadeController::class, 'uploadFicha'])->name('servicos.ficha.upload');
+        Route::get('/servicos/{servico}/ficha/download', [NetworkServicoConectividadeController::class, 'downloadFicha'])->name('servicos.ficha.download');
+        Route::post('/servicos/{servico}/extrair-ia', [NetworkServicoConectividadeController::class, 'extractAi'])->name('servicos.ficha.extract');
+        Route::get('/localidades/lookup', [NetworkDatacenterController::class, 'lookupLocation'])->name('localidades.lookup');
+
+        Route::get('/contratantes', [NetworkContratanteController::class, 'index'])->name('contratantes.index');
+        Route::post('/contratantes', [NetworkContratanteController::class, 'store'])->name('contratantes.store');
+        Route::patch('/contratantes/{contratante}', [NetworkContratanteController::class, 'update'])->name('contratantes.update');
+        Route::patch('/contratantes/{contratante}/toggle', [NetworkContratanteController::class, 'toggle'])->name('contratantes.toggle');
+
+        Route::get('/produtos', [NetworkProdutoController::class, 'index'])->name('produtos.index');
+        Route::post('/produtos', [NetworkProdutoController::class, 'store'])->name('produtos.store');
+        Route::patch('/produtos/{produto}', [NetworkProdutoController::class, 'update'])->name('produtos.update');
+        Route::patch('/produtos/{produto}/toggle', [NetworkProdutoController::class, 'toggle'])->name('produtos.toggle');
+    });
 
     Route::prefix('service-desk')->name('service-desk.')->middleware('module_access:servicedesk')->group(function () {
         Route::get('/', [ServiceDeskController::class, 'dashboard'])->name('dashboard');
