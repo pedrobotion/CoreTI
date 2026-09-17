@@ -113,6 +113,54 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        /*
+         | Base legada de auditoria de backup (MySQL 172.17.3.97), usada apenas
+         | pelo comando backups:importar-legado. Depois que o histórico for
+         | importado e os agentes apontarem para o CoreTI, pode ser removida.
+         */
+        'auditoria_backups' => [
+            'driver' => 'mysql',
+            'host' => env('AUDITORIA_BACKUPS_DB_HOST', '172.17.3.97'),
+            'port' => env('AUDITORIA_BACKUPS_DB_PORT', '3306'),
+            'database' => env('AUDITORIA_BACKUPS_DB_DATABASE', 'auditoria_backups'),
+            'username' => env('AUDITORIA_BACKUPS_DB_USERNAME'),
+            'password' => env('AUDITORIA_BACKUPS_DB_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+        ],
+
+        /*
+         | Base do COCARI Gestão TI, lida apenas pela importação do módulo de
+         | Telefonia/Equipamentos.
+         |
+         | O gestaoTI continua em produção e é dono desses dados: nada aqui
+         | pode escrever nele. A recusa não depende de disciplina de quem
+         | programa — App\Services\GestaoTi\GestaoTiReadOnlyConnection
+         | registra um interceptador que rejeita qualquer comando que não
+         | comece com SELECT nesta conexão.
+         |
+         | Pode ser removida depois que a importação estiver conferida.
+         */
+        'gestaoti' => [
+            'driver' => 'mysql',
+            'host' => env('GESTAOTI_DB_HOST', '127.0.0.1'),
+            'port' => env('GESTAOTI_DB_PORT', '3306'),
+            'database' => env('GESTAOTI_DB_DATABASE', 'cocari_gestao_ti'),
+            'username' => env('GESTAOTI_DB_USERNAME'),
+            'password' => env('GESTAOTI_DB_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::ATTR_TIMEOUT => env('GESTAOTI_DB_CONNECT_TIMEOUT', 5),
+            ]) : [],
+        ],
+
         'intranet_cocari' => [
             'driver' => 'mysql',
             'host' => env('INTRANET_COCARI_DB_HOST', '127.0.0.1'),
@@ -129,6 +177,26 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
+        'intranet' => [
+            'driver' => 'mysql',
+            'host' => env('INTRANET_DB_HOST', env('INTRANET_COCARI_DB_HOST', '127.0.0.1')),
+            'port' => env('INTRANET_DB_PORT', env('INTRANET_COCARI_DB_PORT', '3306')),
+            'database' => env('INTRANET_DB_DATABASE', env('INTRANET_COCARI_DB_DATABASE', 'intranet_cocari')),
+            'username' => env('INTRANET_DB_USERNAME', env('INTRANET_COCARI_DB_USERNAME', 'root')),
+            'password' => env('INTRANET_DB_PASSWORD', env('INTRANET_COCARI_DB_PASSWORD', '')),
+            'unix_socket' => env('INTRANET_DB_SOCKET', env('INTRANET_COCARI_DB_SOCKET', '')),
+            'charset' => env('INTRANET_DB_CHARSET', env('DB_CHARSET', 'utf8mb4')),
+            'collation' => env('INTRANET_DB_COLLATION', env('DB_COLLATION', 'utf8mb4_unicode_ci')),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::ATTR_TIMEOUT => env('INTRANET_DB_CONNECT_TIMEOUT', 5),
+                PDO::MYSQL_ATTR_SSL_CA => env('INTRANET_DB_SSL_CA'),
             ]) : [],
         ],
 
