@@ -131,6 +131,17 @@ return [
             ],
         ],
 
+        'impressoras' => [
+            'label' => 'Impressoras',
+            'description' => 'Parque de impressoras, suprimentos, contadores e pedidos de toner.',
+            'group' => 'Operação',
+            'abilities' => ['view', 'manage'],
+            'ability_labels' => [
+                'view' => 'Consultar o parque e os contadores',
+                'manage' => 'Pedir toner e ajustar o cadastro',
+            ],
+        ],
+
         'admissao' => [
             'label' => 'Admissão de Colaboradores',
             'description' => 'Fluxo único de admissão: RH registra, o sistema distribui as solicitações.',

@@ -62,7 +62,21 @@ class InsightApiClient
         ]);
     }
 
-    /** Níveis de suprimento de todos os equipamentos do cliente. */
+    /**
+     * Consumíveis detalhados de todos os equipamentos do cliente.
+     *
+     * Preferido sobre niveisDeSuprimento(): traz o consumableId, que é o que
+     * o POST de pedido de toner exige. O outro devolve só preto/ciano/
+     * magenta/amarelo/resíduo, sem identificador.
+     *
+     * @return array<int, array{deviceId: int, consumables: array}>
+     */
+    public function consumiveisDoCliente(int $customerId): array
+    {
+        return $this->get('/api/devices/consumables', ['customerId' => $customerId]);
+    }
+
+    /** Níveis de suprimento resumidos (sem consumableId). */
     public function niveisDeSuprimento(int $customerId): array
     {
         return $this->get('/api/devices/supplylevels', ['customerId' => $customerId]);
