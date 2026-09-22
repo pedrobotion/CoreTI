@@ -35,6 +35,22 @@
             </p>
         </section>
 
+        @if(($totals['linhas_sem_cadastro'] ?? 0) > 0)
+            <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p class="font-semibold">
+                    {{ $totals['linhas_sem_cadastro'] }} {{ $totals['linhas_sem_cadastro'] == 1 ? 'linha' : 'linhas' }}
+                    sem unidade cadastrada ({{ $totals['emails_sem_cadastro'] }}
+                    {{ $totals['emails_sem_cadastro'] == 1 ? 'e-mail' : 'e-mails' }}).
+                </p>
+                <p class="mt-1 text-amber-800">
+                    O rateio está correto, mas essas linhas aparecem pelo código porque a combinação
+                    unicoop/área não existe no catálogo. Cadastre o centro de custo em
+                    <a href="{{ route('administrativo.cost-centers.index') }}" class="font-semibold underline">Centros de custo</a>
+                    para elas ganharem nome.
+                </p>
+            </div>
+        @endif
+
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">E-mails ativos</p><p class="mt-2 text-2xl font-bold">{{ $totals['emails'] }}</p></div>
             <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">E-mails inativos</p><p class="mt-2 text-2xl font-bold">{{ $totals['emails_inactive'] ?? 0 }}</p></div>
@@ -66,8 +82,13 @@
                                 : 0;
                             $baseCost = ($totals['unit_cost'] ?? 0) * $qtd;
                         @endphp
-                        <tr>
-                            <td class="px-4 py-3">{{ $row->unidade }}</td>
+                        <tr @class(['bg-amber-50/60' => $row->sem_cadastro ?? false])>
+                            <td class="px-4 py-3">
+                                {{ $row->unidade }}
+                                @if($row->sem_cadastro ?? false)
+                                    <span class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">sem cadastro</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3">{{ $row->unicoop }}</td>
                             <td class="px-4 py-3">{{ $row->area }}</td>
                             <td class="px-4 py-3">{{ $qtd }}</td>

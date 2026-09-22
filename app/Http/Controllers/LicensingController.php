@@ -4,16 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\JiraProject;
 use App\Models\CoretiRateioLocal;
+use App\Models\CoretiGoogleEmail;
+use App\Models\CoretiCostCenter;
 use App\Models\OfficeLicense;
+use App\Models\OfficeAllocationBatch;
+use App\Models\OrganizationCostCenter;
+use App\Models\OrganizationDepartment;
+use App\Models\OrganizationUnit;
 use App\Models\ServiceDeskEmail;
-use App\Models\ServiceDeskEmailCostCenter;
 use App\Services\CoretiRateioLocalService;
+use App\Services\OfficeLicenseImportService;
+use App\Services\OfficeUserSyncService;
 use App\Services\GoogleWorkspaceDryRunSyncService;
+use App\Support\OfficeLicenseReportPolicy;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -25,30 +36,58 @@ class LicensingController extends Controller
 {
     public function email(Request $request, GoogleWorkspaceDryRunSyncService $workspaceSync): View|StreamedResponse
     {
-        $rateioLocalService = app(CoretiRateioLocalService::class);
         $cost = (float) $request->query('valor_fatura', 0);
         $availability = $this->resolveWorkspaceEmailAvailability($workspaceSync);
         $extra = (int) $availability['available'];
 
+        $costCenterNames = CoretiCostCenter::query()
+            ->active()
+            ->get(['code', 'name'])
+            ->keyBy(fn (CoretiCostCenter $center): string => $this->normalizeCostCenterCode($center->code));
+
         $rows = ServiceDeskEmail::query()
             ->where('ativo', true)
             ->get(['centro_custo', 'unicoop_sede', 'area_sede'])
-            ->map(function ($row) use ($rateioLocalService): array {
-                return $this->resolveRateioBucket([
-                    'nome' => (string) ($row->centro_custo ?? ''),
-                    'tipo' => null,
-                    'unicoop' => $row->unicoop_sede,
-                    'area' => $row->area_sede,
-                    'centro_custo' => $row->centro_custo,
-                ], $rateioLocalService);
+            ->map(function ($row) use ($costCenterNames): array {
+                $unicoop = trim((string) ($row->unicoop_sede ?? ''));
+                $area = trim((string) ($row->area_sede ?? ''));
+                $code = ($unicoop !== '' && $area !== '')
+                    ? $this->normalizeCostCenterCode($unicoop . '.' . $area)
+                    : '';
+                $catalogName = $costCenterNames->get($code)?->name;
+
+                /*
+                 | Sem nome no cadastro, mostra o próprio código em vez de "-".
+                 |
+                 | Um traço na coluna Unidade junta combinações diferentes sob o
+                 | mesmo rótulo na leitura e deixa a linha impossível de ratear:
+                 | não dá para lançar custo em "-". O código identifica a linha
+                 | e aponta o que falta cadastrar.
+                 */
+                $semCadastro = ! filled($catalogName);
+                $rotulo = match (true) {
+                    ! $semCadastro => (string) $catalogName,
+                    $code !== '' => $code,
+                    default => 'Sem unicoop/área',
+                };
+
+                return [
+                    'unidade' => $rotulo,
+                    'unicoop' => $unicoop !== '' ? $unicoop : '-',
+                    'area' => $area !== '' ? $area : '-',
+                    'sem_cadastro' => $semCadastro,
+                    'codigo' => $code,
+                ];
             })
-            ->groupBy(fn (array $row) => $row['unidade'] . '|' . $row['unicoop'] . '|' . $row['area'])
+            ->groupBy(fn (array $row) => mb_strtolower($row['unidade']) . '|' . $row['unicoop'] . '|' . $row['area'])
             ->map(function ($group): object {
                 $first = $group->first();
                 return (object) [
                     'unidade' => $first['unidade'],
                     'unicoop' => $first['unicoop'],
                     'area' => $first['area'],
+                    'sem_cadastro' => (bool) $first['sem_cadastro'],
+                    'codigo' => $first['codigo'],
                     'total' => $group->count(),
                 ];
             })
@@ -77,6 +116,9 @@ class LicensingController extends Controller
                 'workspace_total' => $availability['total'] !== null ? (int) $availability['total'] : null,
                 'workspace_source' => (string) $availability['source'],
                 'workspace_warning' => $availability['warning'],
+                // Quanto do rateio está apoiado em código que ninguém cadastrou.
+                'linhas_sem_cadastro' => $rows->where('sem_cadastro', true)->count(),
+                'emails_sem_cadastro' => (int) $rows->where('sem_cadastro', true)->sum('total'),
             ],
         ]);
     }
@@ -84,19 +126,21 @@ class LicensingController extends Controller
     private function resolveWorkspaceEmailAvailability(GoogleWorkspaceDryRunSyncService $workspaceSync): array
     {
         $warning = null;
+        // A página é uma consulta de licenciamento e não deve disparar uma
+        // chamada ao Google Workspace durante uma requisição web. A prévia é
+        // atualizada pelo fluxo de sincronização agendado/manual.
         $preview = $workspaceSync->cachedPreview();
         if (! is_array($preview) || ! isset($preview['summary'])) {
-            try {
-                $preview = $workspaceSync->buildAndCachePreview();
-            } catch (\Throwable $e) {
-                $warning = 'Não foi possível atualizar a prévia do Google Workspace agora. Foi mantido o último cálculo disponível.';
-            }
+            $warning = 'A prévia do Google Workspace ainda não está disponível. Execute a sincronização para atualizar os totais.';
         }
 
         $summary = is_array($preview['summary'] ?? null) ? $preview['summary'] : [];
         // Regra de faturamento: usuário suspenso com licença atribuída continua consumindo custo.
         // Por isso usamos o total de contas do Workspace presentes no snapshot (ativas + suspensas).
         $used = (int) ($summary['google_total'] ?? 0);
+        if ($used === 0 && ! is_array($preview)) {
+            $used = (int) CoretiGoogleEmail::query()->count();
+        }
         $suspended = (int) ($summary['google_suspended'] ?? 0);
 
         $configuredTotal = config('services.google_workspace.email_total_licenses');
@@ -183,104 +227,79 @@ class LicensingController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'per_page' => ['nullable', 'integer', 'in:10,25,50'],
-            'status' => ['nullable', 'string', 'in:todos,ativo,inativo,sem_unidade'],
+            'status' => ['nullable', 'string', 'in:todos,ativo,inativo,sem_unidade,matched,manual_assignment,not_found,ambiguous,invalid_centro_custo'],
+            'division' => ['nullable', 'string', 'in:todos,sede,unidades,cerrado,genericos'],
         ]);
 
+        $query = $this->officeLicensesBaseQuery($filters);
         $status = (string) ($filters['status'] ?? 'todos');
-        $query = OfficeLicense::query();
-        if ($status === 'ativo') {
-            $query->where('ativo', true);
-        } elseif ($status === 'inativo') {
-            $query->where('ativo', false);
-        } elseif ($status === 'sem_unidade') {
-            $query->where('ativo', true)
-                ->where(function ($q): void {
-                    $q->where(function ($q2): void {
-                        $q2->whereNull('departamento_unidade')
-                            ->orWhereRaw('TRIM(departamento_unidade) = ""')
-                            ->orWhere('departamento_unidade', 'N/D')
-                            ->orWhereRaw('TRIM(departamento_unidade) IN ("0", "00")');
-                    })->orWhere(function ($q2): void {
-                        $q2->whereNull('unicoop_office')
-                            ->orWhereRaw('TRIM(unicoop_office) = ""')
-                            ->orWhereRaw('TRIM(unicoop_office) IN ("0", "00", "N/D")');
-                    })->orWhere(function ($q2): void {
-                        $q2->whereNull('area_office')
-                            ->orWhereRaw('TRIM(area_office) = ""')
-                            ->orWhereRaw('TRIM(area_office) IN ("0", "00", "N/D")');
-                    });
-                });
-        }
-
         $search = trim((string) ($filters['q'] ?? ''));
-        if ($search !== '') {
-            $query->where(function ($q) use ($search): void {
-                $q->where('nome', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('matricula', 'like', "%{$search}%")
-                    ->orWhere('departamento_unidade', 'like', "%{$search}%");
-            });
-        }
+        $division = (string) ($filters['division'] ?? 'todos');
 
         $perPage = (int) ($filters['per_page'] ?? 10);
 
         $licensesCount = (int) OfficeLicense::query()->where('ativo', true)->count();
 
         $licenses = $query->orderBy('nome')->paginate($perPage)->withQueryString();
+        $costCenterNames = CoretiCostCenter::query()
+            ->active()
+            ->get(['code', 'name'])
+            ->keyBy(fn (CoretiCostCenter $center): string => $this->normalizeCostCenterCode($center->code));
+        $licenses->getCollection()->transform(function (OfficeLicense $license) use ($costCenterNames): OfficeLicense {
+            $license->catalog_cost_center_name = $costCenterNames->get($this->normalizeCostCenterCode($license->centro_custo))?->name;
 
-        $officeEditOptions = collect()
-            ->merge(
-                DB::table('unidades')
-                    ->selectRaw('unidade as name, unicoop, area, "unidade" as source')
-                    ->whereNotNull('unidade')
-                    ->whereRaw('TRIM(unidade) <> ""')
-                    ->get()
-            )
-            ->merge(
-                DB::table('departamentos')
-                    ->selectRaw('nome as name, unicoop, area, "departamento" as source')
-                    ->whereNotNull('nome')
-                    ->whereRaw('TRIM(nome) <> ""')
-                    ->get()
-            )
-            ->filter(fn ($item) => trim((string) $item->name) !== '')
-            ->map(function ($item) {
-                $item->name = trim((string) $item->name);
-                $item->sort_key = mb_strtolower($item->name);
+            return $license;
+        });
 
-                return $item;
-            })
-            ->sortBy('sort_key')
-            ->unique(fn ($item) => mb_strtolower($item->name) . '|' . trim((string) $item->unicoop) . '|' . trim((string) $item->area))
-            ->values();
+        $divisionStats = OfficeLicense::query()
+            ->where('ativo', true)
+            ->get(['matricula', 'unicoop_office', 'account_classification'])
+            ->groupBy(fn (OfficeLicense $license): string => $this->officeDivisionFor($license))
+            ->map->count()
+            ->all();
 
-        $officeUnitOptions = collect()
-            ->merge($officeEditOptions)
-            ->merge(
-                ServiceDeskEmailCostCenter::query()
-                    ->selectRaw('name, unicoop, area, "legacy" as source')
-                    ->whereNotNull('name')
-                    ->whereRaw('TRIM(name) <> ""')
-                    ->get()
-            )
-            ->filter(fn ($item) => trim((string) $item->name) !== '')
-            ->map(function ($item) {
-                $item->name = trim((string) $item->name);
-                $item->sort_key = mb_strtolower($item->name);
+        $pendingRateioBatch = OfficeAllocationBatch::query()
+            ->where('competence', now()->format('Y-m'))
+            ->whereNotIn('status', ['cancelled'])
+            ->orderByRaw("CASE WHEN status = 'closed' THEN 0 ELSE 1 END DESC")
+            ->orderByDesc('version')
+            ->first();
+        $pendingRateioRows = $pendingRateioBatch
+            ? $pendingRateioBatch->rows()
+                ->where('classification_status', '<>', 'classified')
+                ->orderBy('user_name')
+                ->orderBy('sku_name')
+                ->get()
+            : collect();
 
-                return $item;
-            })
-            ->sortBy('sort_key')
-            ->unique(fn ($item) => mb_strtolower($item->name) . '|' . trim((string) $item->unicoop) . '|' . trim((string) $item->area))
+        // Os dois modais usam o mesmo catalogo canonico. As opcoes sao
+        // derivadas de centros de custo validos, evitando areas 000 e
+        // preservando departamentos com mais de uma alocacao.
+        $officeEditOptions = $this->officeOrganizationOptions();
+        $officeUnitOptions = $officeEditOptions;
+
+        $officeCostCenterOptions = OrganizationCostCenter::query()
+            ->where('source_system', 'intranet')
+            ->where('active', true)
+            ->whereNotNull('accounting_area_source_id')
+            ->orderBy('name')
+            ->orderBy('source_id')
+            ->get(['id', 'source_id', 'name', 'unit_source_id', 'accounting_area_source_id'])
             ->values();
 
         return view('service-desk.licensing.office', [
             'licenses' => $licenses,
             'officeUnitOptions' => $officeUnitOptions,
             'officeEditOptions' => $officeEditOptions,
+            'officeCostCenterOptions' => $officeCostCenterOptions,
             'search' => $search,
             'perPage' => $perPage,
             'status' => $status,
+            'division' => $division,
+            'divisionStats' => array_merge(['sede' => 0, 'unidades' => 0, 'cerrado' => 0, 'genericos' => 0], $divisionStats),
+            'pendingRateioBatch' => $pendingRateioBatch,
+            'pendingRateioRows' => $pendingRateioRows,
+            'pendingRateioLabels' => \App\Services\OfficeAllocationService::classificationStatusLabels(),
             'canManage' => Auth::user()?->role === 'admin',
             'stats' => [
                 'total' => $licensesCount,
@@ -294,9 +313,237 @@ class LicensingController extends Controller
         ]);
     }
 
+    private function officeOrganizationOptions()
+    {
+        $normalizer = static function ($value): ?string {
+            $digits = preg_replace('/\D+/', '', trim((string) $value)) ?: '';
+            $digits = ltrim($digits, '0');
+
+            return $digits !== '' ? $digits : null;
+        };
+        $formatUnit = static fn ($value): ?string => ($digits = $normalizer($value)) !== null
+            ? str_pad($digits, 2, '0', STR_PAD_LEFT)
+            : null;
+        $formatArea = static fn ($value): ?string => ($digits = $normalizer($value)) !== null
+            ? str_pad($digits, 3, '0', STR_PAD_LEFT)
+            : null;
+
+        $units = OrganizationUnit::query()
+            ->where('source_system', 'intranet')
+            ->where('active', true)
+            ->get(['id', 'source_id', 'name']);
+        $departments = OrganizationDepartment::query()
+            ->where('source_system', 'intranet')
+            ->where('active', true)
+            ->get(['id', 'source_id', 'source_unit_id', 'source_area_id', 'name']);
+        $costCenters = OrganizationCostCenter::query()
+            ->where('source_system', 'intranet')
+            ->where('active', true)
+            ->whereNotNull('accounting_area_source_id')
+            ->get(['id', 'source_id', 'name', 'unit_source_id', 'accounting_area_source_id']);
+        $coretiNames = CoretiCostCenter::query()
+            ->active()
+            ->get(['code', 'name'])
+            ->keyBy(fn (CoretiCostCenter $center): string => $this->normalizeCostCenterCode($center->code));
+
+        $options = collect();
+        foreach ($costCenters as $costCenter) {
+            $unicoop = $formatUnit($costCenter->unit_source_id);
+            $area = $formatArea($costCenter->accounting_area_source_id);
+            if ($unicoop === null || $area === null || $area === '000') {
+                continue;
+            }
+
+            $unit = $units->first(fn ($item) => $normalizer($item->source_id) === $normalizer($costCenter->unit_source_id));
+            $department = $departments->first(function ($item) use ($normalizer, $costCenter): bool {
+                return $normalizer($item->source_unit_id) === $normalizer($costCenter->unit_source_id)
+                    && $normalizer($item->source_area_id) === $normalizer($costCenter->accounting_area_source_id);
+            });
+            $code = $unicoop . '.' . $area;
+            $name = trim((string) ($coretiNames->get($code)?->name ?: $department?->name ?: $unit?->name ?: $costCenter->name));
+            if ($name === '') {
+                continue;
+            }
+
+            $options->push((object) [
+                'id' => $department?->id ?: $unit?->id,
+                'name' => $name,
+                'display_name' => $name . ' - ' . $unicoop . '.' . $area,
+                'unicoop' => $unicoop,
+                'area' => $area,
+                'source' => $department ? 'departamento' : 'unidade',
+                'organization_unit_id' => $unit?->id,
+                'organization_department_id' => $department?->id,
+                'organization_cost_center_id' => $costCenter->id,
+                'office_key' => mb_strtolower($name) . '|' . $unicoop . '|' . $area,
+                'sort_key' => mb_strtolower($name) . '|' . $unicoop . '|' . $area,
+            ]);
+        }
+
+        foreach ($departments as $department) {
+            $name = trim((string) $department->name);
+            if ($name === '') {
+                continue;
+            }
+
+            $unicoop = $formatUnit($department->source_unit_id);
+            $area = $formatArea($department->source_area_id);
+            $options->push((object) [
+                'id' => $department->id,
+                'name' => $name,
+                'display_name' => $name . ' (Departamento)',
+                'unicoop' => $unicoop,
+                'area' => $area !== '000' ? $area : null,
+                'source' => 'departamento',
+                'organization_unit_id' => null,
+                'organization_department_id' => $department->id,
+                'organization_cost_center_id' => null,
+                'office_key' => mb_strtolower($name) . '|' . ($unicoop ?? '') . '|' . ($area ?? ''),
+                'sort_key' => mb_strtolower($name) . '|zz',
+            ]);
+        }
+
+        return $options
+            ->unique(fn ($item) => $item->name . '|' . $item->unicoop . '|' . $item->area . '|' . $item->organization_cost_center_id)
+            ->sortBy('sort_key')
+            ->values();
+    }
+
+    private function normalizeCostCenterCode(?string $code): string
+    {
+        if (! preg_match('/^\s*(\d{1,2})\s*[.\/-]\s*(\d{1,3})\s*$/', (string) $code, $matches)) {
+            return '';
+        }
+
+        return str_pad((string) ((int) $matches[1]), 2, '0', STR_PAD_LEFT)
+            . '.'
+            . str_pad((string) ((int) $matches[2]), 3, '0', STR_PAD_LEFT);
+    }
+
+    public function exportOfficeLicenses(Request $request): StreamedResponse
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'in:todos,ativo,inativo,sem_unidade,matched,manual_assignment,not_found,ambiguous,invalid_centro_custo'],
+            'division' => ['nullable', 'string', 'in:todos,sede,unidades,cerrado,genericos'],
+        ]);
+
+        $licenses = $this->officeLicensesBaseQuery($filters)
+            ->with('assignments')
+            ->orderBy('nome')
+            ->get([
+                'id',
+                'matricula',
+                'nome',
+                'email',
+                'departamento_unidade',
+                'unicoop_office',
+                'area_office',
+                'cargo_nome',
+                'office_apps',
+                'office_business',
+                'powerbi_pro',
+                'powerbi_premium',
+                'visio_plan',
+                'account_enabled',
+                'ativo',
+                'microsoft_last_sign_in_at',
+                'microsoft_last_non_interactive_sign_in_at',
+            ])
+            ->flatMap(function ($license): array {
+                $allAssignments = $license->assignments;
+                $assignments = $allAssignments->where('included_in_report', true);
+                if ($assignments->isEmpty() && $allAssignments->isNotEmpty()) {
+                    return [];
+                }
+                if ($assignments->isEmpty()) {
+                    // Compatibilidade para registros antigos até a primeira
+                    // sincronização após a nova tabela normalizada.
+                    $assignments = collect([null]);
+                }
+
+                return $assignments->map(function ($assignment) use ($license): array {
+                    $lastActivity = collect([
+                        $license->microsoft_last_sign_in_at,
+                        $license->microsoft_last_non_interactive_sign_in_at,
+                    ])->filter()
+                        ->map(fn ($value) => \Carbon\Carbon::parse($value))
+                        ->sortDesc()
+                        ->first();
+
+                    return [
+                    'matricula' => (string) ($license->matricula ?? ''),
+                    'nome' => (string) ($license->nome ?? ''),
+                    'cargo' => $this->lookupOfficeCargoForExport($license),
+                    'email' => (string) ($license->email ?? ''),
+                    'departamento_unidade' => (string) ($license->departamento_unidade ?? ''),
+                    'unicoop_office' => (string) ($license->unicoop_office ?? ''),
+                    'area_office' => (string) ($license->area_office ?? ''),
+                    'sku_id' => (string) ($assignment?->sku_id ?? ''),
+                    'sku_part_number' => (string) ($assignment?->sku_part_number ?? ''),
+                    'sku_name' => OfficeLicenseReportPolicy::displayName(
+                        $assignment?->sku_part_number,
+                        $assignment?->sku_name
+                    ),
+                    'license_category' => (string) ($assignment?->license_category ?? ''),
+                    'account_enabled' => ($assignment?->account_enabled ?? $license->account_enabled) ? 'Sim' : 'Não',
+                    'ativo' => $license->ativo ? 'Ativo' : 'Inativo',
+                    'ultima_atividade_microsoft_365' => $lastActivity?->format('d/m/Y H:i') ?? 'Não disponível',
+                    ];
+                })->all();
+            })
+            ->all();
+
+        $filename = 'office_licencas_' . now()->format('Ymd_His') . '.csv';
+
+        return response()->streamDownload(function () use ($licenses): void {
+            $out = fopen('php://output', 'w');
+            fprintf($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, [
+                'Matrícula',
+                'Nome',
+                'Cargo',
+                'E-mail',
+                'Unidade/Departamento',
+                'Unicoop',
+                'Área',
+                'SKU ID',
+                'SKU/Produto',
+                'Nome da licença',
+                'Categoria',
+                'Conta habilitada',
+                'Status',
+                'Último acesso Microsoft 365',
+            ], ';');
+
+            foreach ($licenses as $license) {
+                fputcsv($out, [
+                    $license['matricula'],
+                    $license['nome'],
+                    $license['cargo'],
+                    $license['email'],
+                    $license['departamento_unidade'],
+                    $license['unicoop_office'],
+                    $license['area_office'],
+                    $license['sku_id'],
+                    $license['sku_part_number'],
+                    $license['sku_name'],
+                    $license['license_category'],
+                    $license['account_enabled'],
+                    $license['ativo'],
+                    $license['ultima_atividade_microsoft_365'],
+                ], ';');
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function officeRateio(Request $request): View|StreamedResponse
     {
-        $rateioLocalService = app(CoretiRateioLocalService::class);
         $filters = $request->validate([
             'custo_office_apps' => ['nullable', 'string', 'max:30'],
             'custo_office_business' => ['nullable', 'string', 'max:30'],
@@ -332,18 +579,15 @@ class LicensingController extends Controller
         $grouped = OfficeLicense::query()
             ->where('ativo', true)
             ->get(['departamento_unidade', 'unicoop_office', 'area_office', 'office_apps', 'office_business', 'powerbi_pro', 'visio_plan'])
-            ->map(function ($row) use ($rateioLocalService): array {
-                $resolved = $this->resolveRateioBucket([
-                    'nome' => (string) ($row->departamento_unidade ?? ''),
-                    'tipo' => null,
-                    'unicoop' => $row->unicoop_office,
-                    'area' => $row->area_office,
-                    'centro_custo' => trim((string) $row->unicoop_office) !== '' && trim((string) $row->area_office) !== ''
-                        ? trim((string) $row->unicoop_office) . '.' . trim((string) $row->area_office)
-                        : null,
-                ], $rateioLocalService);
+            ->map(function ($row): array {
+                $unidade = trim((string) ($row->departamento_unidade ?? ''));
+                $unicoop = trim((string) ($row->unicoop_office ?? ''));
+                $area = trim((string) ($row->area_office ?? ''));
 
-                return $resolved + [
+                return [
+                    'unidade' => $unidade !== '' ? $unidade : 'Pendente de mapeamento',
+                    'unicoop' => $unicoop !== '' ? $unicoop : '-',
+                    'area' => $area !== '' ? $area : '-',
                     'total_office_apps' => (int) ($row->office_apps ? 1 : 0),
                     'total_office_business' => (int) ($row->office_business ? 1 : 0),
                     'total_powerbi_pro' => (int) ($row->powerbi_pro ? 1 : 0),
@@ -363,7 +607,7 @@ class LicensingController extends Controller
                     'total_visio_plan' => $group->sum('total_visio_plan'),
                 ];
             })
-            ->sortBy('unidade')
+            ->sortBy(fn ($row) => mb_strtolower(trim((string) $row->unidade)) . '|' . trim((string) $row->unicoop) . '|' . trim((string) $row->area))
             ->values();
 
         $grouped = $grouped->map(function ($row) use ($costs) {
@@ -407,6 +651,9 @@ class LicensingController extends Controller
             'departamento_unidade' => ['required', 'string', 'max:255'],
             'unicoop_office' => ['nullable', 'string', 'max:255'],
             'area_office' => ['nullable', 'string', 'max:255'],
+            'organization_unit_id' => ['nullable', 'integer', 'exists:organization_units,id'],
+            'organization_department_id' => ['nullable', 'integer', 'exists:organization_departments,id'],
+            'organization_cost_center_id' => ['nullable', 'integer', 'exists:organization_cost_centers,id'],
             'office_apps' => ['nullable', 'boolean'],
             'office_business' => ['nullable', 'boolean'],
             'powerbi_pro' => ['nullable', 'boolean'],
@@ -419,6 +666,7 @@ class LicensingController extends Controller
             $data['unicoop_office'] ?? null,
             $data['area_office'] ?? null
         );
+        $manualOrganization = $this->resolveManualOfficeOrganization($data, $resolvedUnicoop, $resolvedArea);
 
         OfficeLicense::updateOrCreate(
             ['email' => mb_strtolower(trim($data['email']))],
@@ -427,8 +675,25 @@ class LicensingController extends Controller
                 'nome' => $data['nome'],
                 'email' => mb_strtolower(trim($data['email'])),
                 'departamento_unidade' => $data['departamento_unidade'],
-                'unicoop_office' => $resolvedUnicoop,
-                'area_office' => $resolvedArea,
+                'unicoop_office' => $manualOrganization['unicoop'],
+                'area_office' => $manualOrganization['area'],
+                'unidade_nome' => $manualOrganization['unit_name'],
+                'organization_unit_id' => $manualOrganization['unit_id'],
+                'organization_department_id' => $manualOrganization['department_id'],
+                'organization_cost_center_id' => $manualOrganization['cost_center_id'],
+                'centro_custo' => $manualOrganization['code'],
+                'centro_custo_nome' => $manualOrganization['cost_center_name'],
+                'organization_assignment_source' => 'manual',
+                'organization_unit_source' => 'manual',
+                'organization_department_source' => 'manual',
+                'organization_cost_center_source' => 'manual',
+                'organization_position_source' => 'manual',
+                'organization_assignment_locked_at' => now(),
+                'organization_assignment_locked_by' => Auth::id(),
+                'organization_assignment_updated_at' => now(),
+                'organization_assignment_updated_by' => Auth::id(),
+                'colaborador_match_status' => 'manual_assignment',
+                'colaborador_match_message' => 'Organização definida manualmente pelo usuário.',
                 'office_apps' => (bool) ($data['office_apps'] ?? false),
                 'office_business' => (bool) ($data['office_business'] ?? false),
                 'powerbi_pro' => (bool) ($data['powerbi_pro'] ?? false),
@@ -439,6 +704,7 @@ class LicensingController extends Controller
         );
 
         $this->syncOfficeOrgForDepartment($data['departamento_unidade'], $resolvedUnicoop, $resolvedArea);
+        $this->refreshCurrentOfficeAllocation();
 
         return back()->with('success', 'Licença Office salva com sucesso.');
     }
@@ -452,6 +718,9 @@ class LicensingController extends Controller
             'departamento_unidade' => ['required', 'string', 'max:255'],
             'unicoop_office' => ['nullable', 'string', 'max:255'],
             'area_office' => ['nullable', 'string', 'max:255'],
+            'organization_unit_id' => ['nullable', 'integer', 'exists:organization_units,id'],
+            'organization_department_id' => ['nullable', 'integer', 'exists:organization_departments,id'],
+            'organization_cost_center_id' => ['nullable', 'integer', 'exists:organization_cost_centers,id'],
             'office_apps' => ['nullable', 'boolean'],
             'office_business' => ['nullable', 'boolean'],
             'powerbi_pro' => ['nullable', 'boolean'],
@@ -464,14 +733,32 @@ class LicensingController extends Controller
             $data['unicoop_office'] ?? null,
             $data['area_office'] ?? null
         );
+        $manualOrganization = $this->resolveManualOfficeOrganization($data, $resolvedUnicoop, $resolvedArea);
 
         $officeLicense->update([
             'matricula' => trim((string) ($data['matricula'] ?? '')) ?: null,
             'nome' => $data['nome'],
             'email' => mb_strtolower(trim($data['email'])),
             'departamento_unidade' => $data['departamento_unidade'],
-            'unicoop_office' => $resolvedUnicoop,
-            'area_office' => $resolvedArea,
+            'unicoop_office' => $manualOrganization['unicoop'],
+            'area_office' => $manualOrganization['area'],
+            'unidade_nome' => $manualOrganization['unit_name'],
+            'organization_unit_id' => $manualOrganization['unit_id'],
+            'organization_department_id' => $manualOrganization['department_id'],
+            'organization_cost_center_id' => $manualOrganization['cost_center_id'],
+            'centro_custo' => $manualOrganization['code'],
+            'centro_custo_nome' => $manualOrganization['cost_center_name'],
+            'organization_assignment_source' => 'manual',
+            'organization_unit_source' => 'manual',
+            'organization_department_source' => 'manual',
+            'organization_cost_center_source' => 'manual',
+            'organization_position_source' => 'manual',
+            'organization_assignment_locked_at' => now(),
+            'organization_assignment_locked_by' => Auth::id(),
+            'organization_assignment_updated_at' => now(),
+            'organization_assignment_updated_by' => Auth::id(),
+            'colaborador_match_status' => 'manual_assignment',
+            'colaborador_match_message' => 'Organização definida manualmente pelo usuário.',
             'office_apps' => (bool) ($data['office_apps'] ?? false),
             'office_business' => (bool) ($data['office_business'] ?? false),
             'powerbi_pro' => (bool) ($data['powerbi_pro'] ?? false),
@@ -480,65 +767,156 @@ class LicensingController extends Controller
         ]);
 
         $this->syncOfficeOrgForDepartment($data['departamento_unidade'], $resolvedUnicoop, $resolvedArea);
+        $this->refreshCurrentOfficeAllocation();
 
         return back()->with('success', 'Licença Office atualizada com sucesso.');
     }
 
+    public function updateOfficeOrganization(Request $request, OfficeLicense $officeLicense)
+    {
+        $data = $request->validate([
+            'departamento_unidade' => ['required', 'string', 'max:255'],
+            'unicoop_office' => ['nullable', 'string', 'max:255'],
+            'area_office' => ['nullable', 'string', 'max:255'],
+            'organization_unit_id' => ['nullable', 'integer', 'exists:organization_units,id'],
+            'organization_department_id' => ['nullable', 'integer', 'exists:organization_departments,id'],
+            'organization_cost_center_id' => ['nullable', 'integer', 'exists:organization_cost_centers,id'],
+        ]);
+
+        [$resolvedUnicoop, $resolvedArea] = $this->resolveOfficeOrgMeta(
+            $data['departamento_unidade'],
+            $data['unicoop_office'] ?? null,
+            $data['area_office'] ?? null
+        );
+
+        $manualOrganization = $this->resolveManualOfficeOrganization($data, $resolvedUnicoop, $resolvedArea);
+
+        $officeLicense->update([
+            'departamento_unidade' => $data['departamento_unidade'],
+            'unicoop_office' => $manualOrganization['unicoop'],
+            'area_office' => $manualOrganization['area'],
+            'unidade_nome' => $manualOrganization['unit_name'],
+            'organization_unit_id' => $manualOrganization['unit_id'],
+            'organization_department_id' => $manualOrganization['department_id'],
+            'organization_cost_center_id' => $manualOrganization['cost_center_id'],
+            'centro_custo' => $manualOrganization['code'],
+            'centro_custo_nome' => $manualOrganization['cost_center_name'],
+            'organization_assignment_source' => 'manual',
+            'organization_unit_source' => 'manual',
+            'organization_department_source' => 'manual',
+            'organization_cost_center_source' => 'manual',
+            'organization_assignment_locked_at' => now(),
+            'organization_assignment_locked_by' => Auth::id(),
+            'organization_assignment_updated_at' => now(),
+            'organization_assignment_updated_by' => Auth::id(),
+            'colaborador_match_status' => 'manual_assignment',
+            'colaborador_match_message' => 'Organização definida manualmente pelo usuário.',
+        ]);
+
+        $this->syncOfficeOrgForDepartment($data['departamento_unidade'], $resolvedUnicoop, $resolvedArea);
+        $this->refreshCurrentOfficeAllocation();
+
+        return back()->with('success', 'Ajuste organizacional manual salvo. A sincronização Microsoft preservará este ajuste.');
+    }
+
     private function resolveOfficeOrgMeta(string $department, ?string $preferredUnicoop = null, ?string $preferredArea = null): array
     {
-        $department = trim($department);
-        if ($department === '') {
-            return [null, null];
-        }
+        $resolved = app(OfficeLicenseImportService::class)->resolveOfficeOrganizationFromDepartment(
+            $department,
+            $preferredUnicoop,
+            $preferredArea
+        );
 
-        $preferredUnicoop = trim((string) $preferredUnicoop);
-        $preferredArea = trim((string) $preferredArea);
+        return [
+            $resolved['unicoop'] ?? null,
+            $resolved['area'] ?? null,
+        ];
+    }
 
-        if ($preferredUnicoop !== '' && $preferredArea !== '') {
-            $preferredDepartment = DB::table('departamentos')
-                ->where('nome', $department)
-                ->where('unicoop', $preferredUnicoop)
-                ->where('area', $preferredArea)
-                ->select(['unicoop', 'area'])
+    /** @return array{unicoop:?string,area:?string,unit_id:?int,unit_name:string,cost_center_id:?int,code:?string,cost_center_name:string} */
+    private function resolveManualOfficeOrganization(array $data, ?string $unicoop, ?string $area): array
+    {
+        $department = ! empty($data['organization_department_id'])
+            ? OrganizationDepartment::query()->find((int) $data['organization_department_id'])
+            : null;
+        $unit = ! empty($data['organization_unit_id'])
+            ? OrganizationUnit::query()->find((int) $data['organization_unit_id'])
+            : null;
+        $costCenter = ! empty($data['organization_cost_center_id'])
+            ? OrganizationCostCenter::query()->find((int) $data['organization_cost_center_id'])
+            : null;
+
+        // The selected catalog records are authoritative for manual changes.
+        // Rebuilding them only from the displayed unit/area can select a
+        // different cost center when the same name has multiple allocations.
+        if ($unit === null && $department?->source_unit_id !== null) {
+            $unit = OrganizationUnit::query()
+                ->where('source_system', 'intranet')
+                ->where('source_id', (string) $department->source_unit_id)
                 ->first();
-            if ($preferredDepartment) {
-                return [$preferredUnicoop, $preferredArea];
-            }
+        }
 
-            $preferredUnit = DB::table('unidades')
-                ->where('unidade', $department)
-                ->where('unicoop', $preferredUnicoop)
-                ->where('area', $preferredArea)
-                ->select(['unicoop', 'area'])
+        $unitDigits = preg_replace('/\D+/', '', (string) $unicoop) ?: '';
+        $areaDigits = preg_replace('/\D+/', '', (string) $area) ?: '';
+
+        if ($costCenter !== null) {
+            $unitDigits = preg_replace('/\D+/', '', (string) ($costCenter->unit_source_id ?: $unitDigits)) ?: $unitDigits;
+            $areaDigits = preg_replace('/\D+/', '', (string) ($costCenter->accounting_area_source_id ?: $areaDigits)) ?: $areaDigits;
+        } elseif ($department !== null) {
+            $unitDigits = preg_replace('/\D+/', '', (string) ($department->source_unit_id ?: $unitDigits)) ?: $unitDigits;
+            $areaDigits = preg_replace('/\D+/', '', (string) ($department->source_area_id ?: $areaDigits)) ?: $areaDigits;
+        }
+
+        if ($costCenter === null && $unitDigits !== '' && $areaDigits !== '') {
+            $costCenter = OrganizationCostCenter::query()
+                ->where('source_system', 'intranet')
+                ->where('source_id', (string) ((int) $unitDigits) . str_pad((string) ((int) $areaDigits), 3, '0', STR_PAD_LEFT))
+                ->whereNotNull('accounting_area_source_id')
+                ->orderBy('id')
                 ->first();
-            if ($preferredUnit) {
-                return [$preferredUnicoop, $preferredArea];
-            }
+        }
+        if ($unit === null && $unitDigits !== '') {
+            $unit = OrganizationUnit::query()
+                ->where('source_system', 'intranet')
+                ->where('source_id', (string) ((int) $unitDigits))
+                ->first();
         }
 
-        $unit = DB::table('unidades')
-            ->where('unidade', $department)
-            ->select(['unicoop', 'area'])
-            ->first();
-        if ($unit) {
-            return [
-                ($u = trim((string) ($unit->unicoop ?? ''))) !== '' ? $u : null,
-                ($a = trim((string) ($unit->area ?? ''))) !== '' ? $a : null,
-            ];
+        $normalizedUnicoop = $unitDigits !== '' ? str_pad((string) ((int) $unitDigits), 2, '0', STR_PAD_LEFT) : null;
+        $normalizedArea = $areaDigits !== '' ? str_pad((string) ((int) $areaDigits), 3, '0', STR_PAD_LEFT) : null;
+
+        $costCenterCode = null;
+        if ($costCenter !== null) {
+            $costCenterSourceId = preg_replace('/\D+/', '', (string) $costCenter->source_id) ?: '';
+            $costCenterCode = $normalizedUnicoop !== null && $normalizedArea !== null
+                ? $normalizedUnicoop . '.' . $normalizedArea
+                : ($costCenterSourceId !== '' ? $costCenterSourceId : null);
         }
 
-        $dep = DB::table('departamentos')
-            ->where('nome', $department)
-            ->select(['unicoop', 'area'])
-            ->first();
-        if ($dep) {
-            return [
-                ($u = trim((string) ($dep->unicoop ?? ''))) !== '' ? $u : null,
-                ($a = trim((string) ($dep->area ?? ''))) !== '' ? $a : null,
-            ];
-        }
+        return [
+            'unicoop' => $normalizedUnicoop,
+            'area' => $normalizedArea,
+            'unit_id' => $unit?->id,
+            'unit_name' => (string) ($unit?->name ?: ($data['departamento_unidade'] ?? '')),
+            'cost_center_id' => $costCenter?->id,
+            'code' => $costCenterCode,
+            'cost_center_name' => (string) ($costCenter?->name ?: ($data['departamento_unidade'] ?? '')),
+            'department_id' => $department?->id,
+            'department_name' => (string) ($department?->name ?: ''),
+        ];
+    }
 
-        return [null, null];
+    private function refreshCurrentOfficeAllocation(): void
+    {
+        $competence = now()->format('Y-m');
+        $batch = OfficeAllocationBatch::query()
+            ->where('competence', $competence)
+            ->whereNotIn('status', ['closed', 'cancelled'])
+            ->exists();
+
+        if ($batch) {
+            app(\App\Services\OfficeAllocationService::class)->generate($competence, Auth::id());
+        }
     }
 
     private function syncOfficeOrgForDepartment(string $department, ?string $unicoop, ?string $area): void
@@ -548,12 +926,18 @@ class LicensingController extends Controller
             return;
         }
 
-        if ($this->isCristalinaDepartment($department)) {
-            return;
-        }
+        $resolved = app(OfficeLicenseImportService::class)->resolveOfficeOrganizationFromDepartment($department, $unicoop, $area);
+        $unicoop = $resolved['unicoop'] ?? $unicoop;
+        $area = $resolved['area'] ?? $area;
 
         OfficeLicense::query()
             ->where('departamento_unidade', $department)
+            ->where(function ($query): void {
+                $query->whereNull('unicoop_office')
+                    ->orWhereRaw('TRIM(COALESCE(unicoop_office, "")) = ""')
+                    ->orWhereNull('area_office')
+                    ->orWhereRaw('TRIM(COALESCE(area_office, "")) = ""');
+            })
             ->update([
                 'unicoop_office' => $unicoop,
                 'area_office' => $area,
@@ -564,7 +948,9 @@ class LicensingController extends Controller
     private function isCristalinaDepartment(string $department): bool
     {
         $normalized = mb_strtolower(trim($department));
-        return str_starts_with($normalized, 'cristalina');
+        $normalized = Str::of($normalized)->ascii()->replaceMatches('/[^a-z0-9]+/', ' ')->squish()->value();
+
+        return $normalized === 'cristalina';
     }
 
     public function lookupOfficeByMatricula(Request $request)
@@ -578,27 +964,16 @@ class LicensingController extends Controller
             ], 422);
         }
 
-        try {
-            $row = DB::connection('intranet_cocari')
-                ->table('cadColaborador as c')
-                ->leftJoin('cadCentroCustoRh as rh', 'rh.IdCentroCusto', '=', 'c.CentroCusto')
-                ->leftJoin('cadCentroCustos as cc', 'cc.IdCCusto', '=', 'c.CentroCusto')
-                ->select([
-                    DB::raw('c.Matricula as matricula'),
-                    DB::raw('c.Nome as nome'),
-                    'c.Email as email',
-                    DB::raw('COALESCE(rh.Nome, cc.Nome, c.CentroCusto) as centro_custo'),
-                ])
-                ->where('c.Matricula', $matricula)
-                ->first();
-        } catch (\Throwable) {
-            $row = null;
-        }
+        $row = CoretiGoogleEmail::query()
+            ->where('matricula', $matricula)
+            ->orderByRaw("CASE WHEN mapeamento_status = 'mapeado' THEN 0 ELSE 1 END")
+            ->orderByDesc('updated_at')
+            ->first();
 
         if (! $row) {
             return response()->json([
                 'found' => false,
-                'message' => 'Matrícula não encontrada na base de e-mails.',
+                'message' => 'Matrícula não encontrada na base local de e-mails sincronizados.',
             ], 404);
         }
 
@@ -609,7 +984,7 @@ class LicensingController extends Controller
             ->first();
 
         $costCenter = DB::table('service_desk_email_cost_centers')
-            ->where('name', (string) ($row->centro_custo ?? ''))
+            ->where('name', (string) ($row->nome_local ?? $row->centro_custo_nome ?? ''))
             ->orderByRaw("FIELD(scope, 'sede', 'unidades', 'cerrado')")
             ->first();
 
@@ -619,11 +994,175 @@ class LicensingController extends Controller
                 'matricula' => $row->matricula,
                 'nome' => $row->nome,
                 'email' => $row->email ?: ($localEmail->email ?? null),
-                'departamento_unidade' => $row->centro_custo ?: ($localEmail->centro_custo ?? null),
-                'unicoop_office' => $costCenter->unicoop ?? ($localEmail->unicoop_sede ?? null),
-                'area_office' => $costCenter->area ?? ($localEmail->area_sede ?? null),
+                'departamento_unidade' => $row->nome_local ?: ($localEmail->centro_custo ?? null),
+                'unicoop_office' => $row->unicoop ?? $costCenter->unicoop ?? ($localEmail->unicoop_sede ?? null),
+                'area_office' => $row->area ?? $costCenter->area ?? ($localEmail->area_sede ?? null),
             ],
         ]);
+    }
+
+    private function officeLicensesBaseQuery(array $filters): Builder
+    {
+        $status = (string) ($filters['status'] ?? 'todos');
+        $search = trim((string) ($filters['q'] ?? ''));
+        $division = (string) ($filters['division'] ?? 'todos');
+
+        $query = OfficeLicense::query();
+
+        if ($status === 'ativo') {
+            $query->where('ativo', true);
+        } elseif ($status === 'inativo') {
+            $query->where('ativo', false);
+        } elseif ($status === 'sem_unidade') {
+            $query->where('ativo', true)
+                ->where(function ($q): void {
+                    $q->where(function ($q2): void {
+                        $q2->whereNull('departamento_unidade')
+                            ->orWhereRaw('TRIM(departamento_unidade) = ""')
+                            ->orWhere('departamento_unidade', 'N/D')
+                            ->orWhereRaw('TRIM(departamento_unidade) IN ("0", "00")');
+                    })->orWhere(function ($q2): void {
+                        $q2->whereNull('unicoop_office')
+                            ->orWhereRaw('TRIM(unicoop_office) = ""')
+                            ->orWhereRaw('TRIM(unicoop_office) IN ("0", "00", "N/D")');
+                    })->orWhere(function ($q2): void {
+                        $q2->whereNull('area_office')
+                            ->orWhereRaw('TRIM(area_office) = ""')
+                            ->orWhereRaw('TRIM(area_office) IN ("0", "00", "N/D")');
+                    });
+                });
+        } elseif (in_array($status, ['matched', 'manual_assignment', 'not_found', 'ambiguous', 'invalid_centro_custo'], true)) {
+            $query->where('colaborador_match_status', $status);
+        }
+
+        $closedUnicoops = ['16', '19', '53', '55', '56', '57', '58', '59', '60', '63', '70', '72', '77', '78', '79'];
+        if ($division === 'sede') {
+            $query->whereRaw("LPAD(REGEXP_REPLACE(COALESCE(unicoop_office, ''), '[^0-9]', ''), 2, '0') = '01'");
+        } elseif ($division === 'cerrado') {
+            $query->whereIn(DB::raw("LPAD(REGEXP_REPLACE(COALESCE(unicoop_office, ''), '[^0-9]', ''), 2, '0')"), $closedUnicoops);
+        } elseif ($division === 'unidades') {
+            $query->whereNotNull('unicoop_office')
+                ->whereRaw("TRIM(unicoop_office) <> ''")
+                ->whereRaw("LPAD(REGEXP_REPLACE(unicoop_office, '[^0-9]', ''), 2, '0') <> '01'")
+                ->whereNotIn(DB::raw("LPAD(REGEXP_REPLACE(unicoop_office, '[^0-9]', ''), 2, '0')"), $closedUnicoops)
+                ->where(function ($q): void {
+                    $q->whereNull('account_classification')
+                        ->orWhere('account_classification', '<>', 'generic_account');
+                });
+        } elseif ($division === 'genericos') {
+            $query->where(function ($q): void {
+                $q->where('account_classification', 'generic_account')
+                    ->orWhereNull('matricula')
+                    ->orWhereRaw("TRIM(matricula) = ''");
+            });
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search): void {
+                    $q->where('nome', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('matricula', 'like', "%{$search}%")
+                        ->orWhere('departamento_unidade', 'like', "%{$search}%")
+                        ->orWhere('colaborador_source_view', 'like', "%{$search}%")
+                        ->orWhere('centro_custo', 'like', "%{$search}%")
+                        ->orWhere('centro_custo_nome', 'like', "%{$search}%")
+                        ->orWhere('unidade_nome', 'like', "%{$search}%")
+                        ->orWhere('area_nome', 'like', "%{$search}%")
+                        ->orWhere('departamento_nome', 'like', "%{$search}%")
+                        ->orWhere('setor_nome', 'like', "%{$search}%")
+                        ->orWhere('cargo_nome', 'like', "%{$search}%")
+                        ->orWhere('empresa_nome', 'like', "%{$search}%")
+                        ->orWhere('colaborador_nome', 'like', "%{$search}%")
+                        ->orWhere('colaborador_match_status', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
+    private function lookupOfficeCargoByMatricula(string $matricula): ?string
+    {
+        return OfficeLicense::query()
+            ->where('matricula', trim($matricula))
+            ->whereNotNull('cargo_nome')
+            ->whereRaw("TRIM(cargo_nome) <> ''")
+            ->orderByDesc('ativo')
+            ->orderByDesc('updated_at')
+            ->value('cargo_nome');
+    }
+
+    private function officeDivisionFor(OfficeLicense $license): string
+    {
+        if ((string) $license->account_classification === 'generic_account' || trim((string) $license->matricula) === '') {
+            return 'genericos';
+        }
+
+        $code = preg_replace('/\D+/', '', trim((string) $license->unicoop_office)) ?: '';
+        $code = str_pad(ltrim($code, '0') ?: '0', 2, '0', STR_PAD_LEFT);
+
+        if ($code === '01') {
+            return 'sede';
+        }
+
+        return in_array($code, ['16', '19', '53', '55', '56', '57', '58', '59', '60', '63', '70', '72', '77', '78', '79'], true)
+            ? 'cerrado'
+            : 'unidades';
+    }
+
+    private function lookupOfficeCargoForExport(object $license): ?string
+    {
+        $cargo = trim((string) ($license->cargo_nome ?? ''));
+
+        return $cargo !== '' ? $cargo : null;
+    }
+
+    private function normalizeOfficeIdentifier(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? '';
+    }
+
+    private function lookupOfficeCargoByEmail(string $email): ?string
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        return OfficeLicense::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->whereNotNull('cargo_nome')
+            ->whereRaw("TRIM(cargo_nome) <> ''")
+            ->orderByDesc('ativo')
+            ->orderByDesc('updated_at')
+            ->value('cargo_nome');
+    }
+
+    private function findAdUserByEmail(string $email): ?object
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+
+        try {
+            $username = (string) Str::of($email)->before('@');
+
+            return DB::table('ad_users')
+                ->whereRaw('LOWER(email) = ?', [$email])
+                ->orWhereRaw('LOWER(nome_usuario) = ?', [$username])
+                ->orWhereRaw('LOWER(nome_usuario) = ?', [$email])
+                ->orderByDesc('e_ativo')
+                ->orderByDesc('id')
+                ->first(['id', 'nome_completo', 'nome_usuario', 'email', 'unidade_setor', 'unidade_principal', 'e_ativo']);
+        } catch (
+Throwable) {
+            return null;
+        }
+    }
+
+    private function findCollaboratorByNameInView(string $name): ?object
+    {
+        return null;
     }
 
     public function toggleOfficeStatus(OfficeLicense $officeLicense)
@@ -642,49 +1181,24 @@ class LicensingController extends Controller
         return back()->with('success', 'Licença Office desativada.');
     }
 
+    public function syncOfficeMicrosoft()
+    {
+        $exitCode = Artisan::call('office:sync-microsoft', ['--deactivate-missing' => true]);
+        $consoleOutput = trim((string) Artisan::output());
+
+        return back()->with($exitCode === 0 ? 'success' : 'error', $consoleOutput !== ''
+            ? $consoleOutput
+            : ($exitCode === 0 ? 'Sincronização Microsoft 365 concluída.' : 'Falha ao sincronizar o Microsoft 365.'));
+    }
+
     public function importOfficeMatriculasByEmail()
     {
-        $officeRows = OfficeLicense::query()
-            ->select(['id', 'email', 'matricula'])
-            ->get();
+        $exitCode = Artisan::call('office:backfill-organizational-links');
+        $consoleOutput = trim((string) Artisan::output());
 
-        $updated = 0;
-        $alreadyFilled = 0;
-        $notFound = 0;
-
-        foreach ($officeRows as $office) {
-            $email = mb_strtolower(trim((string) $office->email));
-            if ($email === '') {
-                $notFound++;
-                continue;
-            }
-
-            $mailRow = ServiceDeskEmail::query()
-                ->whereRaw('LOWER(email) = ?', [$email])
-                ->orderByDesc('ativo')
-                ->orderBy('id')
-                ->first(['matricula']);
-
-            $matricula = trim((string) ($mailRow->matricula ?? ''));
-            if ($matricula === '') {
-                $notFound++;
-                continue;
-            }
-
-            $current = trim((string) ($office->matricula ?? ''));
-            if ($current !== '' && $current === $matricula) {
-                $alreadyFilled++;
-                continue;
-            }
-
-            $office->update(['matricula' => $matricula]);
-            $updated++;
-        }
-
-        return back()->with(
-            'success',
-            "Importação concluída. Matrículas atualizadas: {$updated}; já corretas: {$alreadyFilled}; sem correspondência: {$notFound}."
-        );
+        return back()->with($exitCode === 0 ? 'success' : 'error', $consoleOutput !== ''
+            ? $consoleOutput
+            : ($exitCode === 0 ? 'Vínculos internos atualizados.' : 'Falha ao atualizar vínculos internos.'));
     }
 
     private function csv(string $baseName, array $header, array $rows): StreamedResponse
@@ -709,16 +1223,36 @@ class LicensingController extends Controller
      */
     private function resolveRateioBucket(array $candidate, CoretiRateioLocalService $rateioLocalService): array
     {
+        $candidateName = trim((string) ($candidate['nome'] ?? ''));
+        $candidateUnicoop = trim((string) ($candidate['unicoop'] ?? ''));
+        $candidateArea = trim((string) ($candidate['area'] ?? ''));
+        $candidateCentroCusto = trim((string) ($candidate['centro_custo'] ?? ''));
+
+        if ($this->isCristalinaDepartment($candidateName)
+            && $candidateUnicoop !== ''
+            && $candidateArea !== ''
+        ) {
+            return [
+                'unidade' => $candidateName !== '' ? $candidateName : 'Cristalina II',
+                'unicoop' => $candidateUnicoop,
+                'area' => $candidateArea,
+                'centro_custo' => $candidateCentroCusto !== '' ? $candidateCentroCusto : ($candidateUnicoop . '.' . $candidateArea),
+                'manual' => false,
+                'matched' => true,
+                'reason' => 'Cristalina preservada por únicoop/área informados',
+            ];
+        }
+
         $resolved = $rateioLocalService->resolveCandidate($candidate);
 
         if ($resolved['manual']) {
             return [
-                'unidade' => trim((string) ($candidate['nome'] ?? '')) !== ''
-                    ? trim((string) ($candidate['nome'] ?? '')) . ' - validação manual'
+                'unidade' => $candidateName !== ''
+                    ? $candidateName . ' - validação manual'
                     : 'Cristalina II - validação manual',
-                'unicoop' => trim((string) ($candidate['unicoop'] ?? '-')) !== '' ? trim((string) ($candidate['unicoop'] ?? '-')) : '-',
-                'area' => trim((string) ($candidate['area'] ?? '-')) !== '' ? trim((string) ($candidate['area'] ?? '-')) : '-',
-                'centro_custo' => trim((string) ($candidate['centro_custo'] ?? '-')) !== '' ? trim((string) ($candidate['centro_custo'] ?? '-')) : '-',
+                'unicoop' => $candidateUnicoop !== '' ? $candidateUnicoop : '-',
+                'area' => $candidateArea !== '' ? $candidateArea : '-',
+                'centro_custo' => $candidateCentroCusto !== '' ? $candidateCentroCusto : '-',
                 'manual' => true,
                 'matched' => false,
                 'reason' => $resolved['reason'],
@@ -740,12 +1274,12 @@ class LicensingController extends Controller
         }
 
         return [
-            'unidade' => trim((string) ($candidate['nome'] ?? '')) !== ''
-                ? trim((string) ($candidate['nome'] ?? ''))
+            'unidade' => $candidateName !== ''
+                ? $candidateName
                 : 'Pendente de mapeamento',
-            'unicoop' => trim((string) ($candidate['unicoop'] ?? '-')) !== '' ? trim((string) ($candidate['unicoop'] ?? '-')) : '-',
-            'area' => trim((string) ($candidate['area'] ?? '-')) !== '' ? trim((string) ($candidate['area'] ?? '-')) : '-',
-            'centro_custo' => trim((string) ($candidate['centro_custo'] ?? '-')) !== '' ? trim((string) ($candidate['centro_custo'] ?? '-')) : '-',
+            'unicoop' => $candidateUnicoop !== '' ? $candidateUnicoop : '-',
+            'area' => $candidateArea !== '' ? $candidateArea : '-',
+            'centro_custo' => $candidateCentroCusto !== '' ? $candidateCentroCusto : '-',
             'manual' => false,
             'matched' => false,
             'reason' => $resolved['reason'],

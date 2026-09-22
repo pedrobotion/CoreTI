@@ -209,21 +209,6 @@ class CoretiRateioLocalService
             $baseQuery->where('tipo_local', $tipo);
         }
 
-        if ($normalizedName !== '') {
-            $nameMatches = (clone $baseQuery)
-                ->where('nome_normalizado', $normalizedName)
-                ->get();
-
-            if ($nameMatches->count() === 1) {
-                return [
-                    'matched' => true,
-                    'manual' => false,
-                    'reason' => 'Correspondência por nome normalizado',
-                    'local' => $nameMatches->first(),
-                ];
-            }
-        }
-
         if ($centerUnicoop !== null && $centerArea !== null) {
             $codeMatches = (clone $baseQuery)->get()->filter(function (CoretiRateioLocal $local) use ($centerUnicoop, $centerArea): bool {
                 return $this->normalizeCenterComponent($local->unicoop) === $centerUnicoop
@@ -253,6 +238,21 @@ class CoretiRateioLocalService
                         'local' => $sameName,
                     ];
                 }
+            }
+        }
+
+        if ($normalizedName !== '') {
+            $nameMatches = (clone $baseQuery)
+                ->where('nome_normalizado', $normalizedName)
+                ->get();
+
+            if ($nameMatches->count() === 1) {
+                return [
+                    'matched' => true,
+                    'manual' => false,
+                    'reason' => 'Correspondência por nome normalizado',
+                    'local' => $nameMatches->first(),
+                ];
             }
         }
 
