@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# coreti-backup-audit — wrapper de auditoria somente leitura.
+#
+# Instalado no SERVIDOR AUDITADO (ex.: sdb1), em /usr/local/bin/.
+# A chave SSH do CoreTI fica restrita a este wrapper no authorized_keys, o que
+# permite auditar VÁRIOS backups com UMA única identidade — sem forced-command
+# fixo por arquivo e sem dar shell ao usuário de monitoramento.
+#
+# Operações aceitas (todas de leitura):
+#   ping                      -> testa a conexão
+#   stat <caminho>            -> "<bytes>|<mtime_epoch>"
+#   progress-log <caminho>    -> últimas linhas de um log (ainda não usado)
+#
+# Recusa: caminho fora da allowlist, '..', link simbólico, metacaracteres de
+# shell, qualquer escrita. Entrada nunca é reavaliada pelo shell.
+#
+set -euo pipefail
+
+# ---------------------------------------------------------------- allowlist
+# Apenas estes prefixos podem ser consultados. Ajuste conforme o servidor.
+DIRETORIOS_PERMITIDOS=(
+  "/backup/dbmon"
+)
+
+recusar() { echo "coreti-backup-audit: $1" >&2; exit 2; }
+
+caminho_permitido() {
+  local alvo="$1" prefixo real
+
+  # Rejeita travessia e metacaracteres antes de qualquer resolução.
+  case "$alvo" in
+    *..*|*'$'*|*'`'*|*';'*|*'|'*|*'&'*|*'<'*|*'>'*|*$'\n'*) return 1 ;;
+  esac
+  [[ "$alvo" == /* ]] || return 1
+
+  # readlink -m canonicaliza sem exigir que o caminho exista: assim um
+  # arquivo de backup AUSENTE é reportado como ausente, e não confundido
+  # com "caminho não permitido". Symlinks existentes continuam resolvidos,
+  # barrando link que aponte para fora da allowlist.
+  real="$(readlink -m -- "$alvo" 2>/dev/null || true)"
+  [[ -n "$real" ]] || return 1
+
+  for prefixo in "${DIRETORIOS_PERMITIDOS[@]}"; do
+    [[ "$real" == "$prefixo"/* || "$real" == "$prefixo" ]] && return 0
+  done
+  return 1
+}
+
+# Sob forced-command o pedido chega inteiro em SSH_ORIGINAL_COMMAND, já
+# citado pelo cliente — e incluindo o próprio caminho deste wrapper.
+#
+# A tokenização usa xargs, que respeita aspas SEM invocar shell: 'read -r -a'
+# quebraria caminhos com espaço e ainda deixaria as aspas dentro do valor.
+# Aspas desbalanceadas fazem o xargs falhar, e falhamos fechado.
+if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
+  mapfile -t ARGS < <(printf '%s' "$SSH_ORIGINAL_COMMAND" | xargs -n1 2>/dev/null) \
+    || recusar "não foi possível interpretar o comando recebido"
+
+  [[ ${#ARGS[@]} -ge 1 ]] || recusar "comando recebido vazio ou malformado"
+
+  # Descarta o caminho do próprio wrapper, quando o cliente o envia.
+  if [[ "${ARGS[0]}" == */coreti-backup-audit || "${ARGS[0]}" == "coreti-backup-audit" ]]; then
+    ARGS=("${ARGS[@]:1}")
+  fi
+else
+  ARGS=("$@")
+fi
+
+[[ ${#ARGS[@]} -ge 1 ]] || recusar "nenhuma operação informada"
+
+OPERACAO="${ARGS[0]}"
+CAMINHO="${ARGS[1]:-}"
+
+case "$OPERACAO" in
+  ping)
+    echo "ok"
+    ;;
+
+  stat)
+    [[ -n "$CAMINHO" ]] || recusar "stat exige um caminho"
+    caminho_permitido "$CAMINHO" || recusar "caminho não permitido: $CAMINHO"
+    [[ -f "$CAMINHO" ]] || recusar "cannot stat '$CAMINHO': No such file or directory"
+    stat -c '%s|%Y' -- "$CAMINHO"
+    ;;
+
+  progress-log)
+    # Preparado para evolução; a leitura de log ainda não é interpretada pelo
+    # CoreTI, então devolve apenas o rodapé bruto do arquivo.
+    [[ -n "$CAMINHO" ]] || recusar "progress-log exige um caminho"
+    caminho_permitido "$CAMINHO" || recusar "caminho não permitido: $CAMINHO"
+    [[ -f "$CAMINHO" ]] || recusar "cannot stat '$CAMINHO': No such file or directory"
+    tail -n 200 -- "$CAMINHO"
+    ;;
+
+  *)
+    recusar "operação não permitida: $OPERACAO"
+    ;;
+esac
