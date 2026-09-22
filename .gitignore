@@ -27,3 +27,22 @@ emails_pendentes_com_google_admin.csv
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Blade compilado: artefato de execução, regerado a cada deploy.
+/storage/framework/views
+
+# Extrações de AD, RH e folha usadas em análises pontuais.
+# Contêm dados pessoais (e o gas_usuario.csv, hashes de senha).
+# Ficam na máquina de quem analisa, nunca no repositório.
+/ad_matricula_*.csv
+/ad_pares_rh_*.csv
+/ad_expurgo_*.csv
+/ad_cadastro_incompleto_*.csv
+/cad_colaborador.csv
+/gas_usuario.csv
+/servicedesk_ad_*.xlsx
+/auditoria_backups.csv
+
+# Documentos de apoio recebidos de terceiros.
+/Termo de Responsabilidade.docm
+/Insight API Developer Guide*.pdf
