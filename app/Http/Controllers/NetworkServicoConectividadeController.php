@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -24,6 +25,7 @@ class NetworkServicoConectividadeController extends Controller
         '0 Mbps',
         '10 Mbps',
         '20 Mbps',
+        '25 Mbps',
         '30 Mbps',
         '50 Mbps',
         '100 Mbps',
@@ -153,8 +155,12 @@ class NetworkServicoConectividadeController extends Controller
 
         $servico = NetworkServicoConectividade::create($payload);
 
+        $this->applyExtractionMetadata($servico, $request);
+
         if ($request->hasFile('ficha_pdf')) {
             app(NetworkFichaUploadService::class)->store($servico, $request->file('ficha_pdf'));
+        } elseif (! empty($data['temp_ficha_path']) && Storage::disk('local')->exists($data['temp_ficha_path'])) {
+            app(NetworkFichaUploadService::class)->storeFromTemporaryPath($servico, $data['temp_ficha_path'], (string) ($data['temp_ficha_name'] ?? 'ficha.pdf'));
         }
 
         return redirect()->route('network-datacenter.servicos.show', $servico)->with('success', 'Serviço cadastrado com sucesso.');
@@ -186,11 +192,33 @@ class NetworkServicoConectividadeController extends Controller
 
         $servico->update($payload);
 
+        $this->applyExtractionMetadata($servico, $request);
+
         if ($request->hasFile('ficha_pdf')) {
             app(NetworkFichaUploadService::class)->store($servico, $request->file('ficha_pdf'));
+        } elseif (! empty($data['temp_ficha_path']) && Storage::disk('local')->exists($data['temp_ficha_path'])) {
+            app(NetworkFichaUploadService::class)->storeFromTemporaryPath($servico, $data['temp_ficha_path'], (string) ($data['temp_ficha_name'] ?? 'ficha.pdf'));
         }
 
         return redirect()->route('network-datacenter.servicos.show', $servico)->with('success', 'Serviço atualizado com sucesso.');
+    }
+
+    public function extractFicha(Request $request, NetworkFichaIaExtractionService $extractor): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'ficha_pdf' => ['required', 'file', 'mimetypes:application/pdf', 'max:10240'],
+        ]);
+
+        $file = $request->file('ficha_pdf');
+        $tempDirectory = 'network-datacenter/tmp';
+        $tempName = Str::uuid() . '.pdf';
+        $tempPath = $file->storeAs($tempDirectory, $tempName, 'local');
+
+        $result = $extractor->extractFromPdf(Storage::disk('local')->path($tempPath));
+        $result['temp_path'] = $tempPath;
+        $result['temp_name'] = $file->getClientOriginalName();
+
+        return response()->json($result);
     }
 
     public function uploadFicha(Request $request, NetworkServicoConectividade $servico, NetworkFichaUploadService $uploadService): RedirectResponse
@@ -268,26 +296,42 @@ class NetworkServicoConectividadeController extends Controller
             'local_nome' => ['nullable', 'string', 'max:255'],
             'unidade_id' => ['nullable', 'integer'],
             'departamento_id' => ['nullable', 'integer'],
+            'organization_unit_id' => ['nullable', 'integer', 'exists:organization_units,id'],
+            'organization_department_id' => ['nullable', 'integer', 'exists:organization_departments,id'],
             'observacao' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'max:20'],
             'ficha_pdf' => ['nullable', 'file', 'mimetypes:application/pdf', 'max:20480'],
+            'temp_ficha_path' => ['nullable', 'string', 'max:255'],
+            'temp_ficha_name' => ['nullable', 'string', 'max:255'],
+            'ia_resultado_json' => ['nullable', 'string'],
         ]);
     }
 
     private function buildPayload(Request $request, array $data, NetworkLocationResolverService $locationResolver): array
     {
+        $extraction = $this->decodedExtractionPayload($data['ia_resultado_json'] ?? null);
         $location = null;
         $locationTerm = trim((string) ($data['local_busca'] ?? ''));
         if ($locationTerm !== '') {
             $location = $locationResolver->resolve($locationTerm);
         }
 
+        $contratanteId = $data['contratante_id'] ?? null;
+        if (! $contratanteId) {
+            $contratanteId = $this->resolveOrCreateContratanteFromExtraction($extraction);
+        }
+
+        $produtoId = $data['produto_id'] ?? null;
+        if (! $produtoId) {
+            $produtoId = $this->resolveOrCreateProdutoFromExtraction($extraction);
+        }
+
         $payload = [
             'contrato' => trim((string) ($data['contrato'] ?? '')) ?: null,
-            'contratante_id' => $data['contratante_id'] ?? null,
+            'contratante_id' => $contratanteId,
             'razao_social' => trim((string) ($data['razao_social'] ?? '')) ?: null,
             'velocidade_nominal' => trim((string) ($data['velocidade_nominal'] ?? '')) ?: null,
-            'produto_id' => $data['produto_id'] ?? null,
+            'produto_id' => $produtoId,
             'rede' => trim((string) ($data['rede'] ?? '')) ?: null,
             'mascara' => trim((string) ($data['mascara'] ?? '')) ?: null,
             'gateway' => trim((string) ($data['gateway'] ?? '')) ?: null,
@@ -307,6 +351,8 @@ class NetworkServicoConectividadeController extends Controller
             'status' => trim((string) ($data['status'] ?? 'ativo')) ?: 'ativo',
             'unidade_id' => $data['unidade_id'] ?? null,
             'departamento_id' => $data['departamento_id'] ?? null,
+            'organization_unit_id' => $data['organization_unit_id'] ?? null,
+            'organization_department_id' => $data['organization_department_id'] ?? null,
             'local_tipo' => trim((string) ($data['local_tipo'] ?? '')) ?: null,
             'local_nome' => trim((string) ($data['local_nome'] ?? '')) ?: null,
         ];
@@ -314,8 +360,8 @@ class NetworkServicoConectividadeController extends Controller
         if ($location !== null) {
             $payload['local_tipo'] = $location['type'];
             $payload['local_nome'] = $location['name'];
-            $payload['unidade_id'] = $location['type'] === 'unidade' ? $location['id_unidade'] : null;
-            $payload['departamento_id'] = $location['type'] === 'departamento' ? $location['id_departamento'] : null;
+            $payload['organization_unit_id'] = $location['type'] === 'unidade' ? $location['id_unidade'] : null;
+            $payload['organization_department_id'] = $location['type'] === 'departamento' ? $location['id_departamento'] : null;
             if (! empty($location['endereco'])) {
                 $payload['endereco_instalacao'] = $location['endereco'];
             }
@@ -339,5 +385,102 @@ class NetworkServicoConectividadeController extends Controller
             'velocidades' => self::VELOCIDADES,
             'locationOptions' => $locationResolver->allLocations()->values()->all(),
         ];
+    }
+
+    private function decodedExtractionPayload(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        $raw = trim((string) $payload);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function resolveOrCreateContratanteFromExtraction(array $extraction): ?int
+    {
+        $name = trim((string) ($extraction['contratante_nome'] ?? $extraction['razao_social'] ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $normalized = $this->normalizeText($name);
+
+        $existing = NetworkContratante::query()->get()->first(function (NetworkContratante $item) use ($normalized): bool {
+            return $this->normalizeText((string) $item->razao_social) === $normalized
+                || $this->normalizeText((string) $item->nome_fantasia) === $normalized;
+        });
+
+        if ($existing !== null) {
+            return (int) $existing->id;
+        }
+
+        $contratante = NetworkContratante::query()->create([
+            'razao_social' => $name,
+            'nome_fantasia' => $name,
+            'cnpj' => 'AUTO-' . substr(sha1($normalized), 0, 15),
+            'ativo' => true,
+        ]);
+
+        return (int) $contratante->id;
+    }
+
+    private function resolveOrCreateProdutoFromExtraction(array $extraction): ?int
+    {
+        $name = trim((string) ($extraction['produto_nome'] ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $normalized = $this->normalizeText($name);
+
+        $existing = NetworkProduto::query()->get()->first(function (NetworkProduto $item) use ($normalized): bool {
+            return $this->normalizeText((string) $item->nome) === $normalized;
+        });
+
+        if ($existing !== null) {
+            return (int) $existing->id;
+        }
+
+        $produto = NetworkProduto::query()->create([
+            'nome' => $name,
+            'descricao' => 'Criado automaticamente a partir da ficha PDF.',
+            'ativo' => true,
+        ]);
+
+        return (int) $produto->id;
+    }
+
+    private function normalizeText(?string $value): string
+    {
+        $value = Str::ascii(mb_strtoupper(trim((string) $value)));
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+        return trim($value);
+    }
+
+    private function applyExtractionMetadata(NetworkServicoConectividade $servico, Request $request): void
+    {
+        $raw = trim((string) $request->input('ia_resultado_json', ''));
+        if ($raw === '') {
+            return;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return;
+        }
+
+        $servico->update([
+            'ia_status' => 'processado',
+            'ia_resultado' => $decoded,
+            'ia_processado_em' => now(),
+        ]);
     }
 }

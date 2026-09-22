@@ -29,5 +29,6 @@
                 </div>
             </form>
         </section>
+
     </div>
 </x-app-layout>

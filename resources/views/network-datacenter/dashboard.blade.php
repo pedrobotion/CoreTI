@@ -1,9 +1,10 @@
 <x-app-layout>
     <div class="mx-auto max-w-7xl space-y-6">
-        <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Network &amp; DataCenter</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950">Dashboard</h1>
-        </div>
+        @if(!empty($setupPending))
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Estrutura do módulo ainda não foi criada no banco. Execute as migrations do CMDB para liberar os cadastros.
+            </div>
+        @endif
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -100,10 +101,5 @@
             </div>
         </section>
 
-        <div class="flex flex-wrap gap-3">
-            <a href="{{ route('network-datacenter.servicos.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-md bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Serviços</a>
-            <a href="{{ route('network-datacenter.contratantes.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Contratantes</a>
-            <a href="{{ route('network-datacenter.produtos.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Produtos</a>
-        </div>
     </div>
 </x-app-layout>

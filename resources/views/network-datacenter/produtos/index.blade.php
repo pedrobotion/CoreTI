@@ -1,11 +1,10 @@
 <x-app-layout>
     <div class="mx-auto max-w-7xl space-y-6" x-data="{ editId: null }">
-        <div class="flex items-start justify-between gap-3">
-            <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Network &amp; DataCenter</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950">Produtos</h1>
+        @if(!empty($setupPending))
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Estrutura do módulo ainda não foi criada no banco. Execute as migrations do Network &amp; DataCenter para liberar os cadastros.
             </div>
-        </div>
+        @endif
 
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <form method="GET" class="flex flex-wrap items-end gap-2">

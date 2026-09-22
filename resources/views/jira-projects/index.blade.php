@@ -4,7 +4,10 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Jira</p>
             </div>
-            <button type="button" onclick="openJiraCreateModal()" class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800">Adicionar Registro</button>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="openJiraCatalogModal()" class="toolbar-btn inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 font-semibold text-slate-700 hover:bg-slate-50">Adicionar Projeto/Grupo</button>
+                <button type="button" onclick="openJiraCreateModal()" class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 font-semibold text-white hover:bg-slate-800">Adicionar Registro</button>
+            </div>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -205,6 +208,44 @@
         </div>
     </div>
 
+    <div id="jira-catalog-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
+        <div class="form-modal-shell max-w-3xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div class="form-modal-header">
+                <div>
+                    <h2 class="form-modal-title">Projetos e grupos Jira</h2>
+                    <p class="mt-1 text-sm text-slate-500">Cadastre o nome e os identificadores usados no Jira.</p>
+                </div>
+                <button type="button" onclick="closeJiraCatalogModal()" class="form-modal-close">Fechar</button>
+            </div>
+
+            <form method="POST" action="{{ route('jira-projects.catalog.store') }}" class="mt-4 grid gap-3 sm:grid-cols-3">
+                @csrf
+                <input name="name" required placeholder="Nome, ex.: Pivot" class="toolbar-input rounded-md border-slate-300 text-sm">
+                <input name="jira_project_id" placeholder="ID do projeto Jira" class="toolbar-input rounded-md border-slate-300 text-sm">
+                <input name="jira_group_id" placeholder="ID do grupo Jira" class="toolbar-input rounded-md border-slate-300 text-sm">
+                <button class="toolbar-btn-primary sm:col-span-3">Adicionar Projeto/Grupo</button>
+            </form>
+
+            <div class="mt-5 max-h-64 space-y-2 overflow-y-auto pr-1">
+                @forelse($projectGroupCatalog as $catalog)
+                    <div class="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm">
+                        <div><strong>{{ $catalog->name }}</strong><span class="ml-2 text-xs text-slate-500">Projeto: {{ $catalog->jira_project_id ?: '-' }} | Grupo: {{ $catalog->jira_group_id ?: '-' }}</span></div>
+                        @if($catalog->active)
+                            <form method="POST" action="{{ route('jira-projects.catalog.destroy', $catalog) }}" data-confirm-message="Desativar este projeto/grupo?">
+                                @csrf @method('DELETE')
+                                <button class="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800">Desativar</button>
+                            </form>
+                        @else
+                            <span class="text-xs text-slate-400">Inativo</span>
+                        @endif
+                    </div>
+                @empty
+                    <p class="text-sm text-slate-500">Nenhum projeto/grupo cadastrado.</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
     <script>
         function openJiraCreateModal() {
             const modal = document.getElementById('jira-create-modal');
@@ -220,6 +261,20 @@
                 const form = modal.querySelector('form');
                 if (form) form.reset();
             }
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        function openJiraCatalogModal() {
+            const modal = document.getElementById('jira-catalog-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeJiraCatalogModal() {
+            const modal = document.getElementById('jira-catalog-modal');
+            if (!modal) return;
             modal.classList.remove('flex');
             modal.classList.add('hidden');
         }

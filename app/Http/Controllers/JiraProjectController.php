@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\JiraProject;
+use App\Models\JiraProjectGroup;
 use App\Models\ServiceDeskEmailCostCenter;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -59,6 +60,8 @@ class JiraProjectController extends Controller
 
         $projects = $query->orderBy('email')->paginate($perPage)->withQueryString();
 
+        $projectGroupCatalog = JiraProjectGroup::query()->orderBy('name')->get();
+
         return view('jira-projects.index', [
             'projects' => $projects,
             'search' => $search,
@@ -66,14 +69,17 @@ class JiraProjectController extends Controller
             'tipoUnidade' => $tipoUnidade,
             'grupo' => $grupo,
             'perPage' => $perPage,
-            'grupos' => JiraProject::query()
-                ->where('excluido', false)
-                ->whereNotNull('projeto_grupo')
-                ->where('projeto_grupo', '<>', '')
-                ->distinct()
-                ->orderBy('projeto_grupo')
-                ->pluck('projeto_grupo'),
-            'projetoGrupos' => $this->defaultGroups(),
+            'grupos' => JiraProjectGroup::query()
+                ->where('active', true)
+                ->orderBy('name')
+                ->pluck('name'),
+            'projetoGrupos' => collect($this->defaultGroups())
+                ->merge($projectGroupCatalog->where('active', true)->pluck('name'))
+                ->unique()
+                ->sort()
+                ->values()
+                ->all(),
+            'projectGroupCatalog' => $projectGroupCatalog,
             'centroCustoOptionsUnidades' => $this->costCenterOptions('Unidades'),
             'centroCustoOptionsSede' => $this->costCenterOptions('Sede'),
             'stats' => [
@@ -133,6 +139,46 @@ class JiraProjectController extends Controller
         return back()->with('success', 'Registro Jira removido.');
     }
 
+    public function storeCatalog(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:jira_project_groups,name'],
+            'jira_project_id' => ['nullable', 'string', 'max:100'],
+            'jira_group_id' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        JiraProjectGroup::create([
+            ...$data,
+            'active' => true,
+        ]);
+
+        return back()->with('success', 'Projeto/grupo cadastrado.');
+    }
+
+    public function updateCatalog(Request $request, JiraProjectGroup $jiraProjectGroup)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('jira_project_groups', 'name')->ignore($jiraProjectGroup->id)],
+            'jira_project_id' => ['nullable', 'string', 'max:100'],
+            'jira_group_id' => ['nullable', 'string', 'max:100'],
+            'active' => ['nullable', 'boolean'],
+        ]);
+
+        $jiraProjectGroup->update([
+            ...$data,
+            'active' => (bool) ($data['active'] ?? false),
+        ]);
+
+        return back()->with('success', 'Projeto/grupo atualizado.');
+    }
+
+    public function destroyCatalog(JiraProjectGroup $jiraProjectGroup)
+    {
+        $jiraProjectGroup->update(['active' => false]);
+
+        return back()->with('success', 'Projeto/grupo desativado.');
+    }
+
     private function validatePayload(Request $request, ?int $id): array
     {
         $data = $request->validate([
@@ -154,6 +200,14 @@ class JiraProjectController extends Controller
         $parts = explode('.', (string) ($data['centro_custo'] ?? ''), 2);
         $data['unicoop'] = $parts[0] ?? null;
         $data['area'] = $parts[1] ?? null;
+        $projectGroup = JiraProjectGroup::query()->firstOrCreate(
+            ['name' => trim((string) $data['projeto_grupo'])],
+            ['active' => true]
+        );
+        if (! $projectGroup->active) {
+            $projectGroup->update(['active' => true]);
+        }
+        $data['jira_project_group_id'] = $projectGroup->id;
 
         return $data;
     }
@@ -175,14 +229,11 @@ class JiraProjectController extends Controller
 
     private function defaultGroups(): array
     {
-        return [
-            'Team Segurança Patrimonial',
-            'Team Infra',
-            'Team MKT',
-            'Team Suprimentos',
-            'Team CSC',
-            'Team RH',
-        ];
+        return JiraProjectGroup::query()
+            ->where('active', true)
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
     }
 
     private function exportCsv($rows)

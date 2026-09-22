@@ -30,7 +30,7 @@
             @include('layouts.partials.feedback-modal')
             @include('layouts.partials.confirm-dialog')
 
-            <div class="content-shell">
+            <div class="content-shell {{ request()->routeIs('cmdb.*') ? 'cmdb-content-shell' : '' }}">
                 <!-- Page Content -->
                 <main class="p-4 sm:p-6 lg:p-8">
                     {{ $slot }}
@@ -47,5 +47,8 @@
                 window.dispatchEvent(new CustomEvent('coreti-confirm', { detail: { message, form } }));
             }, true);
         </script>
+
+        {{-- Scripts específicos de página (@push('scripts') nas views). --}}
+        @stack('scripts')
     </body>
 </html>

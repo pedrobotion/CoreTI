@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Configuração de testes apontando para um banco MySQL/MariaDB dedicado.
+  Usada quando a extensão pdo_sqlite não está disponível (o caso deste
+  servidor: php8.3-sqlite3 não está nos repositórios configurados).
+
+  Antes de rodar, crie o banco vazio uma vez:
+    CREATE DATABASE `intranet_infra_test`
+      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+  Depois, rode a suite passando esta configuracao:
+    php artisan test  (com a flag de configuration apontando para este arquivo)
+
+  force="true" garante que estes valores vençam qualquer variável de ambiente:
+  a suíte usa RefreshDatabase, que executa migrate:fresh (DROP de todas as
+  tabelas). O banco DEVE ser exclusivo de teste — nunca o de produção.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_DATABASE" value="intranet_infra_test" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+    </php>
+</phpunit>

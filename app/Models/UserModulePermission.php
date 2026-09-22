@@ -17,7 +17,9 @@ class UserModulePermission extends Model
         'aplicativos',
         'bancada',
         'administrativo',
+        'cmdb',
         'network_datacenter',
+        'coordenacao',
     ];
 
     protected function casts(): array
@@ -28,7 +30,9 @@ class UserModulePermission extends Model
             'aplicativos' => 'boolean',
             'bancada' => 'boolean',
             'administrativo' => 'boolean',
+            'cmdb' => 'boolean',
             'network_datacenter' => 'boolean',
+            'coordenacao' => 'boolean',
         ];
     }
 

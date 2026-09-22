@@ -13,10 +13,758 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Services\CoretiRateioMaintenanceService;
 use App\Services\CoretiGoogleEmailImportService;
+use App\Services\OfficeLicenseImportService;
+use App\Services\OfficeUserSyncService;
+use App\Services\OfficeCollaboratorMatcherService;
+use App\Models\CmdbExpiration;
+use App\Services\CmdbAssetHistoryService;
+use App\Services\CmdbServerSpreadsheetImportService;
+use App\Services\CmdbServerIpSyncService;
+use App\Services\CmdbVCenterAssetCreationService;
+use App\Services\JiraIssueService;
+use App\Services\IntranetOrganization\IntranetOrganizationSyncService;
+use App\Services\IntranetOrganization\IntranetHrSnapshotSyncService;
+use App\Models\OrganizationLegacyMapping;
+use App\Models\OrganizationUnit;
+use App\Models\OrganizationDepartment;
+use App\Models\OfficeLicense;
+use App\Models\CmdbConnector;
+use App\Services\CmdbSyncService;
+use App\Services\Cmdb\Discovery\Connectors\VCenterSyncLock;
+use App\Support\OfficeLicenseReportPolicy;
+use App\Services\Cmdb\Veeam\VeeamApiException;
+use App\Services\Cmdb\Veeam\VeeamBackupSyncService;
+use App\Services\CoreTiSyncNotificationService;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('cmdb:vcenter-sync {--connector=} {--dry-run} {--object-type=} {--limit=}', function (CmdbSyncService $syncService, VCenterSyncLock $lock) {
+    $query = CmdbConnector::query()->whereIn('connector_type', ['vmware', 'vcenter']);
+    if ($this->option('connector')) {
+        $query->whereKey((int) $this->option('connector'));
+    }
+
+    $connector = $query->first();
+    if (! $connector) {
+        $this->error('Conector VMware não encontrado.');
+        return 1;
+    }
+
+    $settings = is_array($connector->settings) ? $connector->settings : [];
+    $originalSettings = $settings;
+    if ($this->option('object-type')) {
+        $settings['object_types'] = [(string) $this->option('object-type')];
+    }
+    if ((int) $this->option('limit') > 0) {
+        $settings['runtime_limit'] = (int) $this->option('limit');
+    }
+    $connector->setAttribute('settings', $settings);
+
+    $mutex = $lock->acquire($connector->id);
+    if (! $mutex->get()) {
+        $this->warn('Já existe uma sincronização em execução para este conector.');
+        return 0;
+    }
+
+    try {
+        if ($this->option('dry-run')) {
+            $result = app(\App\Services\Cmdb\Discovery\DiscoveryEngine::class)->discover($connector)->toArray();
+            $this->info('Dry-run concluído. Nenhuma descoberta foi persistida.');
+            $this->line('Objetos encontrados: ' . count($result['items'] ?? []));
+            foreach (($result['warnings'] ?? []) as $warning) {
+                $this->warn($warning);
+            }
+            return ($result['success'] ?? false) ? 0 : 1;
+        }
+
+        $result = $syncService->syncConnector($connector);
+        $summary = $result['summary'] ?? [];
+        $this->info($result['message'] ?? 'Sincronização concluída.');
+        $this->table(['Indicador', 'Total'], [
+            ['Objetos encontrados', $summary['assets_found'] ?? 0],
+            ['Enviados para revisão', $summary['assets_unchanged'] ?? 0],
+            ['Falhas', $summary['assets_failed'] ?? 0],
+        ]);
+        return ($result['status'] ?? 'failed') === 'failed' ? 1 : 0;
+    } finally {
+        $connector->setAttribute('settings', $originalSettings);
+        $mutex->release();
+    }
+})->purpose('Descobre o inventário VMware vCenter no CMDB sem alterar ativos automaticamente.');
+
+Artisan::command('cmdb:sync-due-connectors {--type=}', function (CmdbSyncService $syncService, VCenterSyncLock $lock) {
+    $type = (string) ($this->option('type') ?: 'vcenter');
+    $now = now();
+    $connectors = CmdbConnector::query()
+        ->whereIn('connector_type', $type === 'vcenter' ? ['vmware', 'vcenter'] : [$type])
+        ->where('is_active', true)
+        ->get();
+
+    foreach ($connectors as $connector) {
+        if ($connector->last_connection_test_status !== 'success') {
+            continue;
+        }
+        $interval = max(1, (int) ($connector->sync_interval_minutes ?: 60));
+        if ($connector->last_sync_at && $connector->last_sync_at->copy()->addMinutes($interval)->isFuture()) {
+            continue;
+        }
+        $mutex = $lock->acquire($connector->id);
+        if (! $mutex->get()) {
+            continue;
+        }
+        try {
+            $result = $syncService->syncConnector($connector);
+            $this->line($connector->name . ': ' . ($result['message'] ?? 'concluído'));
+        } finally {
+            $mutex->release();
+        }
+    }
+
+    return 0;
+})->purpose('Executa sincronizações vencidas de conectores CMDB.');
+
+Artisan::command('cmdb:veeam-sync {--connector=} {--asset=} {--full} {--dry-run}', function (VeeamBackupSyncService $syncService, CoreTiSyncNotificationService $notificationService) {
+    $query = CmdbConnector::query()
+        ->where('connector_type', 'veeam')
+        ->where('is_active', true);
+
+    if ($this->option('connector')) {
+        $query->whereKey((int) $this->option('connector'));
+    }
+
+    $connectors = $query->get();
+    if ($connectors->isEmpty()) {
+        $this->warn('Nenhum conector Veeam ativo foi configurado.');
+        return 0;
+    }
+
+    $exitCode = 0;
+    foreach ($connectors as $connector) {
+        try {
+            $summary = $syncService->sync($connector, [
+                'asset_id' => $this->option('asset') ? (int) $this->option('asset') : null,
+                'full' => (bool) $this->option('full'),
+                'dry_run' => (bool) $this->option('dry-run'),
+            ]);
+            $this->info($connector->name . ': sincronização concluída.');
+            $this->table(['Encontrados', 'Vinculados', 'Ambíguos', 'Não encontrados', 'Atualizados'], [[
+                $summary['found'] ?? 0,
+                $summary['matched'] ?? 0,
+                $summary['ambiguous'] ?? 0,
+                $summary['not_found'] ?? 0,
+                $summary['updated'] ?? 0,
+            ]]);
+            if (! $this->option('dry-run')) {
+                $notificationService->notify(
+                    'Veeam Backup',
+                    $summary,
+                    ((int) ($summary['ambiguous'] ?? 0) > 0 || (int) ($summary['not_found'] ?? 0) > 0) ? 'warning' : 'success',
+                    null,
+                    ['details' => ['conector' => $connector->name]]
+                );
+            }
+        } catch (VeeamApiException $exception) {
+            $exitCode = 1;
+            $this->error($connector->name . ': ' . $exception->getMessage());
+            $connector->update([
+                'status' => 'error',
+                'last_sync_at' => now(),
+                'last_sync_status' => 'failed',
+                'last_error' => $exception->getMessage(),
+            ]);
+            $notificationService->notify(
+                'Veeam Backup',
+                ['errors' => 1],
+                'failed',
+                $exception->getMessage(),
+                ['details' => ['conector' => $connector->name]]
+            );
+        }
+    }
+
+    return $exitCode;
+})->purpose('Sincroniza a proteção das VMs no Veeam por meio da API oficial configurada.');
+
+Schedule::command('cmdb:sync-due-connectors --type=vcenter')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Artisan::command('cmdb:vcenter-create-servers {--connector=} {--limit=}', function (CmdbVCenterAssetCreationService $service) {
+    $connector = $this->option('connector') !== null ? (int) $this->option('connector') : null;
+    $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;
+    $summary = $service->createPendingServers($connector, $limit);
+
+    $this->info('Criação de ativos do vCenter concluída.');
+    $this->table(['Encontradas', 'Criadas', 'Falhas'], [[
+        $summary['found'],
+        $summary['created'],
+        $summary['failed'],
+    ]]);
+
+    foreach ($summary['issues'] as $issue) {
+        $this->error(sprintf('Descoberta #%s (%s): %s', $issue['discovery_id'], $issue['name'], $issue['message']));
+    }
+
+    return $summary['failed'] > 0 ? 1 : 0;
+})->purpose('Converte descobertas de VMs e hosts vCenter em ativos CMDB, sem converter redes/VLANs.');
+
+Artisan::command('cmdb:vcenter-sync-ips {--connector=}', function (CmdbVCenterAssetCreationService $service) {
+    $connector = $this->option('connector') !== null ? (int) $this->option('connector') : null;
+    $summary = $service->syncExistingServerIps($connector);
+    $this->info('IPs das VMs e hosts vCenter sincronizados.');
+    $this->table(['Descobertas', 'Com IP', 'Sem IP'], [[$summary['found'], $summary['updated'], $summary['without_ip']]]);
+    return 0;
+})->purpose('Atualiza os endereços IP das VMs e hosts já criados a partir dos dados do vCenter.');
+
+Artisan::command('intranet:sync-organization {--units} {--departments} {--full} {--dry-run} {--force} {--chunk=500}', function (IntranetOrganizationSyncService $syncService) {
+    $syncUnits = (bool) $this->option('units');
+    $syncDepartments = (bool) $this->option('departments');
+    $full = (bool) $this->option('full');
+
+    if (! $syncUnits && ! $syncDepartments && ! $full) {
+        $full = true;
+    }
+
+    if ($full) {
+        $syncUnits = true;
+        $syncDepartments = true;
+    }
+
+    $summary = $syncService->sync(
+        syncUnits: $syncUnits,
+        syncDepartments: $syncDepartments,
+        dryRun: (bool) $this->option('dry-run'),
+        force: (bool) $this->option('force'),
+    );
+
+    $this->components->info(($summary['dry_run'] ?? false) ? 'Prévia da sincronização organizacional concluída.' : 'Sincronização organizacional concluída.');
+    $this->table(['Indicador', 'Total'], [
+        ['Unidades encontradas', $summary['units_found'] ?? 0],
+        ['Unidades criadas', $summary['units_created'] ?? 0],
+        ['Unidades atualizadas', $summary['units_updated'] ?? 0],
+        ['Unidades sem alteração', $summary['units_unchanged'] ?? 0],
+        ['Unidades ausentes', $summary['units_missing'] ?? 0],
+        ['Departamentos encontrados', $summary['departments_found'] ?? 0],
+        ['Departamentos criados', $summary['departments_created'] ?? 0],
+        ['Departamentos atualizados', $summary['departments_updated'] ?? 0],
+        ['Departamentos sem alteração', $summary['departments_unchanged'] ?? 0],
+        ['Departamentos ausentes', $summary['departments_missing'] ?? 0],
+        ['Tempo total (s)', $summary['duration_seconds'] ?? 0],
+    ]);
+
+    foreach (($summary['warnings'] ?? []) as $warning) {
+        $this->warn($warning);
+    }
+
+    if (! empty($summary['batch_id'])) {
+        $this->line('Batch: #' . $summary['batch_id']);
+    }
+
+    return ($summary['status'] ?? null) === 'failed' ? 1 : 0;
+})->purpose('Sincroniza unidades e departamentos da Intranet para o snapshot local do CoreTI.');
+
+Artisan::command('intranet:sync-hr-snapshots {--collaborators} {--cost-centers} {--full} {--dry-run}', function (IntranetHrSnapshotSyncService $syncService) {
+    $syncCollaborators = (bool) $this->option('collaborators');
+    $syncCostCenters = (bool) $this->option('cost-centers');
+    $full = (bool) $this->option('full');
+
+    if (! $syncCollaborators && ! $syncCostCenters && ! $full) {
+        $full = true;
+    }
+
+    if ($full) {
+        $syncCollaborators = true;
+        $syncCostCenters = true;
+    }
+
+    $summary = $syncService->sync(
+        syncCollaborators: $syncCollaborators,
+        syncCostCenters: $syncCostCenters,
+        dryRun: (bool) $this->option('dry-run'),
+    );
+
+    $this->components->info(($summary['dry_run'] ?? false) ? 'Prévia da sincronização RH concluída.' : 'Sincronização RH concluída.');
+    $this->table(['Indicador', 'Total'], [
+        ['Colaboradores encontrados', $summary['collaborators_found'] ?? 0],
+        ['Colaboradores criados', $summary['collaborators_created'] ?? 0],
+        ['Colaboradores atualizados', $summary['collaborators_updated'] ?? 0],
+        ['Colaboradores sem alteração', $summary['collaborators_unchanged'] ?? 0],
+        ['Centros de custo encontrados', $summary['cost_centers_found'] ?? 0],
+        ['Centros de custo criados', $summary['cost_centers_created'] ?? 0],
+        ['Centros de custo atualizados', $summary['cost_centers_updated'] ?? 0],
+        ['Centros de custo sem alteração', $summary['cost_centers_unchanged'] ?? 0],
+        ['Cargos encontrados', $summary['positions_found'] ?? 0],
+        ['Cargos criados', $summary['positions_created'] ?? 0],
+        ['Cargos atualizados', $summary['positions_updated'] ?? 0],
+        ['Cargos sem alteração', $summary['positions_unchanged'] ?? 0],
+        ['Tempo total (s)', $summary['duration_seconds'] ?? 0],
+    ]);
+
+    return 0;
+})->purpose('Sincroniza colaboradores e centros de custo da Intranet para snapshots locais do CoreTI.');
+
+Artisan::command('organization:audit-legacy-dependencies {--strict}', function () {
+    $strict = (bool) $this->option('strict');
+    $schemaRows = DB::table('information_schema.KEY_COLUMN_USAGE')
+        ->select('TABLE_NAME', 'COLUMN_NAME', 'CONSTRAINT_NAME', 'REFERENCED_TABLE_NAME')
+        ->whereRaw('TABLE_SCHEMA = DATABASE()')
+        ->whereIn('REFERENCED_TABLE_NAME', ['unidades', 'departamentos'])
+        ->get();
+
+    $mappingPending = Schema::hasTable('organization_legacy_mappings')
+        ? OrganizationLegacyMapping::query()->whereIn('status', ['manual_review', 'unresolved'])->count()
+        : 0;
+
+    $units = Schema::hasTable('organization_units') ? OrganizationUnit::query()->count() : 0;
+    $departments = Schema::hasTable('organization_departments') ? OrganizationDepartment::query()->count() : 0;
+
+    $legacyColumns = collect([
+        ['office_licenses', 'unidade_id', 'organization_unit_id'],
+        ['office_licenses', 'departamento_id', 'organization_department_id'],
+        ['cmdb_assets', 'unit_id', 'organization_unit_id'],
+        ['cmdb_racks', 'unit_id', 'organization_unit_id'],
+        ['network_servicos_conectividade', 'unidade_id', 'organization_unit_id'],
+        ['network_servicos_conectividade', 'departamento_id', 'organization_department_id'],
+        ['circuitos_unidades', 'id_unidades', 'organization_unit_id'],
+    ])->map(function (array $row) {
+        [$table, $legacyColumn, $newColumn] = $row;
+
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $legacyColumn)) {
+            return [$table, $legacyColumn, 'tabela/coluna ausente', 0];
+        }
+
+        $query = DB::table($table)->whereNotNull($legacyColumn);
+        if (Schema::hasColumn($table, $newColumn)) {
+            $query->whereNull($newColumn);
+        }
+
+        return [$table, $legacyColumn, $newColumn, $query->count()];
+    });
+
+    $integrityRows = collect([
+        ['office_licenses', 'unidade_id', 'organization_unit_id', 'unit', 'unidades'],
+        ['office_licenses', 'departamento_id', 'organization_department_id', 'department', 'departamentos'],
+        ['cmdb_assets', 'unit_id', 'organization_unit_id', 'unit', 'unidades'],
+        ['cmdb_racks', 'unit_id', 'organization_unit_id', 'unit', 'unidades'],
+        ['network_servicos_conectividade', 'unidade_id', 'organization_unit_id', 'unit', 'unidades'],
+        ['network_servicos_conectividade', 'departamento_id', 'organization_department_id', 'department', 'departamentos'],
+        ['circuitos_unidades', 'id_unidades', 'organization_unit_id', 'unit', 'unidades'],
+    ])->map(function (array $row) {
+        [$table, $legacyColumn, $newColumn, $entityType, $legacyTable] = $row;
+
+        if (! Schema::hasTable($table)) {
+            return [$table, 0, 0, 0, 0, 0, 0];
+        }
+
+        $total = DB::table($table)->count();
+        $withLegacy = Schema::hasColumn($table, $legacyColumn)
+            ? DB::table($table)->whereNotNull($legacyColumn)->count()
+            : 0;
+        $withOrganization = Schema::hasColumn($table, $newColumn)
+            ? DB::table($table)->whereNotNull($newColumn)->count()
+            : 0;
+        $withoutOrganization = Schema::hasColumn($table, $newColumn)
+            ? DB::table($table)->whereNull($newColumn)->count()
+            : $total;
+        $resolvedMappings = OrganizationLegacyMapping::query()
+            ->matched()
+            ->where('entity_type', $entityType)
+            ->where('legacy_table', $legacyTable)
+            ->count();
+        $unresolvedMappings = OrganizationLegacyMapping::query()
+            ->where('entity_type', $entityType)
+            ->where('legacy_table', $legacyTable)
+            ->whereIn('status', ['manual_review', 'unresolved'])
+            ->count();
+
+        $mixed = 0;
+        if (Schema::hasColumn($table, $legacyColumn)) {
+            $organizationTable = $entityType === 'unit' ? 'organization_units' : 'organization_departments';
+            $legacyValuesThatLookLikeOrganizationIds = Schema::hasTable($organizationTable)
+                ? DB::table($organizationTable)->pluck('id')->map(fn ($id) => (string) $id)->all()
+                : [];
+
+            if ($legacyValuesThatLookLikeOrganizationIds !== []) {
+                $mappedLegacyIds = OrganizationLegacyMapping::query()
+                    ->where('entity_type', $entityType)
+                    ->where('legacy_table', $legacyTable)
+                    ->pluck('legacy_id')
+                    ->map(fn ($id) => (string) $id)
+                    ->all();
+
+                $mixed = DB::table($table)
+                    ->whereIn($legacyColumn, $legacyValuesThatLookLikeOrganizationIds)
+                    ->whereNotIn($legacyColumn, $mappedLegacyIds)
+                    ->count();
+            }
+        }
+
+        return [$table . '.' . $legacyColumn, $total, $withLegacy, $withOrganization, $withoutOrganization, $resolvedMappings, $unresolvedMappings, $mixed];
+    });
+
+    $this->line('Snapshot organizacional local');
+    $this->table(['Item', 'Total'], [
+        ['organization_units', $units],
+        ['organization_departments', $departments],
+        ['Mapeamentos pendentes', $mappingPending],
+    ]);
+
+    $this->line('Foreign keys legadas');
+    $this->table(['Tabela', 'Coluna', 'Constraint', 'Referência'], $schemaRows->map(fn ($row) => [
+        $row->TABLE_NAME,
+        $row->COLUMN_NAME,
+        $row->CONSTRAINT_NAME,
+        $row->REFERENCED_TABLE_NAME,
+    ])->all());
+
+    $this->line('Registros com ID legado sem vínculo organization_*');
+    $this->table(['Tabela', 'Coluna legada', 'Coluna nova', 'Pendentes'], $legacyColumns->all());
+
+    $this->line('Integridade de vínculos organizacionais');
+    $this->table(
+        ['Campo', 'Total', 'Com legado', 'Com organization', 'Sem organization', 'Mappings resolvidos', 'Mappings pendentes', 'Possível mistura'],
+        $integrityRows->all()
+    );
+
+    $brokenOrganizationReferences = collect([
+        ['office_licenses', 'organization_unit_id', 'organization_units'],
+        ['office_licenses', 'organization_department_id', 'organization_departments'],
+        ['cmdb_assets', 'organization_unit_id', 'organization_units'],
+        ['cmdb_assets', 'organization_department_id', 'organization_departments'],
+        ['cmdb_racks', 'organization_unit_id', 'organization_units'],
+        ['cmdb_racks', 'organization_department_id', 'organization_departments'],
+        ['network_servicos_conectividade', 'organization_unit_id', 'organization_units'],
+        ['network_servicos_conectividade', 'organization_department_id', 'organization_departments'],
+        ['circuitos_unidades', 'organization_unit_id', 'organization_units'],
+        ['circuitos_unidades', 'organization_department_id', 'organization_departments'],
+    ])->map(function (array $row) {
+        [$table, $column, $targetTable] = $row;
+
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column) || ! Schema::hasTable($targetTable)) {
+            return [$table . '.' . $column, $targetTable, 0];
+        }
+
+        $broken = DB::table($table)
+            ->leftJoin($targetTable, "{$targetTable}.id", '=', "{$table}.{$column}")
+            ->whereNotNull("{$table}.{$column}")
+            ->whereNull("{$targetTable}.id")
+            ->count();
+
+        return [$table . '.' . $column, $targetTable, $broken];
+    });
+
+    $this->line('Referências canônicas quebradas');
+    $this->table(['Campo', 'Tabela alvo', 'Quebradas'], $brokenOrganizationReferences->all());
+
+    $fallbackEnabled = (bool) config('organization.legacy_fallback_enabled');
+    $activeLegacyCommands = [
+        'units:sync-intranet',
+        'departamentos:sync',
+        'departamentos:import-areas',
+        'sede-departamentos:sync',
+        'circuits:repair-unit-links',
+    ];
+
+    if ($strict) {
+        $this->line('Auditoria estrita');
+        $this->table(['Item', 'Status'], [
+            ['Fallback legado', $fallbackEnabled ? 'ativado' : 'desativado'],
+            ['Commands legados conhecidos', implode(', ', $activeLegacyCommands)],
+        ]);
+    }
+
+    $hasPending = $schemaRows->isNotEmpty()
+        || $mappingPending > 0
+        || $legacyColumns->contains(fn ($row) => (int) ($row[3] ?? 0) > 0)
+        || $integrityRows->contains(fn ($row) => (int) ($row[7] ?? 0) > 0)
+        || ($strict && $fallbackEnabled)
+        || ($strict && $brokenOrganizationReferences->contains(fn ($row) => (int) ($row[2] ?? 0) > 0));
+
+    $hasPending
+        ? $this->warn('Ainda existem dependências legadas ou pendências de cutover.')
+        : $this->components->info('Nenhuma dependência operacional pendente encontrada pela auditoria básica.');
+
+    return $hasPending ? 1 : 0;
+})->purpose('Audita dependências operacionais remanescentes das tabelas legadas unidades/departamentos.');
+
+Artisan::command('organization:mappings:list {--status=pending}', function () {
+    $status = (string) $this->option('status');
+    $statuses = $status === 'pending'
+        ? ['unresolved', 'manual_review']
+        : array_filter(array_map('trim', explode(',', $status)));
+
+    $mappings = OrganizationLegacyMapping::query()
+        ->whereIn('status', $statuses)
+        ->orderBy('entity_type')
+        ->orderBy('legacy_table')
+        ->orderBy('legacy_id')
+        ->get();
+
+    $impactCount = function (OrganizationLegacyMapping $mapping): int {
+        $pairs = [
+            ['office_licenses', 'departamento_id', 'departamentos'],
+            ['network_servicos_conectividade', 'departamento_id', 'departamentos'],
+            ['office_licenses', 'unidade_id', 'unidades'],
+            ['cmdb_assets', 'unit_id', 'unidades'],
+            ['cmdb_racks', 'unit_id', 'unidades'],
+            ['network_servicos_conectividade', 'unidade_id', 'unidades'],
+            ['circuitos_unidades', 'id_unidades', 'unidades'],
+        ];
+
+        return collect($pairs)
+            ->filter(fn (array $pair): bool => $pair[2] === $mapping->legacy_table && Schema::hasTable($pair[0]) && Schema::hasColumn($pair[0], $pair[1]))
+            ->sum(fn (array $pair): int => DB::table($pair[0])->where($pair[1], $mapping->legacy_id)->count());
+    };
+
+    $rows = $mappings->map(fn (OrganizationLegacyMapping $mapping): array => [
+        $mapping->id,
+        $mapping->entity_type,
+        $mapping->legacy_table,
+        $mapping->legacy_id,
+        $mapping->source_id ?? '-',
+        $mapping->organization_id ?? '-',
+        $mapping->match_type ?? '-',
+        $mapping->confidence ?? '-',
+        $mapping->status,
+        $impactCount($mapping),
+        Str::limit((string) $mapping->notes, 80),
+    ]);
+
+    $this->table(
+        ['ID', 'Tipo', 'Tabela legada', 'ID legado', 'Source sugerido', 'Organization ID', 'Match', 'Conf.', 'Status', 'Impacto', 'Notas'],
+        $rows->all()
+    );
+
+    $this->line('Total: ' . $mappings->count());
+
+    return $mappings->isEmpty() ? 0 : 1;
+})->purpose('Lista mappings organizacionais pendentes ou por status.');
+
+Artisan::command('organization:mappings:resolve {mapping_id} {--organization-id=} {--ignore} {--notes=}', function () {
+    $mapping = OrganizationLegacyMapping::query()->find($this->argument('mapping_id'));
+    if (! $mapping) {
+        $this->error('Mapping não encontrado.');
+
+        return 1;
+    }
+
+    $notes = trim((string) $this->option('notes'));
+    if ($notes === '') {
+        $this->error('Informe uma justificativa em --notes.');
+
+        return 1;
+    }
+
+    if ((bool) $this->option('ignore')) {
+        $mapping->update([
+            'status' => 'ignored',
+            'match_type' => 'manual_ignore',
+            'notes' => trim(((string) $mapping->notes) . "\n" . $notes),
+        ]);
+
+        $this->components->info('Mapping ignorado formalmente.');
+
+        return 0;
+    }
+
+    $organizationId = trim((string) $this->option('organization-id'));
+    if ($organizationId === '') {
+        $this->error('Informe --organization-id ou use --ignore.');
+
+        return 1;
+    }
+
+    $exists = $mapping->entity_type === 'unit'
+        ? OrganizationUnit::query()->whereKey($organizationId)->exists()
+        : OrganizationDepartment::query()->whereKey($organizationId)->exists();
+
+    if (! $exists) {
+        $this->error('Registro canônico não encontrado para o tipo do mapping.');
+
+        return 1;
+    }
+
+    $mapping->update([
+        'organization_id' => $organizationId,
+        'match_type' => 'manual',
+        'confidence' => 100,
+        'status' => 'matched',
+        'notes' => trim(((string) $mapping->notes) . "\n" . $notes),
+    ]);
+
+    $this->components->info('Mapping resolvido manualmente.');
+
+    return 0;
+})->purpose('Resolve ou ignora formalmente um mapping legado.');
+
+Artisan::command('organization:map-legacy', function () {
+    if (! Schema::hasTable('organization_legacy_mappings')) {
+        $this->error('Tabela organization_legacy_mappings não encontrada. Execute as migrations.');
+
+        return 1;
+    }
+
+    $normalize = static function (?string $value): string {
+        $value = Str::ascii(mb_strtolower(trim((string) $value)));
+        $value = preg_replace('/[^a-z0-9]+/', ' ', (string) $value);
+
+        return trim(preg_replace('/\s+/', ' ', (string) $value));
+    };
+
+    $summary = [
+        'units_matched' => 0,
+        'units_unresolved' => 0,
+        'departments_matched' => 0,
+        'departments_unresolved' => 0,
+    ];
+
+    if (Schema::hasTable('unidades') && Schema::hasTable('organization_units')) {
+        $unitsBySource = OrganizationUnit::query()->get()->keyBy(fn ($unit) => (string) $unit->source_id);
+        $unitsByCnpj = OrganizationUnit::query()->whereNotNull('cnpj')->get()->keyBy(fn ($unit) => preg_replace('/\D+/', '', (string) $unit->cnpj));
+        $unitsByName = OrganizationUnit::query()->get()->keyBy(fn ($unit) => $normalize($unit->name));
+
+        DB::table('unidades')->orderBy('id_unidades')->get()->each(function ($legacy) use ($unitsBySource, $unitsByCnpj, $unitsByName, $normalize, &$summary): void {
+            $match = $unitsBySource->get((string) $legacy->id_unidades);
+            $matchType = $match ? 'source_id' : null;
+
+            if (! $match && filled($legacy->cnpj ?? null)) {
+                $match = $unitsByCnpj->get(preg_replace('/\D+/', '', (string) $legacy->cnpj));
+                $matchType = $match ? 'cnpj' : null;
+            }
+
+            if (! $match) {
+                $match = $unitsByName->get($normalize($legacy->unidade ?? null));
+                $matchType = $match ? 'normalized_name_exact' : null;
+            }
+
+            OrganizationLegacyMapping::updateOrCreate(
+                [
+                    'entity_type' => 'unit',
+                    'legacy_table' => 'unidades',
+                    'legacy_id' => (string) $legacy->id_unidades,
+                ],
+                [
+                    'organization_id' => $match?->id,
+                    'source_id' => $match?->source_id,
+                    'match_type' => $matchType ?: 'unresolved',
+                    'confidence' => $match ? 100 : null,
+                    'status' => $match ? 'matched' : 'unresolved',
+                    'notes' => $match ? null : 'Sem correspondência exata por source_id, CNPJ ou nome normalizado.',
+                ]
+            );
+
+            $summary[$match ? 'units_matched' : 'units_unresolved']++;
+        });
+    }
+
+    if (Schema::hasTable('departamentos') && Schema::hasTable('organization_departments')) {
+        $departmentsByArea = OrganizationDepartment::query()
+            ->whereNotNull('source_area_id')
+            ->get()
+            ->keyBy(fn ($department) => ltrim(preg_replace('/\D+/', '', (string) $department->source_area_id), '0') ?: '0');
+        $departmentsByName = OrganizationDepartment::query()->get()->keyBy(fn ($department) => $normalize($department->name));
+
+        DB::table('departamentos')->orderBy('id')->get()->each(function ($legacy) use ($departmentsByArea, $departmentsByName, $normalize, &$summary): void {
+            $area = ltrim(preg_replace('/\D+/', '', (string) ($legacy->area ?? '')), '0') ?: '0';
+            $match = $departmentsByArea->get($area);
+            $matchType = $match ? 'area' : null;
+
+            if (! $match) {
+                $match = $departmentsByName->get($normalize($legacy->nome ?? null));
+                $matchType = $match ? 'normalized_name_exact' : null;
+            }
+
+            OrganizationLegacyMapping::updateOrCreate(
+                [
+                    'entity_type' => 'department',
+                    'legacy_table' => 'departamentos',
+                    'legacy_id' => (string) $legacy->id,
+                ],
+                [
+                    'organization_id' => $match?->id,
+                    'source_id' => $match?->source_id,
+                    'match_type' => $matchType ?: 'unresolved',
+                    'confidence' => $match ? 100 : null,
+                    'status' => $match ? 'matched' : 'unresolved',
+                    'notes' => $match ? null : 'Sem correspondência exata por área ou nome normalizado.',
+                ]
+            );
+
+            $summary[$match ? 'departments_matched' : 'departments_unresolved']++;
+        });
+    }
+
+    $this->components->info('Mapeamento legado concluído.');
+    $this->table(['Indicador', 'Total'], [
+        ['Unidades mapeadas', $summary['units_matched']],
+        ['Unidades não resolvidas', $summary['units_unresolved']],
+        ['Departamentos mapeados', $summary['departments_matched']],
+        ['Departamentos não resolvidos', $summary['departments_unresolved']],
+    ]);
+
+    return ($summary['units_unresolved'] + $summary['departments_unresolved']) > 0 ? 1 : 0;
+})->purpose('Cria mapeamentos auditáveis das tabelas legadas para organization_units/organization_departments.');
+
+Artisan::command('organization:backfill-links', function () {
+    if (! Schema::hasTable('organization_legacy_mappings')) {
+        $this->error('Tabela organization_legacy_mappings não encontrada.');
+
+        return 1;
+    }
+
+    $summary = [];
+
+    $backfill = function (string $table, string $legacyColumn, string $newColumn, string $entityType, string $legacyTable) use (&$summary): void {
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $legacyColumn) || ! Schema::hasColumn($table, $newColumn)) {
+            $summary[] = [$table, $legacyColumn, $newColumn, 'não aplicável', 0];
+            return;
+        }
+
+        $updated = 0;
+        DB::table($table)
+            ->whereNotNull($legacyColumn)
+            ->whereNull($newColumn)
+            ->orderBy($table === 'circuitos_unidades' ? 'id_circuitos' : 'id')
+            ->chunkById(500, function ($rows) use ($table, $legacyColumn, $newColumn, $entityType, $legacyTable, &$updated): void {
+                foreach ($rows as $row) {
+                    $idColumn = $table === 'circuitos_unidades' ? 'id_circuitos' : 'id';
+                    $mapping = OrganizationLegacyMapping::query()
+                        ->matched()
+                        ->where('entity_type', $entityType)
+                        ->where('legacy_table', $legacyTable)
+                        ->where('legacy_id', (string) $row->{$legacyColumn})
+                        ->first();
+
+                    if (! $mapping?->organization_id) {
+                        continue;
+                    }
+
+                    DB::table($table)
+                        ->where($idColumn, $row->{$idColumn})
+                        ->whereNull($newColumn)
+                        ->update([$newColumn => $mapping->organization_id]);
+                    $updated++;
+                }
+            }, $table === 'circuitos_unidades' ? 'id_circuitos' : 'id');
+
+        $summary[] = [$table, $legacyColumn, $newColumn, 'atualizados', $updated];
+    };
+
+    $backfill('office_licenses', 'unidade_id', 'organization_unit_id', 'unit', 'unidades');
+    $backfill('office_licenses', 'departamento_id', 'organization_department_id', 'department', 'departamentos');
+    $backfill('cmdb_assets', 'unit_id', 'organization_unit_id', 'unit', 'unidades');
+    $backfill('cmdb_racks', 'unit_id', 'organization_unit_id', 'unit', 'unidades');
+    $backfill('network_servicos_conectividade', 'unidade_id', 'organization_unit_id', 'unit', 'unidades');
+    $backfill('network_servicos_conectividade', 'departamento_id', 'organization_department_id', 'department', 'departamentos');
+    $backfill('circuitos_unidades', 'id_unidades', 'organization_unit_id', 'unit', 'unidades');
+
+    $this->components->info('Backfill organizacional concluído.');
+    $this->table(['Tabela', 'Campo legado', 'Campo novo', 'Status', 'Total'], $summary);
+
+    return 0;
+})->purpose('Preenche organization_unit_id/organization_department_id a partir dos mapeamentos legados resolvidos.');
 
 Artisan::command('applications:import {--programs-path=/var/www/html/plataforma_chamado/templates/programas} {--images-path=/var/www/html/plataforma_chamado/templates/img} {--truncate}', function () {
     $programsPath = rtrim((string) $this->option('programs-path'), '/');
@@ -351,12 +1099,160 @@ Artisan::command('workspace:sync-dry-run {--cache-preview}', function (GoogleWor
     return 0;
 })->purpose('Compara Google Workspace x CoreTI em modo somente leitura (dry-run).');
 
+Artisan::command('workspace:sync-auto', function (GoogleWorkspaceDryRunSyncService $syncService, CoreTiSyncNotificationService $notificationService) {
+    $this->components->info('Executando sincronização automática do Google Workspace...');
+
+    try {
+        $preview = $syncService->buildAndCachePreview();
+        $summary = is_array($preview['summary'] ?? null) ? $preview['summary'] : [];
+        $hasChanges =
+            (int) ($summary['new_emails'] ?? 0) > 0
+            || (int) ($summary['updated_emails'] ?? 0) > 0
+            || (int) ($summary['center_cost_changes'] ?? 0) > 0;
+
+        if (! $hasChanges) {
+            $this->components->info('Nenhuma alteração pendente. Sync automática ignorada.');
+            return 0;
+        }
+
+        $result = $syncService->applyFromCachedPreview();
+    } catch (\Throwable $e) {
+        $this->components->error('Falha na sync automática: ' . $e->getMessage());
+        $notificationService->notify('Google Workspace', ['errors' => 1], 'failed', $e->getMessage(), [
+            'url' => url('/service-desk'),
+        ]);
+        return 1;
+    }
+
+    $summary = $result['summary'] ?? [];
+    $this->newLine();
+    $this->table(
+        ['Métrica', 'Valor'],
+        [
+            ['Google total', $summary['google_total'] ?? 0],
+            ['Novos e-mails', $summary['new_emails'] ?? 0],
+            ['E-mails existentes', $summary['existing_emails'] ?? 0],
+            ['Atualizados', $summary['updated_emails'] ?? 0],
+            ['Mapeados', $summary['mapped'] ?? 0],
+            ['Pendentes', $summary['pending'] ?? 0],
+            ['Sem AD', $summary['sem_ad'] ?? 0],
+            ['Sem centro de custo real', $summary['sem_centro_custo'] ?? 0],
+            ['Trocas de centro de custo', $summary['center_cost_changes'] ?? 0],
+            ['Já corretos', $summary['ja_correto'] ?? 0],
+        ]
+    );
+
+    $this->newLine();
+    $this->components->info('Sync automática concluída.');
+    $workspaceStatus = ((int) ($summary['pending'] ?? 0) > 0 || (int) ($summary['sem_centro_custo'] ?? 0) > 0) ? 'warning' : 'success';
+    $notificationService->notify('Google Workspace', $summary, $workspaceStatus, null, [
+        'url' => url('/service-desk'),
+    ]);
+
+    return 0;
+})->purpose('Executa a sincronização automática do Google Workspace quando houver mudanças.');
+
+Artisan::command('cmdb:check-expirations', function (JiraIssueService $jiraIssueService, CmdbAssetHistoryService $historyService) {
+    if (! Schema::hasTable('cmdb_expirations')) {
+        $this->components->warn('Tabela cmdb_expirations não encontrada.');
+        return 0;
+    }
+
+    $items = CmdbExpiration::query()
+        ->with('asset')
+        ->where('status', 'pending')
+        ->whereDate('expiration_date', '<=', now()->addDays(90)->toDateString())
+        ->orderBy('expiration_date')
+        ->get();
+
+    $analyzed = 0;
+    $eligible = 0;
+    $ignoredWithJira = 0;
+    $created = 0;
+    $simulated = 0;
+    $errors = 0;
+
+    foreach ($items as $item) {
+        $analyzed++;
+
+        if ($item->jira_issue_key) {
+            $ignoredWithJira++;
+            continue;
+        }
+
+        $daysBefore = (int) ($item->alert_days_before ?? 30);
+        if ($item->expiration_date && now()->addDays($daysBefore)->startOfDay()->lt($item->expiration_date->startOfDay())) {
+            continue;
+        }
+
+        $eligible++;
+        $result = $jiraIssueService->createIssueForExpiration($item);
+
+        if (($result['status'] ?? null) === 'created') {
+            $created++;
+        } elseif (($result['status'] ?? null) === 'simulated') {
+            $simulated++;
+        } else {
+            $errors++;
+            continue;
+        }
+
+        $item->update([
+            'jira_issue_key' => $result['issue_key'] ?? $item->jira_issue_key,
+            'jira_issue_url' => $result['issue_url'] ?? $item->jira_issue_url,
+            'status' => 'notified',
+            'notified_at' => now(),
+        ]);
+
+        if (($result['status'] ?? null) === 'created' && $item->asset) {
+            $historyService->record(
+                $item->asset,
+                null,
+                'jira_issue_created',
+                'Chamado Jira criado',
+                $item->title,
+                [],
+                $item->fresh()->toArray()
+            );
+        }
+    }
+
+    $this->components->table(
+        ['Métrica', 'Valor'],
+        [
+            ['Analisados', $analyzed],
+            ['Elegíveis para ação', $eligible],
+            ['Ignorados por já possuírem Jira', $ignoredWithJira],
+            ['Chamados criados', $created],
+            ['Chamados simulados', $simulated],
+            ['Erros', $errors],
+        ]
+    );
+
+    $this->components->info("Vencimentos processados. Jira criado: {$created} | Simulados: {$simulated} | Ignorados com Jira: {$ignoredWithJira} | Erros: {$errors}");
+    return 0;
+})->purpose('Verifica vencimentos do CMDB e abre chamados no Jira quando necessário');
+
 Schedule::command('workspace:sync-dry-run --cache-preview')
     ->everyThirtyMinutes()
     ->withoutOverlapping()
     ->runInBackground();
 
+Schedule::command('workspace:sync-auto')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+Schedule::command('cmdb:check-expirations')
+    ->dailyAt('07:00')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Artisan::command('units:sync-intranet', function () {
+    $this->components->error('Comando desativado. Use intranet:sync-organization --units ou --full.');
+
+    return 1;
+
     $this->components->info('Sincronizando unidades da intranet_cocari.cadUnicoop...');
 
     try {
@@ -522,12 +1418,11 @@ Artisan::command('units:sync-intranet', function () {
     return 0;
 })->purpose('Sincroniza unidades locais com cadUnicoop (nome, CNPJ e endereço).');
 
-Schedule::command('units:sync-intranet')
-    ->dailyAt('02:15')
-    ->withoutOverlapping()
-    ->runInBackground();
-
 Artisan::command('departamentos:sync', function () {
+    $this->components->error('Comando desativado. Use intranet:sync-organization --departments ou --full.');
+
+    return 1;
+
     $this->components->info('Sincronizando tabela departamentos...');
 
     $normalize = static fn (?string $value): string => trim((string) $value);
@@ -628,6 +1523,10 @@ Artisan::command('departamentos:sync', function () {
 })->purpose('Sincroniza departamentos (nome, unicoop, area) para integrações futuras.');
 
 Artisan::command('departamentos:import-areas {path=Areas.txt}', function () {
+    $this->components->error('Comando desativado. Departamentos oficiais agora vêm de organization_departments via intranet:sync-organization.');
+
+    return 1;
+
     $path = (string) $this->argument('path');
     $fullPath = str_starts_with($path, '/') ? $path : base_path($path);
 
@@ -741,6 +1640,10 @@ Artisan::command('departamentos:import-areas {path=Areas.txt}', function () {
 })->purpose('Importa departamentos do arquivo Areas.txt para a tabela departamentos (unicoop 01).');
 
 Artisan::command('sede-departamentos:sync', function () {
+    $this->components->error('Comando desativado. Use organization_departments como catálogo canônico local.');
+
+    return 1;
+
     $this->components->info('Sincronizando tabela sede_departamentos...');
 
     $rows = DB::table('departamentos')
@@ -837,17 +1740,116 @@ Artisan::command('coreti:rateio-corrigir {--dry-run} {--apply}', function () {
     return 0;
 })->purpose('Corrige a base de rateio com dry-run por padrão.');
 
-Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
+Artisan::command('office:diagnose-collaborators {--limit=20}', function () {
+    $limit = max((int) $this->option('limit'), 1);
+    $matcher = app(OfficeCollaboratorMatcherService::class);
+    $diagnostic = $matcher->diagnoseView($limit, 30);
+
+    $metadata = $diagnostic['metadata'];
+    $counts = $diagnostic['counts'];
+    $fallbackMetadata = $diagnostic['fallback_metadata'] ?? [];
+    $fallbackCounts = $diagnostic['fallback_counts'] ?? [];
+
+    $this->info('Diagnóstico do snapshot local de colaboradores');
+    $this->line('Fonte: ' . (($metadata['source'] ?? null) ?: 'não encontrada'));
+    if (! empty($metadata['message'])) {
+        $this->warn((string) $metadata['message']);
+    }
+    if (! empty($metadata['operation_source']) && ($metadata['operation_source'] ?? null) !== ($metadata['source'] ?? null)) {
+        $this->line('Fonte operacional de fallback: ' . $metadata['operation_source']);
+    }
+    $this->line('Campo de nome escolhido: ' . (($metadata['name_field'] ?? null) ?: '-'));
+    $this->line('Campo CentroCusto: ' . (($metadata['centro_custo_field'] ?? null) ?: '-'));
+    $this->line('Campo NomeSetor: ' . (($metadata['nome_setor_field'] ?? null) ?: '-'));
+    $this->line('Campo IdPessoa: ' . (($metadata['id_pessoa_field'] ?? null) ?: '-'));
+    $this->line('Campo IdUnicoop: ' . (($metadata['id_unicoop_field'] ?? null) ?: '-'));
+    $this->line('Campo IdArea: ' . (($metadata['id_area_field'] ?? null) ?: '-'));
+    $this->line('Campo NomeDepartamento: ' . (($metadata['nome_departamento_field'] ?? null) ?: '-'));
+
+    $this->newLine();
+    $this->table(
+        ['Campo candidato', 'Preenchidos'],
+        collect($metadata['name_candidates'] ?? [])
+            ->map(fn (array $item): array => [$item['name'], $item['filled']])
+            ->all()
+    );
+
+    $this->newLine();
+    $this->table(
+        ['Métrica', 'Valor'],
+        [
+            ['Total de registros em hr_collaborators', $counts['total'] ?? 0],
+            ['Total com campo de nome preenchido', $counts['name_filled'] ?? 0],
+            ['Total com IdPessoa preenchido', $counts['id_pessoa_filled'] ?? 0],
+            ['Total com CentroCusto preenchido', $counts['centro_custo_filled'] ?? 0],
+            ['Total com NomeSetor preenchido', $counts['nome_setor_filled'] ?? 0],
+            ['Total Ativo = 1', $counts['active_total'] ?? 0],
+            ['Total Desligado = 0', $counts['not_disabled_total'] ?? 0],
+            ['Total de nomes únicos', $counts['unique_names'] ?? 0],
+        ]
+    );
+
+    $this->newLine();
+    $this->line('Colunas reais da fonte local:');
+    foreach (($metadata['columns'] ?? []) as $column) {
+        $this->line('- ' . $column);
+    }
+
+    $this->newLine();
+    $this->line('Amostra de registros:');
+    foreach (($diagnostic['samples'] ?? []) as $index => $sample) {
+        $this->line('[' . ($index + 1) . '] ' . json_encode($sample, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    $this->newLine();
+    $this->line('Exemplos distintos de CentroCusto:');
+    foreach (($diagnostic['cost_center_samples'] ?? []) as $value) {
+        $this->line('- ' . $value);
+    }
+
+    $this->newLine();
+    $this->line('Exemplos de NomeSetor:');
+    foreach (($diagnostic['nome_setor_samples'] ?? []) as $value) {
+        $this->line('- ' . $value);
+    }
+
+    if (($fallbackMetadata['source'] ?? null) !== null) {
+        $this->newLine();
+        $this->info('Diagnóstico da fonte fallback');
+        $this->line('Fonte fallback: ' . (($fallbackMetadata['source'] ?? null) ?: 'não encontrada'));
+        $this->line('Fonte operacional: ' . (($fallbackMetadata['source_view'] ?? null) ?: '-'));
+        $this->line('Campo nome: ' . (($fallbackMetadata['name_field'] ?? null) ?: '-'));
+        $this->line('Campo matrícula: ' . (($fallbackMetadata['matricula_field'] ?? null) ?: '-'));
+        $this->line('Campo centro custo: ' . (($fallbackMetadata['centro_custo_field'] ?? null) ?: '-'));
+        $this->line('Campo unidade: ' . (($fallbackMetadata['nome_unicoop_field'] ?? null) ?: '-'));
+        $this->table(
+            ['Métrica fallback', 'Valor'],
+            [
+                ['Total de registros', $fallbackCounts['total'] ?? 0],
+                ['Total com nome preenchido', $fallbackCounts['name_filled'] ?? 0],
+                ['Total com matrícula preenchida', $fallbackCounts['id_pessoa_filled'] ?? 0],
+                ['Total ativos', $fallbackCounts['active_total'] ?? 0],
+                ['Total nomes únicos', $fallbackCounts['unique_names'] ?? 0],
+            ]
+        );
+    }
+
+    return 0;
+})->purpose('Diagnostica a estrutura e amostras do snapshot local de colaboradores.');
+
+Artisan::command('office:sync-microsoft {--deactivate-missing} {--force-deactivate-missing} {--dry-run} {--limit=0}', function (CoreTiSyncNotificationService $notificationService) {
     $enabled = filter_var(env('MS_OFFICE_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL);
     if (! $enabled) {
         $this->warn('Sincronização Microsoft Office desativada (MS_OFFICE_SYNC_ENABLED=false).');
         return 0;
     }
 
+    $dryRun = (bool) $this->option('dry-run');
+    $limit = max((int) $this->option('limit'), 0);
+
     $tenantId = trim((string) env('MS_TENANT_ID', ''));
     $clientId = trim((string) env('MS_CLIENT_ID', ''));
     $clientSecret = trim((string) env('MS_CLIENT_SECRET', ''));
-    $allowedDomain = mb_strtolower(trim((string) env('MS_OFFICE_ALLOWED_DOMAIN', 'cocari.com.br')));
 
     if ($tenantId === '' || $clientId === '' || $clientSecret === '') {
         $this->error('Credenciais Microsoft ausentes no .env (MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET).');
@@ -870,6 +1872,7 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
     $skuOfficeApps = $parseSkuList('MS_SKU_OFFICE_APPS');
     $skuOfficeBusiness = $parseSkuList('MS_SKU_OFFICE_BUSINESS');
     $skuPowerBiPro = $parseSkuList('MS_SKU_POWERBI_PRO');
+    $skuPowerBiPremium = $parseSkuList('MS_SKU_POWERBI_PREMIUM');
     $skuVisioPlan = $parseSkuList('MS_SKU_VISIO_PLAN');
 
     $tokenResponse = Http::asForm()
@@ -908,13 +1911,27 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
         }
     }
 
-    $url = 'https://graph.microsoft.com/v1.0/users?$top=999&$select=id,displayName,mail,userPrincipalName,accountEnabled,employeeId,department,assignedLicenses';
+    $activityAvailable = true;
+    $url = 'https://graph.microsoft.com/v1.0/users?$top=999&$select=id,displayName,mail,userPrincipalName,accountEnabled,employeeId,department,assignedLicenses,signInActivity';
     $users = collect();
 
     while ($url) {
         $response = Http::withToken($accessToken)
             ->timeout(60)
             ->get($url);
+
+        if (! $response->ok() && $activityAvailable && str_contains($url, 'signInActivity')) {
+            // signInActivity requires additional Graph audit permissions. A
+            // missing permission must not interrupt the license sync.
+            $activityAvailable = false;
+            $url = str_replace(',signInActivity', '', $url);
+            $response = Http::withToken($accessToken)
+                ->timeout(60)
+                ->get($url);
+            Log::warning('office:sync-microsoft signInActivity unavailable; continuing without activity data', [
+                'status' => $response->status(),
+            ]);
+        }
 
         if (! $response->ok()) {
             $this->error('Falha ao consultar usuários no Microsoft Graph.');
@@ -935,60 +1952,47 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
         'departamento_unidade',
         'unicoop_office',
         'area_office',
+        'unidade_id',
+        'unidade_nome',
+        'area_nome',
+        'departamento_id',
+        'organization_unit_id',
+        'organization_department_id',
+        'organization_cost_center_id',
+        'organization_assignment_source',
+        'organization_assignment_locked_at',
+        'organization_assignment_locked_by',
+        'departamento_nome',
+        'setor_nome',
+        'cargo_nome',
+        'empresa_nome',
+        'empresa_id_cocari',
+        'centro_custo',
+        'centro_custo_nome',
+        'colaborador_nome',
+        'colaborador_source_view',
+        'colaborador_match_score',
+        'colaborador_match_type',
+        'colaborador_match_status',
+        'colaborador_match_message',
+        'colaborador_matched_at',
+        'microsoft_user_id', 'microsoft_upn', 'account_enabled', 'license_skus', 'account_classification',
+        'organization_unit_source', 'organization_department_source', 'organization_cost_center_source',
+        'organization_position_source', 'organization_position_id',
+        'microsoft_last_sign_in_at', 'microsoft_last_non_interactive_sign_in_at',
+        'microsoft_activity_source', 'microsoft_activity_checked_at',
     ])->keyBy(function ($row) {
         return mb_strtolower(trim((string) $row->email));
     });
-    $emailOrgFallback = DB::table('service_desk_emails')
-        ->select(['email', 'colaborador_nome', 'matricula', 'centro_custo', 'unicoop_sede', 'area_sede'])
-        ->get()
-        ->keyBy(function ($row) {
-            return mb_strtolower(trim((string) $row->email));
-        });
-    $adUsersRows = DB::table('ad_users')
-        ->select(['nome_completo', 'nome_usuario', 'email', 'unidade_setor', 'e_ativo'])
-        ->get();
-    $adUsersByEmail = [];
-    $adUsersByUsername = [];
-    foreach ($adUsersRows as $adUser) {
-        $adEmail = mb_strtolower(trim((string) ($adUser->email ?? '')));
-        if ($adEmail !== '') {
-            $adUsersByEmail[$adEmail] = $adUser;
-        }
-        $adUsername = mb_strtolower(trim((string) ($adUser->nome_usuario ?? '')));
-        if ($adUsername !== '') {
-            $adUsersByUsername[$adUsername] = $adUser;
-            if (! str_contains($adUsername, '@')) {
-                $adUsersByUsername[$adUsername . '@cocari.com.br'] = $adUser;
-            }
-        }
-    }
-
-    // Mapa de centro de custo RH por (unicoop + nome) para preencher código/área quando faltante.
-    $ccRhByUnicoopName = [];
-    try {
-        $ccRhRows = DB::connection('intranet_cocari')
-            ->table('cadCentroCustoRh')
-            ->select(['IdCentroCusto', 'Nome', 'IdUnicoop'])
-            ->get();
-        foreach ($ccRhRows as $ccRh) {
-            $u = trim((string) ($ccRh->IdUnicoop ?? ''));
-            $u = $u !== '' && ctype_digit($u) ? str_pad($u, 2, '0', STR_PAD_LEFT) : $u;
-            $n = $norm((string) ($ccRh->Nome ?? ''));
-            if ($u === '' || $n === '') {
-                continue;
-            }
-            $ccRhByUnicoopName[$u . '|' . $n] = (string) ($ccRh->IdCentroCusto ?? '');
-        }
-    } catch (\Throwable) {
-        // Sem a origem externa, segue fluxo normal.
-    }
+    $officeUserSyncService = app(OfficeUserSyncService::class);
+    $diagnostic = app(OfficeCollaboratorMatcherService::class)->diagnoseView(5, 10);
 
     $upsertRows = [];
-    $cristalinaOverrides = [];
+    $pendingAssignmentRows = [];
     $seenEmails = [];
     $created = 0;
     $updated = 0;
-    $norm = static fn (?string $v): string => (string) Str::of((string) $v)->lower()->ascii()->replaceMatches('/[^a-z0-9]+/', '')->value();
+    $relocated = 0;
     $isInvalidUnit = static function (?string $value): bool {
         $value = trim((string) $value);
         if ($value === '' || $value === 'N/D') {
@@ -997,270 +2001,89 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
 
         return in_array($value, ['0', '00'], true);
     };
-    $isBlank = static fn (?string $v): bool => trim((string) $v) === '';
-
-    // Unidades válidas para Office: bases locais e intranet_cocari.
-    $allowedUnitNorm = [];
-    $canonicalUnitByNorm = [];
-    $unitMetaByNorm = [];
-    foreach (DB::table('service_desk_email_cost_centers')->pluck('name') as $name) {
-        $k = $norm($name);
-        if ($k !== '') {
-            $allowedUnitNorm[$k] = true;
-        }
-    }
-    foreach (DB::table('unidades')->get(['unidade', 'unicoop', 'area']) as $unitRow) {
-        $name = (string) ($unitRow->unidade ?? '');
-        $k = $norm($name);
-        if ($k !== '') {
-            $allowedUnitNorm[$k] = true;
-            $canonicalUnitByNorm[$k] = $name;
-            $unitMetaByNorm[$k] = [
-                'unicoop' => trim((string) ($unitRow->unicoop ?? '')),
-                'area' => trim((string) ($unitRow->area ?? '')),
-            ];
-        }
-    }
-    try {
-        foreach (DB::connection('intranet_cocari')->table('cadUnicoop')->where('Ativo', 1)->pluck('Nome') as $name) {
-            $k = $norm($name);
-            if ($k !== '') {
-                $allowedUnitNorm[$k] = true;
-            }
-        }
-    } catch (\Throwable) {
-        // Se a origem externa falhar, seguimos com as bases locais.
-    }
-
-    $orgByMatricula = static function (?string $matricula): ?array {
-        $matricula = trim((string) $matricula);
-        if ($matricula === '') {
-            return null;
-        }
-
-        static $cache = [];
-        if (array_key_exists($matricula, $cache)) {
-            return $cache[$matricula];
-        }
-
-        try {
-            $conn = DB::connection('intranet_cocari');
-
-            $viewRow = null;
-            try {
-                $viewRow = $conn
-                    ->table('vwCadColaboradorEmpresa')
-                    ->select([
-                        'CodColaborador',
-                        'CentroCusto',
-                        'IdUnicoop',
-                        'IdDepartamento',
-                        'NomeUnidade',
-                        'NomeDepartamento',
-                        'Ativo',
-                    ])
-                    ->where('CodColaborador', $matricula)
-                    ->orderByDesc('Ativo')
-                    ->first();
-            } catch (\Throwable) {
-                $viewRow = null;
-            }
-
-            if ($viewRow) {
-                $unicoop = trim((string) ($viewRow->IdUnicoop ?? ''));
-                $unicoop = $unicoop !== '' && ctype_digit($unicoop)
-                    ? str_pad($unicoop, 2, '0', STR_PAD_LEFT)
-                    : ($unicoop !== '' ? $unicoop : null);
-
-                $centroCusto = trim((string) ($viewRow->CentroCusto ?? ''));
-                $departamentoCodigo = trim((string) ($viewRow->IdDepartamento ?? ''));
-                $departamentoCodigo = $departamentoCodigo !== '' ? preg_replace('/\D+/', '', $departamentoCodigo) : '';
-                $departamentoCodigo = $departamentoCodigo !== '' ? ltrim($departamentoCodigo, '0') : '';
-                $centroCustoCodigo = trim((string) ($viewRow->CentroCusto ?? ''));
-                $centroCustoCodigo = $centroCustoCodigo !== '' ? preg_replace('/\D+/', '', $centroCustoCodigo) : '';
-                $centroCustoCodigo = $centroCustoCodigo !== '' ? ltrim($centroCustoCodigo, '0') : '';
-                if ($centroCustoCodigo !== '' && mb_strlen($centroCustoCodigo) >= 3) {
-                    $centroCustoCodigo = mb_substr($centroCustoCodigo, -3);
-                }
-
-                $areaCodigo = $unicoop === '01'
-                    ? ($departamentoCodigo !== '' ? $departamentoCodigo : $centroCustoCodigo)
-                    : ($centroCustoCodigo !== '' ? $centroCustoCodigo : $departamentoCodigo);
-                $areaCodigo = $areaCodigo !== '' ? $areaCodigo : null;
-
-                $departamentoUnidade = $unicoop === '01'
-                    ? trim((string) ($viewRow->NomeDepartamento ?? ''))
-                    : trim((string) ($viewRow->NomeUnidade ?? ''));
-
-                if ($departamentoUnidade === '') {
-                    $departamentoUnidade = $centroCusto;
-                }
-
-                $cache[$matricula] = [
-                    'departamento_unidade' => $departamentoUnidade !== '' ? mb_substr($departamentoUnidade, 0, 255) : null,
-                    'unicoop_office' => $unicoop,
-                    'area_office' => $areaCodigo ? mb_substr($areaCodigo, 0, 50) : null,
-                ];
-
-                return $cache[$matricula];
-            }
-
-            $row = $conn
-                ->table('cadColaboradorEmpresa as cce')
-                ->leftJoin('cadDepartamento as dep', 'dep.IdDepartamento', '=', 'cce.IdDepartamento')
-                ->leftJoin('cadCentroCustoRh as rh', 'rh.IdCentroCusto', '=', 'cce.CentroCusto')
-                ->leftJoin('cadCentroCustos as cc', 'cc.IdCCusto', '=', 'cce.CentroCusto')
-                ->select([
-                    DB::raw('COALESCE(cce.NomeCentroCusto, rh.Nome, cc.Nome, dep.Nome, cce.CentroCusto) as centro_custo'),
-                    DB::raw('COALESCE(cce.IdUnicoop, rh.IdUnicoop, cc.IdUnicoop) as id_unicoop'),
-                    DB::raw('cce.CentroCusto as centro_custo_codigo'),
-                    DB::raw('cce.IdDepartamento as id_departamento_codigo'),
-                    DB::raw('COALESCE(dep.Nome, cce.IdDepartamento) as departamento'),
-                ])
-                ->where('cce.Matricula', $matricula)
-                ->orderByDesc('cce.Ativo')
-                ->orderByDesc('cce.IdColaborador')
-                ->first();
-
-            if (! $row) {
-                $row = $conn
-                    ->table('cadColaborador as c')
-                    ->leftJoin('cadDepartamento as dep', 'dep.IdDepartamento', '=', 'c.IdDepartamento')
-                    ->leftJoin('cadCentroCustoRh as rh', 'rh.IdCentroCusto', '=', 'c.CentroCusto')
-                    ->leftJoin('cadCentroCustos as cc', 'cc.IdCCusto', '=', 'c.CentroCusto')
-                    ->select([
-                        DB::raw('COALESCE(rh.Nome, cc.Nome, dep.Nome, c.CentroCusto) as centro_custo'),
-                        DB::raw('COALESCE(c.IdUnicoop, rh.IdUnicoop, cc.IdUnicoop) as id_unicoop'),
-                        DB::raw('c.CentroCusto as centro_custo_codigo'),
-                        DB::raw('c.IdDepartamento as id_departamento_codigo'),
-                        DB::raw('COALESCE(dep.Nome, c.IdDepartamento) as departamento'),
-                    ])
-                    ->where('c.Matricula', $matricula)
-                    ->orderByDesc('c.Ativo')
-                    ->first();
-            }
-
-            if (! $row) {
-                $cache[$matricula] = null;
-                return null;
-            }
-
-            $unicoop = trim((string) ($row->id_unicoop ?? ''));
-            $unicoop = $unicoop !== '' && ctype_digit($unicoop)
-                ? str_pad($unicoop, 2, '0', STR_PAD_LEFT)
-                : ($unicoop !== '' ? $unicoop : null);
-
-            $centro = trim((string) ($row->centro_custo ?? ''));
-            $departamento = trim((string) ($row->departamento ?? ''));
-
-            $departamentoCodigo = trim((string) ($row->id_departamento_codigo ?? ''));
-            $departamentoCodigo = $departamentoCodigo !== '' ? preg_replace('/\D+/', '', $departamentoCodigo) : '';
-            $departamentoCodigo = $departamentoCodigo !== '' ? ltrim($departamentoCodigo, '0') : '';
-
-            $centroCustoCodigo = trim((string) ($row->centro_custo_codigo ?? ''));
-            $centroCustoCodigo = $centroCustoCodigo !== '' ? preg_replace('/\D+/', '', $centroCustoCodigo) : '';
-            $centroCustoCodigo = $centroCustoCodigo !== '' ? ltrim($centroCustoCodigo, '0') : '';
-            if ($centroCustoCodigo !== '' && mb_strlen($centroCustoCodigo) >= 3) {
-                $centroCustoCodigo = mb_substr($centroCustoCodigo, -3);
-            }
-
-            $areaCodigo = $unicoop === '01'
-                ? ($departamentoCodigo !== '' ? $departamentoCodigo : $centroCustoCodigo)
-                : ($centroCustoCodigo !== '' ? $centroCustoCodigo : $departamentoCodigo);
-            $areaCodigo = $areaCodigo !== '' ? $areaCodigo : null;
-
-            $departamentoUnidade = $unicoop === '01' ? ($departamento !== '' ? $departamento : $centro) : $centro;
-
-            $cache[$matricula] = [
-                'departamento_unidade' => $departamentoUnidade !== '' ? mb_substr($departamentoUnidade, 0, 255) : null,
-                'unicoop_office' => $unicoop,
-                'area_office' => $areaCodigo ? mb_substr($areaCodigo, 0, 50) : null,
-            ];
-
-            return $cache[$matricula];
-        } catch (\Throwable) {
-            $cache[$matricula] = null;
-            return null;
-        } finally {
-            try {
-                DB::connection('intranet_cocari')->disconnect();
-            } catch (\Throwable) {
-            }
-        }
-    };
-
-    $orgByGasUsuarioForCristalina = static function (?string $email, ?string $matricula): ?array {
-        $email = mb_strtolower(trim((string) $email));
-        $matricula = trim((string) $matricula);
-        $cacheKey = $email . '|' . $matricula;
-
-        static $cache = [];
-        if (array_key_exists($cacheKey, $cache)) {
-            return $cache[$cacheKey];
-        }
-
-        try {
-            $conn = DB::connection('intranet_cocari');
-
-            $query = $conn
-                ->table('gasUsuario as gu')
-                ->leftJoin('cadColaborador as c', 'c.IdPessoa', '=', 'gu.IdPessoa')
-                ->leftJoin('cadCentroCustoRh as rh', 'rh.IdCentroCusto', '=', 'c.CentroCusto')
-                ->leftJoin('cadCentroCustos as cc', 'cc.IdCCusto', '=', 'c.CentroCusto')
-                ->select([
-                    DB::raw('COALESCE(c.IdUnicoop, rh.IdUnicoop, cc.IdUnicoop) as id_unicoop'),
-                    DB::raw('COALESCE(c.CentroCusto, rh.IdCentroCusto, cc.IdCCusto) as centro_custo_codigo'),
-                ]);
-
-            if ($email !== '') {
-                $userAd = trim((string) Str::of($email)->before('@'));
-                $query->where(function ($q) use ($email, $userAd): void {
-                    $q->where('c.Email', $email);
-                    if ($userAd !== '') {
-                        $q->orWhere('gu.UsuarioAd', $userAd);
-                    }
-                });
-            }
-
-            if ($matricula !== '') {
-                $query->orWhere('c.Matricula', $matricula);
-            }
-
-            $row = $query->orderByDesc('c.Ativo')->first();
-            if (! $row) {
-                $cache[$cacheKey] = null;
-                return null;
-            }
-
-            $unicoop = trim((string) ($row->id_unicoop ?? ''));
-            $unicoop = $unicoop !== '' && ctype_digit($unicoop)
-                ? str_pad($unicoop, 2, '0', STR_PAD_LEFT)
-                : ($unicoop !== '' ? $unicoop : null);
-
-            $area = trim((string) ($row->centro_custo_codigo ?? ''));
-            $area = $area !== '' ? preg_replace('/\D+/', '', $area) : '';
-            $area = $area !== '' ? ltrim($area, '0') : '';
-            if ($area !== '' && mb_strlen($area) >= 3) {
-                $area = mb_substr($area, -3);
-            }
-            $area = $area !== '' ? $area : null;
-
-            $cache[$cacheKey] = [
-                'unicoop_office' => $unicoop,
-                'area_office' => $area,
-            ];
-
-            return $cache[$cacheKey];
-        } catch (\Throwable) {
-            $cache[$cacheKey] = null;
-            return null;
-        }
-    };
+    $summary = [
+        'users_total' => 0,
+        'users_with_license' => 0,
+        'matched' => 0,
+        'not_found' => 0,
+        'ambiguous' => 0,
+        'matched_primary_view' => 0,
+        'matched_fallback_view' => 0,
+        'not_found_after_fallback' => 0,
+        'ambiguous_primary_view' => 0,
+        'ambiguous_fallback_view' => 0,
+        'resolved_active_priority' => 0,
+        'resolved_exact_name' => 0,
+        'ambiguous_active_tie' => 0,
+        'ambiguous_equivalent_score' => 0,
+        'centro_custo_valid' => 0,
+        'centro_custo_invalid' => 0,
+        'matricula_found' => 0,
+        'matricula_missing' => 0,
+        'matricula_from_service_desk' => 0,
+        'collaborators_total' => (int) ($diagnostic['counts']['total'] ?? 0),
+        'collaborators_active' => (int) ($diagnostic['counts']['active_total'] ?? 0),
+        'collaborators_not_disabled' => (int) ($diagnostic['counts']['not_disabled_total'] ?? 0),
+        'collaborators_unique_names' => (int) ($diagnostic['counts']['unique_names'] ?? 0),
+        'fallback_collaborators_total' => (int) ($diagnostic['fallback_counts']['total'] ?? 0),
+        'fallback_collaborators_active' => (int) ($diagnostic['fallback_counts']['active_total'] ?? 0),
+        'unit_found' => 0,
+        'unit_missing' => 0,
+        'department_found' => 0,
+        'department_missing' => 0,
+        'licenses_processed' => 0,
+        'errors' => 0,
+    ];
 
     $graphUsersByEmail = [];
+    $changeCandidates = [];
+    $classifyOfficeAccount = static function (string $email, string $name): ?string {
+        $value = mb_strtolower(trim($email . ' ' . $name));
+        foreach (['recepcao', 'financeiro', 'balanca', 'diretoria', 'sala.reuniao', 'power bi', 'powerbi'] as $token) {
+            if (str_contains($value, $token)) {
+                return 'generic_account';
+            }
+        }
+        return null;
+    };
+    $processedLicensed = 0;
+    $emitUserDiagnostics = function (array $officeUser, array $sync): void {
+        $match = $sync['match'] ?? [];
+        $attributes = $sync['attributes'] ?? [];
+
+        $this->newLine();
+        $this->line('Office: ' . trim((string) ($officeUser['nome'] ?? '')) . ' <' . trim((string) ($officeUser['email'] ?? '')) . '>');
+        $this->line('UPN: ' . trim((string) ($officeUser['upn'] ?? '-')));
+        $this->line('Nome normalizado: ' . trim((string) ($match['normalized_office_name'] ?? '-')));
+        $this->line('Campo usado na view: ' . trim((string) ($match['source_name_field'] ?? '-')));
+        $this->line('Candidatos encontrados por LIKE: ' . (int) ($match['like_candidates_count'] ?? 0));
+        $this->line('View usada: ' . trim((string) ($attributes['colaborador_source_view'] ?? '-')));
+        $best = $match['best_candidate'] ?? null;
+        $second = $match['second_candidate'] ?? null;
+        $this->line('Melhor candidato: ' . ($best ? (($best['nome'] ?? '-') . ' - ' . number_format((float) ($best['score'] ?? 0), 2, ',', '.') . '%') : '-'));
+        $this->line('Segundo candidato: ' . ($second ? (($second['nome'] ?? '-') . ' - ' . number_format((float) ($second['score'] ?? 0), 2, ',', '.') . '%') : '-'));
+        $this->line('Status: ' . trim((string) ($attributes['colaborador_match_status'] ?? '-')));
+        $this->line('Motivo: ' . trim((string) ($attributes['colaborador_match_message'] ?? '-')));
+        $this->line('CentroCusto: ' . trim((string) ($attributes['centro_custo'] ?? '-')));
+        $this->line('Unicoop: ' . trim((string) ($attributes['unicoop_office'] ?? '-')));
+        $this->line('Área: ' . trim((string) ($attributes['area_office'] ?? '-')));
+        $this->line('NomeUnicoop: ' . trim((string) ($attributes['unidade_nome'] ?? '-')));
+        $this->line('NomeArea: ' . trim((string) ($attributes['area_nome'] ?? '-')));
+        $this->line('NomeDepartamento: ' . trim((string) ($attributes['departamento_nome'] ?? '-')));
+        $this->line('NomeSetor: ' . trim((string) ($attributes['centro_custo_nome'] ?? '-')));
+        $this->line('Setor: ' . trim((string) ($attributes['setor_nome'] ?? '-')));
+        $this->line('Cargo: ' . trim((string) ($attributes['cargo_nome'] ?? '-')));
+        $this->line('Empresa: ' . trim((string) ($attributes['empresa_nome'] ?? '-')));
+        $this->line('IdPessoa: ' . trim((string) ($attributes['matricula'] ?? '-')));
+        $this->line('Unidade encontrada: ' . trim((string) ($attributes['unidade_nome'] ?? '-')));
+        $this->line('Departamento encontrado: ' . trim((string) ($attributes['departamento_nome'] ?? '-')));
+    };
 
     foreach ($users as $user) {
-        $email = mb_strtolower(trim((string) ($user['mail'] ?? $user['userPrincipalName'] ?? '')));
+        $mail = mb_strtolower(trim((string) ($user['mail'] ?? '')));
+        $upn = mb_strtolower(trim((string) ($user['userPrincipalName'] ?? '')));
+        $emailSource = $mail !== '' && filter_var($mail, FILTER_VALIDATE_EMAIL) ? 'mail' : 'userPrincipalName';
+        $email = $mail !== '' && filter_var($mail, FILTER_VALIDATE_EMAIL) ? $mail : $upn;
         if ($email === '' || ! str_contains($email, '@')) {
             continue;
         }
@@ -1269,18 +2092,23 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
             $email = (string) Str::of($email)->before('@') . '@cocari.com.br';
         }
 
-        if ($allowedDomain !== '' && ! str_ends_with($email, '@' . $allowedDomain)) {
+        // A conta desabilitada ainda pode possuir uma licença atribuída. Ela
+        // também precisa aparecer no painel para controle de custo e ajuste.
+        $assignedLicenses = collect($user['assignedLicenses'] ?? [])->values();
+        if ($assignedLicenses->isEmpty()) {
             continue;
         }
 
+        $summary['users_total']++;
         $seenEmails[$email] = true;
         $graphUsersByEmail[$email] = [
             'id' => (string) ($user['id'] ?? ''),
             'employeeId' => trim((string) ($user['employeeId'] ?? '')),
             'department' => trim((string) ($user['department'] ?? '')),
+            'email_source' => $emailSource,
         ];
 
-        $skuIds = collect($user['assignedLicenses'] ?? [])
+        $skuIds = $assignedLicenses
             ->pluck('skuId')
             ->map(fn ($sku) => mb_strtolower(trim((string) $sku)))
             ->filter()
@@ -1294,12 +2122,12 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
             ->all();
 
         $hasSku = static function (array $ids, array $parts, array $envConfigured, array $partNeedles): bool {
-            if ($envConfigured !== []) {
-                return ! empty(array_intersect($ids, $envConfigured));
+            if ($envConfigured !== [] && ! empty(array_intersect($ids, $envConfigured))) {
+                return true;
             }
             foreach ($parts as $part) {
                 foreach ($partNeedles as $needle) {
-                    if (str_contains($part, $needle)) {
+                    if ($part === $needle || str_starts_with($part, $needle . '_') || str_ends_with($part, '_' . $needle)) {
                         return true;
                     }
                 }
@@ -1307,164 +2135,218 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
             return false;
         };
 
-        $existingRow = $existing->get($email);
-        $employeeId = trim((string) ($user['employeeId'] ?? ''));
-        if ($employeeId === '?' || $employeeId === '-' || $employeeId === '--') {
-            $employeeId = '';
-        }
-        $fallback = $emailOrgFallback->get($email);
-        $emailUserPart = mb_strtolower(trim((string) explode('@', $email)[0]));
-        $adUser = $adUsersByEmail[$email]
-            ?? ($adUsersByUsername[$email] ?? null)
-            ?? ($adUsersByUsername[$emailUserPart] ?? null);
-        $fallbackMatricula = trim((string) ($fallback->matricula ?? ''));
-        $currentMatricula = trim((string) ($existingRow->matricula ?? ''));
-        // Prioridade: matrícula do CoreTI (service_desk_emails) -> Microsoft employeeId -> já existente.
-        $matricula = $fallbackMatricula !== ''
-            ? $fallbackMatricula
-            : ($employeeId !== '' ? $employeeId : ($currentMatricula !== '' ? $currentMatricula : null));
-
-        $orgData = $orgByMatricula($matricula);
-        $fallbackCentro = trim((string) ($fallback->centro_custo ?? ''));
-        $fallbackUnicoop = trim((string) ($fallback->unicoop_sede ?? ''));
-        $fallbackArea = trim((string) ($fallback->area_sede ?? ''));
-        $fallbackNome = trim((string) ($fallback->colaborador_nome ?? ''));
-        $adNome = trim((string) ($adUser->nome_completo ?? ''));
-        $adUnidadeSetor = trim((string) ($adUser->unidade_setor ?? ''));
-        $adUnidadeSetorNorm = $norm($adUnidadeSetor);
-        $adUnidadeSetorCanon = $adUnidadeSetorNorm !== '' && isset($canonicalUnitByNorm[$adUnidadeSetorNorm])
-            ? $canonicalUnitByNorm[$adUnidadeSetorNorm]
-            : $adUnidadeSetor;
-
         // Contabiliza somente as 4 licenças definidas:
         // Microsoft 365 Apps for enterprise, Microsoft 365 Apps for business, Power BI Pro, Visio Plan 2.
-        $hasOfficeApps = $hasSku($skuIds, $skuParts, $skuOfficeApps, ['m365_apps', 'o365_proplus', 'officesubscription']);
-        $hasOfficeBusiness = $hasSku($skuIds, $skuParts, $skuOfficeBusiness, ['business', 'm365_business', 'o365_business']);
+        $hasOfficeApps = $hasSku($skuIds, $skuParts, $skuOfficeApps, ['m365_apps_for_enterprise', 'm365_apps_for_business', 'o365_proplus', 'officesubscription']);
+        $hasOfficeBusiness = $hasSku($skuIds, $skuParts, $skuOfficeBusiness, ['m365_business_basic', 'm365_business_standard', 'm365_business_premium', 'o365_business']);
         $hasPowerBiPro = $hasSku($skuIds, $skuParts, $skuPowerBiPro, ['power_bi_pro']);
-        $hasVisioPlan = $hasSku($skuIds, $skuParts, $skuVisioPlan, ['visio']);
+        $hasPowerBiPremium = $hasSku($skuIds, $skuParts, $skuPowerBiPremium, ['power_bi_premium']);
+        $hasVisioPlan = $hasSku($skuIds, $skuParts, $skuVisioPlan, ['visio_plan', 'visio', 'visioclient', 'visio_client']);
+        // A regra de inclusão é ter qualquer assignedLicense. As categorias
+        // abaixo servem apenas para indicadores e rateio; SKU desconhecida
+        // não pode excluir o usuário da sincronização.
+        $skuDetails = collect($skuIds)->map(function (string $skuId) use ($skuIdToPart, $skuOfficeApps, $skuOfficeBusiness, $skuPowerBiPro, $skuPowerBiPremium, $skuVisioPlan, $hasSku): array {
+            $part = $skuIdToPart[$skuId] ?? '';
+            $category = $hasSku([$skuId], [$part], $skuOfficeApps, ['m365_apps_for_enterprise', 'm365_apps_for_business', 'o365_proplus', 'officesubscription']) ? 'office_apps'
+                : ($hasSku([$skuId], [$part], $skuOfficeBusiness, ['m365_business_basic', 'm365_business_standard', 'm365_business_premium', 'o365_business']) ? 'office_business'
+                : ($hasSku([$skuId], [$part], $skuPowerBiPro, ['power_bi_pro']) ? 'powerbi_pro'
+                : ($hasSku([$skuId], [$part], $skuPowerBiPremium, ['power_bi_premium']) ? 'powerbi_premium'
+                : ($hasSku([$skuId], [$part], $skuVisioPlan, ['visio_plan', 'visio', 'visioclient', 'visio_client']) ? 'visio_plan' : null))));
+            return ['sku_id' => $skuId, 'sku_part_number' => $part, 'mapped_category' => $category, 'is_monitored' => $category !== null];
+        })->all();
 
-        $hasAnyTrackedLicense = $hasOfficeApps || $hasOfficeBusiness || $hasPowerBiPro || $hasVisioPlan;
-
-        if (! $hasAnyTrackedLicense) {
-            // Regra: não adicionar no painel Office usuários sem licenças monitoradas.
-            continue;
+        foreach ($skuDetails as $skuDetail) {
+            $skuDisplayName = OfficeLicenseReportPolicy::displayName(
+                $skuDetail['sku_part_number'],
+                $skuDetail['sku_part_number'] ?: $skuDetail['sku_id']
+            );
+            $pendingAssignmentRows[] = [
+                'email' => $email,
+                'microsoft_user_id' => (string) ($user['id'] ?? ''),
+                'microsoft_upn' => $upn,
+                'user_name' => (string) ($user['displayName'] ?? ''),
+                'user_email' => $email,
+                'sku_id' => $skuDetail['sku_id'],
+                'sku_part_number' => $skuDetail['sku_part_number'] !== '' ? $skuDetail['sku_part_number'] : null,
+                'sku_name' => $skuDisplayName,
+                'license_category' => $skuDetail['mapped_category'],
+                'included_in_report' => ! OfficeLicenseReportPolicy::isExcluded(
+                    $skuDetail['sku_part_number'],
+                    $skuDisplayName
+                ),
+                'exclusion_reason' => OfficeLicenseReportPolicy::exclusionReason(
+                    $skuDetail['sku_part_number'],
+                    $skuDisplayName
+                ),
+                'account_enabled' => (bool) ($user['accountEnabled'] ?? false),
+                'license_source' => 'microsoft_graph',
+                'metadata' => json_encode(['raw_sku_id' => $skuDetail['sku_id']], JSON_UNESCAPED_UNICODE),
+                'synced_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
 
-        $resolvedDepartment = $adUnidadeSetorCanon !== '' ? $adUnidadeSetorCanon : null;
-        if ($isInvalidUnit($resolvedDepartment)) {
-            $resolvedDepartment = $orgData['departamento_unidade'] ?? null;
-        }
-        if ($isInvalidUnit($resolvedDepartment)) {
-            $resolvedDepartment = $fallbackCentro !== '' ? $fallbackCentro : null;
-        }
-        if (! $isInvalidUnit($resolvedDepartment)) {
-            $candidateNorm = $norm($resolvedDepartment);
-            if ($candidateNorm === '' || ! isset($allowedUnitNorm[$candidateNorm])) {
-                $resolvedDepartment = null;
-            }
-        }
-        if ($isInvalidUnit($resolvedDepartment)) {
-            $resolvedDepartment = 'N/D';
+        $processedLicensed++;
+        if ($limit > 0 && $processedLicensed > $limit) {
+            break;
         }
 
-        // Preserva ajustes manuais: para registros já existentes, sincronização NÃO altera
-        // unidade/unicoop/área (apenas nome, matrícula, licenças e ativo).
-        $existingNome = trim((string) ($existingRow->nome ?? ''));
-        $existingMatricula = trim((string) ($existingRow->matricula ?? ''));
-        $existingDepartamento = trim((string) ($existingRow->departamento_unidade ?? ''));
-        $existingUnicoop = trim((string) ($existingRow->unicoop_office ?? ''));
-        $existingArea = trim((string) ($existingRow->area_office ?? ''));
+        $summary['users_with_license']++;
+        $summary['licenses_processed'] += $skuIds !== [] ? count($skuIds) : 0;
 
-        $finalNome = $existingNome !== ''
-            ? $existingNome
-            : ($adNome !== '' ? $adNome : (trim((string) ($user['displayName'] ?? '')) !== '' ? trim((string) $user['displayName']) : ($fallbackNome !== '' ? $fallbackNome : $email)));
+        $existingRow = $existing->get($email);
+        $sync = $officeUserSyncService->buildOfficeLicenseAttributes([
+            'nome' => (string) ($user['displayName'] ?? ''),
+            'email' => $email,
+            'upn' => (string) ($user['userPrincipalName'] ?? ''),
+            'external_id' => (string) ($user['id'] ?? ''),
+            'department' => (string) ($user['department'] ?? ''),
+            'account_enabled' => (bool) ($user['accountEnabled'] ?? false),
+        ], $existingRow);
 
-        $finalMatricula = $existingMatricula !== '' ? $existingMatricula : $matricula;
+        $sync['attributes']['microsoft_user_id'] = (string) ($user['id'] ?? '');
+        $sync['attributes']['microsoft_upn'] = $upn;
+        $sync['attributes']['account_enabled'] = (bool) ($user['accountEnabled'] ?? false);
+        $sync['attributes']['license_skus'] = $skuIds;
+        $sync['attributes']['license_source'] = 'microsoft_graph';
+        $sync['attributes']['account_classification'] = $classifyOfficeAccount($email, (string) ($user['displayName'] ?? ''));
 
-        $finalDepartment = $existingRow
-            ? ($existingRow->departamento_unidade ?? null)
-            : $resolvedDepartment;
+        $activityRow = [];
+        if ($activityAvailable && array_key_exists('signInActivity', $user)) {
+            $signInActivity = is_array($user['signInActivity']) ? $user['signInActivity'] : [];
+            $activityRow = [
+                'microsoft_last_sign_in_at' => $signInActivity['lastSuccessfulSignInDateTime'] ?? null,
+                'microsoft_last_non_interactive_sign_in_at' => $signInActivity['lastNonInteractiveSignInDateTime'] ?? null,
+                'microsoft_activity_source' => 'graph_sign_in_activity',
+                'microsoft_activity_checked_at' => now(),
+            ];
+        }
 
-        $finalUnicoop = $existingRow
-            ? ($existingRow->unicoop_office ?? null)
-            : ($orgData['unicoop_office'] ?? ($fallbackUnicoop !== '' ? $fallbackUnicoop : null));
-        $finalArea = $existingRow
-            ? ($existingRow->area_office ?? null)
-            : ($orgData['area_office'] ?? ($fallbackArea !== '' ? $fallbackArea : null));
+        $sync['attributes']['organization_position_id'] = $sync['attributes']['organization_position_id'] ?? null;
+        $sync['attributes']['organization_position_source'] = $existingRow?->organization_position_source ?? 'sync';
 
-        // Exceção solicitada: colaboradores em Cristalina II podem buscar unicoop/área via gasUsuario.
-        $depNormForGas = (string) Str::of((string) $finalDepartment)->lower()->ascii()->replaceMatches('/[^a-z0-9]+/', '');
-        if (str_starts_with($depNormForGas, 'cristalina')) {
-            $gasOrg = $orgByGasUsuarioForCristalina($email, $finalMatricula);
-            if ($gasOrg) {
-                if (! $isBlank($gasOrg['unicoop_office'] ?? null)) {
-                    $finalUnicoop = $gasOrg['unicoop_office'];
-                }
-                if (! $isBlank($gasOrg['area_office'] ?? null)) {
-                    $finalArea = $gasOrg['area_office'];
-                }
-
-                if ($existingRow) {
-                    $cristalinaOverrides[$email] = [
-                        'unicoop_office' => $finalUnicoop,
-                        'area_office' => $finalArea,
+        $fieldMap = [
+            'organization_unit_id' => 'organization_unit_source',
+            'organization_department_id' => 'organization_department_source',
+            'organization_cost_center_id' => 'organization_cost_center_source',
+            'organization_position_id' => 'organization_position_source',
+        ];
+        foreach ($fieldMap as $field => $sourceField) {
+            $currentSource = trim((string) ($existingRow?->{$sourceField} ?? ($existingRow?->organization_assignment_source ?? 'sync')));
+            $proposed = $sync['attributes'][$field] ?? null;
+            $current = $existingRow?->{$field} ?? null;
+            if ($existingRow && $currentSource === 'manual') {
+                if ((string) $current !== (string) $proposed && $proposed !== null) {
+                    $changeCandidates[] = [
+                        'email' => $email,
+                        'field_name' => $field,
+                        'current_value' => $current,
+                        'proposed_value' => $proposed,
+                        'hr_collaborator_id' => data_get($sync, 'match.collaborator.local_id'),
+                        'current_source' => 'manual',
                     ];
                 }
-            }
-        }
-
-        // Regra operacional: registros em "Cristalina II" com unicoop 16
-        // pertencem à unidade "Cristalina" (exceto e-mails explicitamente definidos).
-        if (
-            (string) Str::of((string) $finalDepartment)->lower()->ascii()->replaceMatches('/[^a-z0-9]+/', '') === 'cristalinaii'
-            && trim((string) $finalUnicoop) === '16'
-            && mb_strtolower((string) $email) !== 'fabio.xavier@cocari.com.br'
-        ) {
-            $finalDepartment = 'Cristalina';
-        }
-
-        // Se for unidade conhecida, completa unicoop/área diretamente da tabela unidades.
-        $depNorm = $norm((string) $finalDepartment);
-        if ($depNorm !== '' && isset($unitMetaByNorm[$depNorm])) {
-            $uMeta = $unitMetaByNorm[$depNorm];
-            if ($isBlank($finalUnicoop) && ! $isBlank($uMeta['unicoop'] ?? null)) {
-                $finalUnicoop = $uMeta['unicoop'];
-            }
-            if ($isBlank($finalArea) && ! $isBlank($uMeta['area'] ?? null)) {
-                $finalArea = $uMeta['area'];
-            }
-        }
-
-        // Se ainda estiver sem área/código, tenta derivar de cadCentroCustoRh por (unicoop + unidade/departamento).
-        if ($isBlank($finalArea) && ! $isBlank($finalUnicoop) && ! $isBlank($finalDepartment)) {
-            $ccKey = trim((string) $finalUnicoop) . '|' . $norm((string) $finalDepartment);
-            $ccId = trim((string) ($ccRhByUnicoopName[$ccKey] ?? ''));
-            if ($ccId !== '' && ctype_digit($ccId)) {
-                // Regra solicitada: 1.xxx recebe 0 à esquerda => 01.xxx
-                if (preg_match('/^1\\d{3}$/', $ccId)) {
-                    $finalArea = '0' . mb_substr($ccId, 0, 1) . '.' . mb_substr($ccId, 1);
-                } else {
-                    $finalArea = $ccId;
+                $sync['attributes'][$field] = $current;
+                foreach (match ($field) {
+                    'organization_unit_id' => ['unicoop_office', 'unidade_id', 'unidade_nome', 'departamento_unidade'],
+                    'organization_department_id' => ['area_office', 'departamento_id', 'area_nome', 'departamento_nome', 'setor_nome'],
+                    'organization_cost_center_id' => ['centro_custo', 'centro_custo_nome'],
+                    'organization_position_id' => ['cargo_nome'],
+                    default => [],
+                } as $relatedField) {
+                    if (property_exists($existingRow, $relatedField)) {
+                        $sync['attributes'][$relatedField] = $existingRow->{$relatedField};
+                    }
                 }
             }
         }
 
-        $row = [
+        foreach ($sync['counters'] as $key => $value) {
+            if (array_key_exists($key, $summary)) {
+                $summary[$key] += (int) $value;
+            }
+        }
+
+        if ($dryRun || $this->output->isVerbose()) {
+            $emitUserDiagnostics([
+                'nome' => (string) ($user['displayName'] ?? ''),
+                'email' => $email,
+                'upn' => (string) ($user['userPrincipalName'] ?? ''),
+            ], $sync);
+        }
+
+        $finalDepartment = trim((string) ($sync['attributes']['departamento_unidade'] ?? ''));
+        if ($isInvalidUnit($finalDepartment)) {
+            $finalDepartment = 'N/D';
+            $sync['attributes']['departamento_unidade'] = $finalDepartment;
+        }
+
+        $finalUnicoop = trim((string) ($sync['attributes']['unicoop_office'] ?? '')) ?: null;
+        $finalArea = trim((string) ($sync['attributes']['area_office'] ?? '')) ?: null;
+        $assignmentSource = ($existingRow?->organization_assignment_source ?? null) === 'manual' ? 'manual' : 'sync';
+
+        if ($existingRow && (
+            trim((string) ($existingRow->departamento_unidade ?? '')) !== trim((string) ($finalDepartment ?? ''))
+            || trim((string) ($existingRow->unicoop_office ?? '')) !== trim((string) ($finalUnicoop ?? ''))
+            || trim((string) ($existingRow->area_office ?? '')) !== trim((string) ($finalArea ?? ''))
+        )) {
+            $relocated++;
+        }
+
+        $row = array_merge([
             'email' => $email,
-            'nome' => $finalNome,
-            'matricula' => $finalMatricula,
+            'nome' => $sync['attributes']['nome'],
+            'matricula' => $sync['attributes']['matricula'],
             'departamento_unidade' => $finalDepartment,
             'unicoop_office' => $finalUnicoop,
             'area_office' => $finalArea,
+            'unidade_id' => $sync['attributes']['unidade_id'],
+            'organization_unit_id' => $sync['attributes']['organization_unit_id'],
+            'unidade_nome' => $sync['attributes']['unidade_nome'],
+            'area_nome' => $sync['attributes']['area_nome'],
+            'departamento_id' => $sync['attributes']['departamento_id'],
+            'organization_department_id' => $sync['attributes']['organization_department_id'],
+            'organization_cost_center_id' => $sync['attributes']['organization_cost_center_id'],
+            'organization_assignment_source' => $sync['attributes']['organization_assignment_source'],
+            'organization_assignment_locked_at' => $sync['attributes']['organization_assignment_locked_at'],
+            'organization_assignment_locked_by' => $sync['attributes']['organization_assignment_locked_by'],
+            'departamento_nome' => $sync['attributes']['departamento_nome'],
+            'setor_nome' => $sync['attributes']['setor_nome'],
+            'cargo_nome' => $sync['attributes']['cargo_nome'],
+            'empresa_nome' => $sync['attributes']['empresa_nome'],
+            'empresa_id_cocari' => $sync['attributes']['empresa_id_cocari'],
+            'centro_custo' => $sync['attributes']['centro_custo'],
+            'centro_custo_nome' => $sync['attributes']['centro_custo_nome'],
+            'colaborador_nome' => $sync['attributes']['colaborador_nome'],
+            'colaborador_source_view' => $sync['attributes']['colaborador_source_view'],
+            'colaborador_match_score' => $sync['attributes']['colaborador_match_score'],
+            'colaborador_match_type' => $sync['attributes']['colaborador_match_type'],
+            'colaborador_matched_at' => $sync['attributes']['colaborador_matched_at'],
+            'colaborador_match_status' => $sync['attributes']['colaborador_match_status'],
+            'colaborador_match_message' => $sync['attributes']['colaborador_match_message'],
+            'microsoft_user_id' => $sync['attributes']['microsoft_user_id'],
+            'microsoft_upn' => $sync['attributes']['microsoft_upn'],
+            'account_enabled' => $sync['attributes']['account_enabled'],
+            'license_skus' => json_encode($skuDetails, JSON_UNESCAPED_UNICODE),
+            'license_source' => $sync['attributes']['license_source'],
+            'account_classification' => $sync['attributes']['account_classification'],
+            'organization_position_id' => $sync['attributes']['organization_position_id'],
+            'organization_unit_source' => $existingRow?->organization_unit_source ?: $assignmentSource,
+            'organization_department_source' => $existingRow?->organization_department_source ?: $assignmentSource,
+            'organization_cost_center_source' => $existingRow?->organization_cost_center_source ?: $assignmentSource,
+            'organization_position_source' => $existingRow?->organization_position_source ?: $assignmentSource,
             'office_apps' => $hasOfficeApps,
             'office_business' => $hasOfficeBusiness,
             'powerbi_pro' => $hasPowerBiPro,
+            'powerbi_premium' => $hasPowerBiPremium,
             'visio_plan' => $hasVisioPlan,
-            // Para o painel de licenciamento, "ativo" segue a presença de licença monitorada.
-            'ativo' => $hasAnyTrackedLicense,
+            // Usuário ativo com qualquer licença atribuída permanece no painel,
+            // inclusive quando a SKU ainda não está mapeada em uma categoria.
+            'ativo' => true,
             'created_at' => $existingRow ? null : now(),
             'updated_at' => now(),
-        ];
+        ], $activityRow);
 
         if (! $existingRow) {
             $created++;
@@ -1475,29 +2357,44 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
         $upsertRows[] = $row;
     }
 
-    if ($upsertRows !== []) {
+    if (! $dryRun && $upsertRows !== []) {
         DB::table('office_licenses')->upsert(
             $upsertRows,
             ['email'],
-            ['nome', 'matricula', 'office_apps', 'office_business', 'powerbi_pro', 'visio_plan', 'ativo', 'updated_at']
+            ['nome', 'matricula', 'departamento_unidade', 'unicoop_office', 'area_office', 'unidade_id', 'organization_unit_id', 'unidade_nome', 'area_nome', 'departamento_id', 'organization_department_id', 'organization_cost_center_id', 'organization_position_id', 'organization_assignment_source', 'organization_assignment_locked_at', 'organization_assignment_locked_by', 'organization_unit_source', 'organization_department_source', 'organization_cost_center_source', 'organization_position_source', 'departamento_nome', 'setor_nome', 'cargo_nome', 'empresa_nome', 'empresa_id_cocari', 'centro_custo', 'centro_custo_nome', 'colaborador_nome', 'colaborador_source_view', 'colaborador_match_score', 'colaborador_match_type', 'colaborador_matched_at', 'colaborador_match_status', 'colaborador_match_message', 'microsoft_user_id', 'microsoft_upn', 'account_enabled', 'license_skus', 'license_source', 'account_classification', 'office_apps', 'office_business', 'powerbi_pro', 'powerbi_premium', 'visio_plan', 'ativo', 'updated_at', 'microsoft_last_sign_in_at', 'microsoft_last_non_interactive_sign_in_at', 'microsoft_activity_source', 'microsoft_activity_checked_at']
         );
     }
 
-    if ($cristalinaOverrides !== []) {
-        foreach ($cristalinaOverrides as $emailKey => $override) {
-            DB::table('office_licenses')
-                ->whereRaw('LOWER(email) = ?', [mb_strtolower((string) $emailKey)])
-                ->update([
-                    'unicoop_office' => $override['unicoop_office'] ?? null,
-                    'area_office' => $override['area_office'] ?? null,
-                    'updated_at' => now(),
-                ]);
+    if (! $dryRun && $limit === 0 && Schema::hasTable('office_license_assignments')) {
+        $licenseIdsByEmail = DB::table('office_licenses')
+            ->whereIn('email', array_keys($seenEmails))
+            ->pluck('id', 'email');
+
+        $assignmentRows = collect($pendingAssignmentRows)
+            ->map(function (array $row) use ($licenseIdsByEmail): ?array {
+                $officeLicenseId = $licenseIdsByEmail->get($row['email']);
+                if (! $officeLicenseId) {
+                    return null;
+                }
+
+                unset($row['email']);
+                $row['office_license_id'] = $officeLicenseId;
+                return $row;
+            })
+            ->filter()
+            ->values();
+
+        // A full Graph sync is the authoritative snapshot: assignments
+        // removed in Microsoft must disappear locally as well.
+        DB::table('office_license_assignments')->delete();
+        foreach ($assignmentRows->chunk(500) as $chunk) {
+            DB::table('office_license_assignments')->insert($chunk->all());
         }
     }
 
     // Opcional: envia para Microsoft (admin.cloud) matrícula e unidade/departamento corrigidos manualmente no CoreTI.
     $pushEnabled = filter_var(env('MS_OFFICE_PUSH_ENABLED', false), FILTER_VALIDATE_BOOL);
-    if ($pushEnabled) {
+    if (! $dryRun && $pushEnabled) {
         $pushed = 0;
         $skipped = 0;
         $errors = 0;
@@ -1561,7 +2458,17 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
 
     $deactivated = 0;
     $deleted = 0;
-    if ($this->option('deactivate-missing')) {
+    $allowDeactivation = ! $dryRun && (bool) $this->option('deactivate-missing') && $limit === 0;
+    if ($allowDeactivation) {
+        $emailsSet = array_keys($seenEmails);
+        $existingActiveCount = (int) DB::table('office_licenses')->where('ativo', true)->count();
+        $reductionIsSuspicious = $existingActiveCount > 0 && count($emailsSet) < (int) floor($existingActiveCount * 0.8);
+        if ($reductionIsSuspicious && ! $this->option('force-deactivate-missing')) {
+            $this->warn("Desativação protegida: o Graph retornou " . count($emailsSet) . " usuários contra {$existingActiveCount} ativos. Use --force-deactivate-missing para confirmar.");
+            $allowDeactivation = false;
+        }
+    }
+    if ($allowDeactivation) {
         $emailsSet = array_keys($seenEmails);
         $query = DB::table('office_licenses');
         if (! empty($emailsSet)) {
@@ -1576,30 +2483,434 @@ Artisan::command('office:sync-microsoft {--deactivate-missing}', function () {
                 'office_apps' => false,
                 'office_business' => false,
                 'powerbi_pro' => false,
+                'powerbi_premium' => false,
                 'visio_plan' => false,
                 'updated_at' => now(),
             ]);
         }
     }
 
-    $this->info("Sincronização Office concluída. Criados: {$created} | Atualizados: {$updated} | Desativados ausentes: {$deactivated} | Excluídos ausentes: {$deleted}");
+    foreach ($changeCandidates as $candidate) {
+        if ($dryRun) {
+            continue;
+        }
+        $licenseId = DB::table('office_licenses')->where('email', $candidate['email'])->value('id');
+        if (! $licenseId || ! Schema::hasTable('office_sync_change_requests')) {
+            continue;
+        }
+        $hash = hash('sha256', $candidate['field_name'] . '|' . (string) $candidate['current_value'] . '|' . (string) $candidate['proposed_value']);
+        $duplicate = DB::table('office_sync_change_requests')
+            ->where('office_license_id', $licenseId)
+            ->where('field_name', $candidate['field_name'])
+            ->where('proposal_hash', $hash)
+            ->whereIn('status', ['pending', 'rejected'])
+            ->exists();
+        if (! $duplicate) {
+            // The matcher may come from a read-only source view whose ID is
+            // not the local snapshot primary key. The FK must only receive a
+            // real hr_collaborators.id; the change request itself remains
+            // valid without that optional link.
+            $hrCollaboratorId = $candidate['hr_collaborator_id'] ?? null;
+            if ($hrCollaboratorId !== null && ! DB::table('hr_collaborators')->where('id', $hrCollaboratorId)->exists()) {
+                $hrCollaboratorId = null;
+            }
+
+            DB::table('office_sync_change_requests')->insert([
+                'office_license_id' => $licenseId,
+                'hr_collaborator_id' => $hrCollaboratorId,
+                'field_name' => $candidate['field_name'],
+                'current_value' => (string) $candidate['current_value'],
+                'proposed_value' => (string) $candidate['proposed_value'],
+                'current_source' => 'manual',
+                'status' => 'pending',
+                'detected_at' => now(),
+                'proposal_hash' => $hash,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    Log::info('office:sync-microsoft summary', [
+        'total_usuarios_office' => $summary['users_total'],
+        'total_usuarios_com_licenca' => $summary['users_with_license'],
+        'total_colaboradores_carregados_view' => $summary['collaborators_total'],
+        'total_colaboradores_ativos' => $summary['collaborators_active'],
+        'total_colaboradores_nao_desligados' => $summary['collaborators_not_disabled'],
+        'total_nomes_unicos_view' => $summary['collaborators_unique_names'],
+        'total_colaboradores_fallback' => $summary['fallback_collaborators_total'],
+        'total_colaboradores_fallback_ativos' => $summary['fallback_collaborators_active'],
+        'total_vinculados_colaborador' => $summary['matched'],
+        'vinculados_pela_view_principal' => $summary['matched_primary_view'],
+        'vinculados_pela_view_empresa' => $summary['matched_fallback_view'],
+        'nao_encontrados_apos_fallback' => $summary['not_found_after_fallback'],
+        'ambiguos_na_view_principal' => $summary['ambiguous_primary_view'],
+        'ambiguos_na_view_empresa' => $summary['ambiguous_fallback_view'],
+        'total_nao_encontrados' => $summary['not_found'],
+        'total_ambiguos' => $summary['ambiguous'],
+        'resolvidos_por_prioridade_ativo' => $summary['resolved_active_priority'],
+        'resolvidos_por_nome_exato' => $summary['resolved_exact_name'],
+        'ambiguos_entre_ativos' => $summary['ambiguous_active_tie'],
+        'ambiguos_por_score_equivalente' => $summary['ambiguous_equivalent_score'],
+        'total_centro_custo_valido' => $summary['centro_custo_valid'],
+        'total_centro_custo_invalido' => $summary['centro_custo_invalid'],
+        'total_matricula_encontrada' => $summary['matricula_found'],
+        'total_sem_matricula' => $summary['matricula_missing'],
+        'matricula_from_service_desk' => $summary['matricula_from_service_desk'],
+        'total_com_unidade_encontrada' => $summary['unit_found'],
+        'total_sem_unidade_encontrada' => $summary['unit_missing'],
+        'total_com_departamento_encontrado' => $summary['department_found'],
+        'total_sem_departamento_encontrado' => $summary['department_missing'],
+        'total_licencas_processadas' => $summary['licenses_processed'],
+        'total_erros' => $summary['errors'],
+        'criados' => $created,
+        'atualizados' => $updated,
+        'realocados' => $relocated,
+        'desativados_ausentes' => $deactivated,
+        'excluidos_ausentes' => $deleted,
+    ]);
+
+    $modeLabel = $dryRun ? 'DRY-RUN Office concluído.' : 'Sincronização Office concluída.';
+    $this->info("{$modeLabel} Office licenciados: {$summary['users_with_license']} | Colab. principal: {$summary['collaborators_total']} | Ativos principal: {$summary['collaborators_active']} | Colab. fallback: {$summary['fallback_collaborators_total']} | Ativos fallback: {$summary['fallback_collaborators_active']} | Criados: {$created} | Atualizados: {$updated} | Realocados: {$relocated} | Vinculados: {$summary['matched']} | Principal: {$summary['matched_primary_view']} | Empresa: {$summary['matched_fallback_view']} | Não encontrados pós-fallback: {$summary['not_found_after_fallback']} | Ambíguos principal: {$summary['ambiguous_primary_view']} | Ambíguos empresa: {$summary['ambiguous_fallback_view']} | Por ativo: {$summary['resolved_active_priority']} | Por nome exato: {$summary['resolved_exact_name']} | Ambíguos entre ativos: {$summary['ambiguous_active_tie']} | Ambíguos por score: {$summary['ambiguous_equivalent_score']} | CC preenchido: {$summary['centro_custo_valid']} | CC zerado/vazio: {$summary['centro_custo_invalid']} | Unidade encontrada: {$summary['unit_found']} | Sem unidade: {$summary['unit_missing']} | Departamento encontrado: {$summary['department_found']} | Sem departamento: {$summary['department_missing']} | Sem matrícula: {$summary['matricula_missing']} | Desativados ausentes: {$deactivated} | Excluídos ausentes: {$deleted}");
+    if (! $dryRun) {
+        $officeNotificationSummary = array_merge($summary, [
+            'created' => $created,
+            'updated' => $updated,
+            'relocated' => $relocated,
+            'deactivated' => $deactivated,
+            'deleted' => $deleted,
+        ]);
+        $officeStatus = ((int) ($summary['not_found'] ?? 0) > 0
+            || (int) ($summary['ambiguous'] ?? 0) > 0
+            || (int) ($summary['unit_missing'] ?? 0) > 0
+            || (int) ($summary['department_missing'] ?? 0) > 0
+            || (int) ($summary['errors'] ?? 0) > 0) ? 'warning' : 'success';
+        $notificationService->notify('Office/Microsoft 365', $officeNotificationSummary, $officeStatus, null, [
+            'url' => url('/service-desk/office'),
+        ]);
+    }
     return 0;
 })->purpose('Sincroniza licenças Office com Microsoft Graph');
+
+Artisan::command('office:diagnose-skus {--show-unmapped}', function () {
+    $rows = DB::table('office_licenses')->where('ativo', true)->get(['license_skus']);
+    $counts = [];
+    foreach ($rows as $row) {
+        $skus = json_decode((string) ($row->license_skus ?? '[]'), true);
+        foreach (is_array($skus) ? $skus : [] as $sku) {
+            $sku = is_array($sku) ? mb_strtolower(trim((string) ($sku['sku_part_number'] ?? $sku['sku_id'] ?? ''))) : mb_strtolower(trim((string) $sku));
+            if ($sku !== '') $counts[$sku] = ($counts[$sku] ?? 0) + 1;
+        }
+    }
+    if ($counts === []) {
+        $this->warn('Nenhuma SKU foi armazenada ainda. Execute office:sync-microsoft para coletar o catálogo atual.');
+        return 0;
+    }
+    $configured = collect(['MS_SKU_OFFICE_APPS', 'MS_SKU_OFFICE_BUSINESS', 'MS_SKU_POWERBI_PRO', 'MS_SKU_POWERBI_PREMIUM', 'MS_SKU_VISIO_PLAN'])
+        ->flatMap(fn (string $key) => array_filter(array_map('trim', explode(',', (string) env($key, '')))))
+        ->map(fn (string $sku) => mb_strtolower($sku))->all();
+    $data = collect($counts)->sortDesc()->map(fn (int $total, string $sku): array => [$sku, $total, in_array($sku, $configured, true) ? 'configured_id' : 'part_number_or_unmapped'])->values()->all();
+    if (! $this->option('show-unmapped')) {
+        $data = array_values(array_filter($data, fn (array $row): bool => $row[2] === 'configured_id'));
+    }
+    $this->table(['SKU/ID armazenada', 'Usuários', 'Origem'], $data);
+    return 0;
+})->purpose('Diagnostica SKUs licenciadas do Microsoft 365 armazenadas no Office.');
+
+Artisan::command('office:report-missing-matriculas {--all}', function () {
+    $rows = DB::table('office_licenses')
+        ->when(! $this->option('all'), fn ($query) => $query->where('ativo', true))
+        ->where(function ($query): void {
+            $query->whereNull('matricula')
+                ->orWhereRaw('TRIM(COALESCE(matricula, "")) = ""');
+        })
+        ->orderBy('email')
+        ->get([
+            'id', 'nome', 'email', 'departamento_unidade', 'unicoop_office',
+            'area_office', 'office_apps', 'office_business', 'powerbi_pro',
+            'powerbi_premium', 'visio_plan', 'ativo',
+        ]);
+
+    $directory = storage_path('app/private/reports');
+    File::ensureDirectoryExists($directory);
+    $path = $directory . '/office_registros_sem_matricula_' . now()->format('Ymd_His') . '.csv';
+    $handle = fopen($path, 'wb');
+    fputcsv($handle, [
+        'id', 'nome', 'email', 'departamento_unidade', 'unicoop', 'area',
+        'licencas', 'ativo', 'motivo',
+    ]);
+
+    foreach ($rows as $row) {
+        $licenses = collect([
+            $row->office_apps ? 'Office Apps' : null,
+            $row->office_business ? 'Office Business' : null,
+            $row->powerbi_pro ? 'Power BI Pro' : null,
+            $row->powerbi_premium ? 'Power BI Premium' : null,
+            $row->visio_plan ? 'Visio Plan' : null,
+        ])->filter()->implode('; ');
+
+        fputcsv($handle, [
+            $row->id,
+            $row->nome,
+            $row->email,
+            $row->departamento_unidade,
+            $row->unicoop_office,
+            $row->area_office,
+            $licenses,
+            $row->ativo ? 'Ativo' : 'Inativo',
+            'Matrícula não preenchida',
+        ]);
+    }
+
+    fclose($handle);
+    $this->table(['Indicador', 'Valor'], [
+        ['Registros analisados', $rows->count()],
+        ['Escopo', $this->option('all') ? 'Todos' : 'Somente ativos'],
+        ['Arquivo', $path],
+    ]);
+
+    return 0;
+})->purpose('Gera relação dos usuários Office sem matrícula.');
 
 Schedule::command('office:sync-microsoft --deactivate-missing')
     ->hourly()
     ->withoutOverlapping()
+    ->onOneServer()
     ->runInBackground();
+
+Artisan::command('office:audit-organizational-enrichment {--email=} {--office-license-id=} {--limit=100} {--only-errors}', function (OfficeUserSyncService $syncService) {
+    $query = OfficeLicense::query()->orderBy('nome');
+    $email = trim((string) $this->option('email'));
+    $id = trim((string) $this->option('office-license-id'));
+    $limit = max((int) $this->option('limit'), 1);
+    $onlyErrors = (bool) $this->option('only-errors');
+
+    if ($email !== '') {
+        $query->whereRaw('LOWER(email) = ?', [mb_strtolower($email)]);
+    }
+    if ($id !== '') {
+        $query->where('id', (int) $id);
+    }
+
+    $rows = $query->limit($limit)->get();
+    $summary = [
+        'total' => 0,
+        'com_colaborador' => 0,
+        'sem_colaborador' => 0,
+        'unidade_resolvida' => 0,
+        'unidade_pendente' => 0,
+        'departamento_resolvido' => 0,
+        'departamento_pendente' => 0,
+        'centro_resolvido' => 0,
+        'centro_pendente' => 0,
+        'precisam_atualizar' => 0,
+    ];
+    $table = [];
+
+    foreach ($rows as $row) {
+        $sync = $syncService->buildOfficeLicenseAttributes([
+            'nome' => (string) $row->nome,
+            'email' => (string) $row->email,
+            'department' => (string) $row->departamento_unidade,
+        ], $row);
+        $attrs = $sync['attributes'];
+        $diffs = [];
+        foreach (['organization_unit_id', 'organization_department_id', 'organization_cost_center_id', 'centro_custo', 'unicoop_office', 'area_office'] as $field) {
+            if (trim((string) ($row->{$field} ?? '')) !== trim((string) ($attrs[$field] ?? ''))) {
+                $diffs[] = $field;
+            }
+        }
+
+        $status = (string) ($attrs['colaborador_match_status'] ?? '');
+        $hasError = $status !== 'matched'
+            || empty($attrs['organization_unit_id'])
+            || empty($attrs['organization_cost_center_id'])
+            || $diffs !== [];
+
+        if ($onlyErrors && ! $hasError) {
+            continue;
+        }
+
+        $summary['total']++;
+        $summary[$status === 'matched' ? 'com_colaborador' : 'sem_colaborador']++;
+        $summary[! empty($attrs['organization_unit_id']) ? 'unidade_resolvida' : 'unidade_pendente']++;
+        $summary[! empty($attrs['organization_department_id']) ? 'departamento_resolvido' : 'departamento_pendente']++;
+        $summary[! empty($attrs['organization_cost_center_id']) ? 'centro_resolvido' : 'centro_pendente']++;
+        $summary['precisam_atualizar'] += $diffs !== [] ? 1 : 0;
+
+        $table[] = [
+            $row->id,
+            $row->email,
+            $status ?: '-',
+            $row->organization_unit_id ?: '-',
+            $attrs['organization_unit_id'] ?: '-',
+            $row->organization_department_id ?: '-',
+            $attrs['organization_department_id'] ?: '-',
+            $row->organization_cost_center_id ?: '-',
+            $attrs['organization_cost_center_id'] ?: '-',
+            $diffs !== [] ? implode(', ', $diffs) : '-',
+        ];
+    }
+
+    $this->table(['ID', 'E-mail', 'Match', 'Unid. atual', 'Unid. nova', 'Depto atual', 'Depto novo', 'CC atual', 'CC novo', 'Diferenças'], $table);
+    $this->table(['Métrica', 'Valor'], collect($summary)->map(fn ($value, $key): array => [$key, $value])->values()->all());
+
+    return 0;
+})->purpose('Audita enriquecimento organizacional local das licenças Office.');
+
+Artisan::command('office:backfill-organizational-links {--dry-run} {--limit=} {--email=} {--office-license-id=} {--only-missing} {--force-refresh}', function (OfficeUserSyncService $syncService) {
+    $query = OfficeLicense::query()->orderBy('id');
+    $dryRun = (bool) $this->option('dry-run');
+    $onlyMissing = (bool) $this->option('only-missing');
+    $forceRefresh = (bool) $this->option('force-refresh');
+    $email = trim((string) $this->option('email'));
+    $id = trim((string) $this->option('office-license-id'));
+    $limit = trim((string) $this->option('limit'));
+
+    if ($email !== '') {
+        $query->whereRaw('LOWER(email) = ?', [mb_strtolower($email)]);
+    }
+    if ($id !== '') {
+        $query->where('id', (int) $id);
+    }
+    if ($onlyMissing) {
+        $query->where(function ($q): void {
+            $q->whereNull('matricula')
+                ->orWhereRaw('TRIM(COALESCE(matricula, "")) = ""')
+                ->orWhereNull('organization_unit_id')
+                ->orWhereNull('organization_cost_center_id')
+                ->orWhereNull('centro_custo')
+                ->orWhereRaw('TRIM(COALESCE(centro_custo, "")) = ""')
+                ->orWhereNull('unicoop_office')
+                ->orWhereNull('area_office');
+        });
+    }
+    if ($limit !== '') {
+        $query->limit(max((int) $limit, 1));
+    }
+
+    $analyzed = 0;
+    $updated = 0;
+    $unchanged = 0;
+    $manualPreserved = 0;
+    $unitFilled = 0;
+    $departmentFilled = 0;
+    $costCenterFilled = 0;
+    $notFound = 0;
+    $ambiguous = 0;
+    $samples = [];
+
+    foreach ($query->get() as $row) {
+        $analyzed++;
+        $sync = $syncService->buildOfficeLicenseAttributes([
+            'nome' => (string) $row->nome,
+            'email' => (string) $row->email,
+            'department' => (string) $row->departamento_unidade,
+        ], $row);
+        $attrs = $sync['attributes'];
+
+        if (($row->organization_assignment_source ?? null) === 'manual') {
+            $manualPreserved++;
+        }
+
+        $payload = [];
+        foreach ([
+            'matricula',
+            'departamento_unidade',
+            'unicoop_office',
+            'area_office',
+            'organization_unit_id',
+            'organization_department_id',
+            'organization_cost_center_id',
+            'organization_position_id',
+            'organization_position_source',
+            'organization_assignment_source',
+            'organization_assignment_locked_at',
+            'organization_assignment_locked_by',
+            'unidade_nome',
+            'area_nome',
+            'departamento_nome',
+            'setor_nome',
+            'cargo_nome',
+            'empresa_nome',
+            'empresa_id_cocari',
+            'centro_custo',
+            'centro_custo_nome',
+            'colaborador_nome',
+            'colaborador_source_view',
+            'colaborador_match_score',
+            'colaborador_match_type',
+            'colaborador_matched_at',
+            'colaborador_match_status',
+            'colaborador_match_message',
+        ] as $field) {
+            if (! array_key_exists($field, $attrs)) {
+                continue;
+            }
+            if (! $forceRefresh && ($attrs[$field] === null || trim((string) $attrs[$field]) === '')) {
+                continue;
+            }
+            if ($field === 'colaborador_match_score'
+                && is_numeric($row->{$field} ?? null)
+                && is_numeric($attrs[$field] ?? null)
+                && round((float) $row->{$field}, 2) === round((float) $attrs[$field], 2)) {
+                continue;
+            }
+            if ($field === 'colaborador_matched_at' && ! empty($row->{$field})) {
+                continue;
+            }
+            if (trim((string) ($row->{$field} ?? '')) !== trim((string) ($attrs[$field] ?? ''))) {
+                $payload[$field] = $attrs[$field];
+            }
+        }
+
+        $status = (string) ($attrs['colaborador_match_status'] ?? '');
+        $notFound += $status === 'not_found' ? 1 : 0;
+        $ambiguous += $status === 'ambiguous' ? 1 : 0;
+
+        if ($payload === []) {
+            $unchanged++;
+            continue;
+        }
+
+        $unitFilled += array_key_exists('organization_unit_id', $payload) && ! empty($payload['organization_unit_id']) ? 1 : 0;
+        $departmentFilled += array_key_exists('organization_department_id', $payload) && ! empty($payload['organization_department_id']) ? 1 : 0;
+        $costCenterFilled += array_key_exists('organization_cost_center_id', $payload) && ! empty($payload['organization_cost_center_id']) ? 1 : 0;
+        $updated++;
+
+        if (count($samples) < 10) {
+            $samples[] = [$row->id, $row->email, implode(', ', array_keys($payload))];
+        }
+
+        if (! $dryRun) {
+            $payload['updated_at'] = now();
+            OfficeLicense::query()->whereKey($row->id)->update($payload);
+        }
+    }
+
+    if ($samples !== []) {
+        $this->table(['ID', 'E-mail', $dryRun ? 'Campos que seriam atualizados' : 'Campos atualizados'], $samples);
+    }
+
+    $this->table(['Métrica', 'Valor'], [
+        ['Modo', $dryRun ? 'dry-run' : 'apply'],
+        ['Analisados', $analyzed],
+        ['Atualizados', $updated],
+        ['Sem alteração', $unchanged],
+        ['Overrides manuais preservados', $manualPreserved],
+        ['Unidades preenchidas', $unitFilled],
+        ['Departamentos preenchidos', $departmentFilled],
+        ['Centros de custo preenchidos', $costCenterFilled],
+        ['Não encontrados', $notFound],
+        ['Ambíguos', $ambiguous],
+    ]);
+
+    return 0;
+})->purpose('Preenche vínculos organizacionais canônicos nas licenças Office usando snapshots locais.');
 
 Artisan::command('office:backfill-missing-departments', function () {
     $this->components->info('Backfill de usuários Office sem departamento/unidade...');
-
-    $normalize = static fn (?string $v): string => (string) Str::of((string) $v)
-        ->lower()
-        ->ascii()
-        ->replaceMatches('/[^a-z0-9]+/', ' ')
-        ->trim()
-        ->value();
+    $officeUserSyncService = app(OfficeUserSyncService::class);
 
     $missingRows = DB::table('office_licenses')
         ->where('ativo', true)
@@ -1609,121 +2920,76 @@ Artisan::command('office:backfill-missing-departments', function () {
                 ->orWhere('departamento_unidade', 'N/D')
                 ->orWhereRaw('TRIM(departamento_unidade) IN ("0", "00")');
         })
-        ->get(['id', 'nome', 'email', 'matricula', 'departamento_unidade', 'unicoop_office', 'area_office']);
+        ->get([
+            'id',
+            'nome',
+            'email',
+            'matricula',
+            'departamento_unidade',
+            'unicoop_office',
+            'area_office',
+            'unidade_id',
+            'unidade_nome',
+            'departamento_id',
+            'departamento_nome',
+            'centro_custo',
+            'centro_custo_nome',
+            'colaborador_nome',
+            'colaborador_match_score',
+            'colaborador_match_type',
+            'colaborador_match_status',
+            'colaborador_match_message',
+            'colaborador_matched_at',
+        ]);
 
     if ($missingRows->isEmpty()) {
         $this->components->info('Nenhum usuário pendente.');
         return 0;
     }
 
-    $emails = DB::table('service_desk_emails')
-        ->where('ativo', true)
-        ->get(['email', 'colaborador_nome', 'matricula', 'centro_custo', 'unicoop_sede', 'area_sede']);
-
-    $byEmail = [];
-    $byUsername = [];
-    $nameIndex = [];
-
-    foreach ($emails as $item) {
-        $email = mb_strtolower(trim((string) $item->email));
-        if ($email === '') {
-            continue;
-        }
-        $byEmail[$email] = $item;
-
-        $username = mb_strtolower(trim((string) explode('@', $email)[0]));
-        if ($username !== '' && ! isset($byUsername[$username])) {
-            $byUsername[$username] = $item;
-        }
-
-        $n = $normalize((string) ($item->colaborador_nome ?? ''));
-        if ($n !== '') {
-            $nameIndex[] = [$n, $item];
-        }
-    }
-
     $updated = 0;
-    $matchedByEmail = 0;
-    $matchedByUsername = 0;
-    $matchedByName = 0;
+    $matched = 0;
+    $ambiguous = 0;
     $noMatch = 0;
+    $invalidCentroCusto = 0;
+    $unitFound = 0;
+    $unitMissing = 0;
+    $departmentFound = 0;
+    $departmentMissing = 0;
 
     foreach ($missingRows as $row) {
         $email = mb_strtolower(trim((string) $row->email));
-        $username = mb_strtolower(trim((string) explode('@', $email)[0]));
-        $candidate = null;
-
-        // 1) e-mail direto
-        if ($email !== '' && isset($byEmail[$email])) {
-            $candidate = $byEmail[$email];
-            $matchedByEmail++;
-        }
-
-        // 2) nome de usuário + @cocari.com.br
-        if (! $candidate && $username !== '') {
-            $probeEmail = $username . '@cocari.com.br';
-            if (isset($byEmail[$probeEmail])) {
-                $candidate = $byEmail[$probeEmail];
-                $matchedByUsername++;
-            } elseif (isset($byUsername[$username])) {
-                $candidate = $byUsername[$username];
-                $matchedByUsername++;
-            }
-        }
-
-        // 3) similaridade por nome
-        if (! $candidate) {
-            $target = $normalize((string) ($row->nome ?? ''));
-            if ($target !== '') {
-                $best = null;
-                $bestScore = 0.0;
-                foreach ($nameIndex as [$nameNorm, $item]) {
-                    similar_text($target, $nameNorm, $pct);
-                    if ($pct > $bestScore) {
-                        $bestScore = $pct;
-                        $best = $item;
-                    }
-                }
-                if ($best && $bestScore >= 82.0) {
-                    $candidate = $best;
-                    $matchedByName++;
-                }
-            }
-        }
-
-        if (! $candidate) {
+        if ($email === '') {
             $noMatch++;
             continue;
         }
 
-        $centro = trim((string) ($candidate->centro_custo ?? ''));
-        $unicoop = trim((string) ($candidate->unicoop_sede ?? ''));
-        $area = trim((string) ($candidate->area_sede ?? ''));
-        $matricula = trim((string) ($candidate->matricula ?? ''));
+        $sync = $officeUserSyncService->buildOfficeLicenseAttributes([
+            'nome' => (string) ($row->nome ?? ''),
+            'email' => $email,
+            'department' => (string) ($row->departamento_unidade ?? ''),
+        ], $row);
 
-        $changes = [];
-        $currMatricula = trim((string) ($row->matricula ?? ''));
-        if ($currMatricula === '' && $matricula !== '') {
-            $changes['matricula'] = $matricula;
-        }
-
-        if ($centro !== '') {
-            $changes['departamento_unidade'] = $centro;
-        }
-        if ($unicoop !== '' && trim((string) ($row->unicoop_office ?? '')) === '') {
-            $changes['unicoop_office'] = $unicoop;
-        }
-        if ($area !== '' && trim((string) ($row->area_office ?? '')) === '') {
-            $changes['area_office'] = $area;
-        }
-
-        if ($changes === []) {
-            continue;
-        }
-
+        $changes = $sync['attributes'];
         $changes['updated_at'] = now();
+
         DB::table('office_licenses')->where('id', $row->id)->update($changes);
         $updated++;
+
+        $status = (string) ($changes['colaborador_match_status'] ?? '');
+        $unitFound += ! empty($changes['unidade_id']) ? 1 : 0;
+        $unitMissing += empty($changes['unidade_id']) ? 1 : 0;
+        $departmentFound += ! empty($changes['departamento_id']) ? 1 : 0;
+        $departmentMissing += empty($changes['departamento_id']) ? 1 : 0;
+        if ($status === 'matched' || $status === 'missing_matricula') {
+            $matched++;
+        } elseif ($status === 'ambiguous') {
+            $ambiguous++;
+        } elseif ($status === 'invalid_centro_custo') {
+            $invalidCentroCusto++;
+        } else {
+            $noMatch++;
+        }
     }
 
     $pending = DB::table('office_licenses')
@@ -1741,9 +3007,13 @@ Artisan::command('office:backfill-missing-departments', function () {
         [
             ['Pendentes antes', $missingRows->count()],
             ['Atualizados', $updated],
-            ['Match por e-mail', $matchedByEmail],
-            ['Match por usuário', $matchedByUsername],
-            ['Match por nome similar', $matchedByName],
+            ['Vinculados', $matched],
+            ['Ambíguos', $ambiguous],
+            ['Centro custo inválido', $invalidCentroCusto],
+            ['Unidade encontrada', $unitFound],
+            ['Sem unidade', $unitMissing],
+            ['Departamento encontrado', $departmentFound],
+            ['Sem departamento', $departmentMissing],
             ['Sem correspondência', $noMatch],
             ['Pendentes após', $pending],
         ]
@@ -1753,6 +3023,10 @@ Artisan::command('office:backfill-missing-departments', function () {
 })->purpose('Preenche departamento/unidade (e matrícula quando possível) para usuários Office pendentes.');
 
 Artisan::command('circuits:repair-unit-links {--apply}', function () {
+    $this->components->error('Comando desativado. Circuitos usam organization_unit_id; use organization:backfill-links para vínculos legados.');
+
+    return 1;
+
     $normalize = static function (string $value): string {
         return (string) Str::of($value)
             ->lower()
@@ -1957,3 +3231,154 @@ Artisan::command('coreti:google-emails-mapear-rateio {--dry-run} {--apply}', fun
 
     return 0;
 })->purpose('Recalcula o mapeamento de rateio dos e-mails importados, em dry-run por padrão.');
+
+Artisan::command('cmdb:import-servers-spreadsheet {path=/var/www/html/coreti/Servidores_cocari.xlsx}', function () {
+    $path = (string) $this->argument('path');
+
+    if (! file_exists($path)) {
+        $this->error("Arquivo não encontrado: {$path}");
+
+        return 1;
+    }
+
+    $summary = app(CmdbServerSpreadsheetImportService::class)->import($path);
+
+    $this->info('Importação concluída.');
+    $this->table(
+        ['Total', 'Criados', 'Atualizados', 'Linhas em branco', 'Erros'],
+        [[
+            $summary['total_rows'],
+            $summary['created'],
+            $summary['updated'],
+            $summary['skipped_blank'],
+            $summary['errors'],
+        ]]
+    );
+
+    if (! empty($summary['issues'])) {
+        $this->warn('Linhas com erro:');
+        foreach ($summary['issues'] as $issue) {
+            $this->line("Linha {$issue['row']} - {$issue['name']}: {$issue['message']}");
+        }
+    }
+
+    return 0;
+})->purpose('Importa a planilha Servidores_cocari.xlsx para os ativos do tipo servidor no CMDB.');
+
+Artisan::command('cmdb:update-server-details-spreadsheet {path=/var/www/html/coreti/Servidores COCARI.xlsx}', function () {
+    $path = (string) $this->argument('path');
+
+    if (! file_exists($path)) {
+        $this->error("Arquivo não encontrado: {$path}");
+
+        return 1;
+    }
+
+    $summary = app(CmdbServerSpreadsheetImportService::class)->updateExisting($path);
+
+    $this->info('Atualização complementar concluída sem criação de ativos.');
+    $this->line('Linhas preenchidas: ' . $summary['total_rows']);
+    $this->line('Ativos atualizados: ' . $summary['updated']);
+    $this->line('Sem alteração: ' . $summary['unchanged']);
+    $this->line('Sem correspondência: ' . $summary['unmatched']);
+    $this->line('Correspondências ambíguas: ' . $summary['ambiguous']);
+    $this->line('Linhas em branco: ' . $summary['skipped_blank']);
+
+    if (! empty($summary['issues'])) {
+        $this->warn('Linhas que precisam de revisão:');
+        foreach ($summary['issues'] as $issue) {
+            $this->line("Linha {$issue['row']} - {$issue['name']}: {$issue['message']}");
+        }
+    }
+
+    return 0;
+})->purpose('Complementa servidores e VMs existentes com dados da planilha, sem criar duplicidades.');
+
+Artisan::command('cmdb:sync-server-ips {--subnet-mask=255.255.255.0} {--gateway=172.17.255.254}', function () {
+    $summary = app(CmdbServerIpSyncService::class)->sync(
+        (string) $this->option('subnet-mask'),
+        (string) $this->option('gateway')
+    );
+
+    $this->info('Sincronização de IPs concluída.');
+    $this->table(
+        ['Hosts', 'Resolvidos', 'Criados', 'Atualizados', 'Sem alteração', 'Sem resolução'],
+        [[
+            $summary['total_hosts'],
+            $summary['resolved'],
+            $summary['created'],
+            $summary['updated'],
+            $summary['unchanged'],
+            count($summary['unresolved']),
+        ]]
+    );
+
+    if (! empty($summary['unresolved'])) {
+        $this->warn('Hostnames sem resolução DNS local:');
+        foreach ($summary['unresolved'] as $item) {
+            $this->line("{$item['asset_id']} - {$item['name']} ({$item['hostname']})");
+        }
+    }
+
+    return 0;
+})->purpose('Resolve os hostnames dos servidores do CMDB e grava IP principal, máscara e gateway.');
+
+Schedule::command('intranet:sync-organization --full')
+    ->dailyAt((string) env('INTRANET_ORGANIZATION_SYNC_TIME', '02:00'))
+    ->withoutOverlapping();
+
+Schedule::command('intranet:sync-hr-snapshots --full')
+    ->dailyAt((string) env('INTRANET_HR_SYNC_TIME', '02:30'))
+    ->withoutOverlapping();
+
+Schedule::command('cmdb:veeam-sync')
+    ->hourly()
+    ->withoutOverlapping();
+
+// LEGADO: backups:verificar-atrasados lê apenas cmdb_database_backups, a
+// tabela alimentada pelo webhook do agente/n8n. Com a auditoria autônoma, o
+// silêncio deixou de ser sinal — o CoreTI vai olhar o servidor de qualquer
+// jeito. Fora do agendamento; segue disponível para consultar o histórico
+// legado à mão.
+
+// Auditoria autônoma de backups: o CoreTI conecta nos servidores e verifica
+// os alvos cadastrados. Não depende de webhook, agente ou n8n.
+//
+// Roda de hora em hora, mas cada alvo só é auditado quando sua periodicidade
+// manda — quem decide é CmdbBackupTarget::deveVerificarAgora(), o que evita
+// abrir SSH desnecessário para um backup diário.
+Schedule::command('backups:verificar')
+    ->hourly()
+    ->withoutOverlapping();
+
+// Enriquecimento de rede das VMs (IP, máscara, gateway, DNS).
+//
+// Separado do inventário de propósito: a coleta exige duas chamadas por VM
+// ligada e o vCenter consulta o VMware Tools em cada uma. Rodar junto do
+// inventário levava o ciclo de 12s para 45s a cada hora, sem ganho — IP de VM
+// quase não muda. Três vezes ao dia cobre com folga.
+Schedule::command('cmdb:enriquecer-rede')
+    ->cron((string) env('CMDB_ENRIQUECER_REDE_CRON', '15 6,12,18 * * *'))
+    ->withoutOverlapping();
+
+// Aprovação automática das descobertas do vCenter.
+//
+// Roda depois do ciclo de inventário, aplicando as regras de config/cmdb.php:
+// VM e host entram sozinhos; template, cópia de backup, restauração e objeto
+// que sumiu do vCenter são marcados como ignorados, com motivo, e continuam
+// visíveis para reabertura na revisão.
+Schedule::command('cmdb:aprovar-descobertas')
+    ->cron((string) env('CMDB_APROVAR_DESCOBERTAS_CRON', '40 * * * *'))
+    ->withoutOverlapping();
+
+/*
+ | Expurgo do Active Directory.
+ |
+ | A prévia é montada e enviada pelo próprio servidor do AD (tarefa agendada
+ | para o dia 1º). Aqui só roda a expiração: aprovação parada perde a validade
+ | porque a lista conferida envelhece — contas são reativadas, pessoas voltam.
+ */
+Schedule::command('ad:expirar-lotes')
+    ->dailyAt('06:30')
+    ->onOneServer()
+    ->withoutOverlapping();

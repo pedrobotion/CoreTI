@@ -6,6 +6,8 @@ use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\EnsureModuleAccess;
+use App\Http\Middleware\VerifyBackupWebhookToken;
+use App\Http\Middleware\VerifyAdPurgeToken;
 use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -20,6 +22,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'admin' => AdminMiddleware::class,
             'module_access' => EnsureModuleAccess::class,
+            'backup_webhook' => VerifyBackupWebhookToken::class,
+            'ad_purge_token' => VerifyAdPurgeToken::class,
+        ]);
+
+        // Webhook chamado por curl a partir dos servidores: não há sessão nem
+        // token CSRF. A autenticação é feita pelo middleware backup_webhook.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/backup',
+            // Chamado pelo servidor do AD via Invoke-RestMethod: não há sessão
+            // nem token CSRF. A autenticação é feita pelo ad_purge_token.
+            'api/ad/exclusao/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

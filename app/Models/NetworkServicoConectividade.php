@@ -33,6 +33,8 @@ class NetworkServicoConectividade extends Model
         'outros_contatos',
         'unidade_id',
         'departamento_id',
+        'organization_unit_id',
+        'organization_department_id',
         'local_tipo',
         'local_nome',
         'observacao',

@@ -119,7 +119,7 @@
         </div>
     </header>
 
-    <aside class="desktop-sidebar fixed bottom-0 left-0 top-0 z-40 w-64 shadow-sm">
+    <aside class="desktop-sidebar {{ request()->routeIs('cmdb.*') ? 'cmdb-desktop-sidebar' : '' }} fixed bottom-0 left-0 top-0 z-40 w-64 shadow-sm">
         @include('layouts.partials.sidebar-menu', ['containerClass' => 'coreti-sidebar-shell'])
     </aside>
 

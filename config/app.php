@@ -69,6 +69,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fuso de exibição
+    |--------------------------------------------------------------------------
+    |
+    | O armazenamento continua em UTC — é o único fuso sem ambiguidade e sem
+    | horário de verão. Este valor é usado apenas na hora de mostrar a data ao
+    | usuário, através de ->local() (macro registrada no AppServiceProvider).
+    |
+    | ATENÇÃO: só aplique ->local() em coluna que você sabe estar em UTC. Parte
+    | das colunas deste banco é escrita por processos externos (n8n, sync do
+    | AD) que gravam hora local; converter essas de novo inverteria o erro.
+    |
+    */
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'America/Sao_Paulo'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

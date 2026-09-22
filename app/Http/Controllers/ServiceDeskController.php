@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\JiraIssue;
 use App\Models\CoretiGoogleEmail;
+use App\Models\CoretiCostCenter;
 use App\Models\OfficeLicense;
 use App\Models\ServiceDeskQueueEmail;
 use App\Models\ServiceDeskEmail;
 use App\Models\ServiceDeskEmailCostCenter;
 use App\Services\GoogleWorkspaceDryRunSyncService;
+use App\Services\ServiceDeskAdDirectoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +25,7 @@ class ServiceDeskController extends Controller
 {
     private const SQUAD_CERRADO = 'Time Cerrado';
 
-    public function dashboard(GoogleWorkspaceDryRunSyncService $workspaceSync): View
+    public function dashboard(GoogleWorkspaceDryRunSyncService $workspaceSync, ServiceDeskAdDirectoryService $adDirectory): View
     {
         $isAdmin = Auth::user()?->role === 'admin';
         $baseQuery = JiraIssue::query()
@@ -79,11 +81,11 @@ class ServiceDeskController extends Controller
             ->get();
 
         $emailStats = [
-            'total_ativos' => (int) ServiceDeskEmail::query()->where('ativo', true)->count(),
-            'sede' => (int) ServiceDeskEmail::query()->where('ativo', true)->where('scope', 'sede')->count(),
-            'unidades' => (int) ServiceDeskEmail::query()->where('ativo', true)->where('scope', 'unidades')->count(),
-            'cerrado' => (int) ServiceDeskEmail::query()->where('ativo', true)->where('scope', 'cerrado')->count(),
-            'genericos' => (int) ServiceDeskEmail::query()->where('ativo', true)->where('scope', 'genericos')->count(),
+            'total_ativos' => (int) ServiceDeskEmail::query()->count(),
+            'sede' => (int) ServiceDeskEmail::query()->where('scope', 'sede')->count(),
+            'unidades' => (int) ServiceDeskEmail::query()->where('scope', 'unidades')->count(),
+            'cerrado' => (int) ServiceDeskEmail::query()->where('scope', 'cerrado')->count(),
+            'genericos' => (int) ServiceDeskEmail::query()->where('scope', 'genericos')->count(),
         ];
 
         $officeStats = [
@@ -96,6 +98,8 @@ class ServiceDeskController extends Controller
             'visio' => (int) OfficeLicense::query()->where('ativo', true)->where('visio_plan', true)->count(),
         ];
 
+        $adStats = $adDirectory->summary($adDirectory->users());
+
         $jiraGeneralStats = [
             'chamados_total' => (int) (clone $baseQuery)->count(),
             'chamados_abertos' => (int) (clone $openQuery)->count(),
@@ -106,10 +110,10 @@ class ServiceDeskController extends Controller
             })->count(),
         ];
 
-        $workspacePreview = null;
-        if ($isAdmin) {
-            $workspacePreview = $workspaceSync->cachedPreview();
-        }
+        $workspacePreviewOpen = (bool) session()->pull('workspace_preview_open', false);
+        $workspacePreview = $isAdmin && $workspacePreviewOpen
+            ? $workspaceSync->cachedPreview()
+            : null;
 
         return view('service-desk.dashboard', [
             'isAdmin' => $isAdmin,
@@ -118,9 +122,11 @@ class ServiceDeskController extends Controller
             'recentTickets' => $recentTickets,
             'emailStats' => $emailStats,
             'officeStats' => $officeStats,
+            'adStats' => $adStats,
             'jiraGeneralStats' => $jiraGeneralStats,
             'jiraTicketBaseUrl' => $this->jiraTicketBaseUrl(),
             'workspacePreview' => $workspacePreview,
+            'workspacePreviewOpen' => $workspacePreviewOpen,
         ]);
     }
 
@@ -128,9 +134,18 @@ class ServiceDeskController extends Controller
     {
         abort_unless(Auth::user()?->role === 'admin', 403);
 
-        $workspaceSync->buildAndCachePreview();
+        $preview = $workspaceSync->buildAndCachePreview();
+        $summary = is_array($preview['summary'] ?? null) ? $preview['summary'] : [];
+        $hasChanges =
+            (int) ($summary['new_emails'] ?? 0) > 0
+            || (int) ($summary['updated_emails'] ?? 0) > 0
+            || (int) ($summary['center_cost_changes'] ?? 0) > 0;
 
-        return back()->with('success', 'Prévia de sincronização atualizada.');
+        return back()
+            ->with('success', $hasChanges
+                ? 'Prévia de sincronização atualizada.'
+                : 'Prévia de sincronização atualizada. Nenhuma alteração pendente.')
+            ->with('workspace_preview_open', $hasChanges);
     }
 
     public function syncWorkspaceNow(GoogleWorkspaceDryRunSyncService $workspaceSync): RedirectResponse
@@ -140,6 +155,7 @@ class ServiceDeskController extends Controller
         try {
             $workspaceSync->buildAndCachePreview();
             $result = $workspaceSync->applyFromCachedPreview();
+            $legacyRefresh = $workspaceSync->refreshIntranetDataForExistingEmails();
         } catch (Throwable $e) {
             return back()->with('error', 'Falha ao sincronizar Google Workspace: ' . $e->getMessage());
         }
@@ -153,7 +169,9 @@ class ServiceDeskController extends Controller
             . ', mapeados: ' . ($result['summary']['mapped'] ?? 0)
             . ', pendentes: ' . ($result['summary']['pending'] ?? 0)
             . ', sem centro de custo real: ' . ($result['summary']['sem_centro_custo'] ?? 0)
-            . ', trocas de centro de custo: ' . ($result['summary']['center_cost_changes'] ?? 0) . '.'
+            . ', trocas de centro de custo: ' . ($result['summary']['center_cost_changes'] ?? 0)
+            . ', e-mails atualizados pelo AD: ' . ($legacyRefresh['ad_rateio_updates'] ?? 0)
+            . ', e-mails legados atualizados: ' . ($legacyRefresh['updated'] ?? 0) . '.'
         );
     }
 
@@ -163,6 +181,7 @@ class ServiceDeskController extends Controller
 
         try {
             $result = $workspaceSync->applyFromCachedPreview();
+            $legacyRefresh = $workspaceSync->refreshIntranetDataForExistingEmails();
         } catch (Throwable $e) {
             return back()->with('error', 'Falha ao aplicar sync do Google Workspace: ' . $e->getMessage());
         }
@@ -176,7 +195,9 @@ class ServiceDeskController extends Controller
             . ', mapeados: ' . ($result['summary']['mapped'] ?? 0)
             . ', pendentes: ' . ($result['summary']['pending'] ?? 0)
             . ', sem centro de custo real: ' . ($result['summary']['sem_centro_custo'] ?? 0)
-            . ', trocas de centro de custo: ' . ($result['summary']['center_cost_changes'] ?? 0) . '.'
+            . ', trocas de centro de custo: ' . ($result['summary']['center_cost_changes'] ?? 0)
+            . ', e-mails atualizados pelo AD: ' . ($legacyRefresh['ad_rateio_updates'] ?? 0)
+            . ', e-mails legados atualizados: ' . ($legacyRefresh['updated'] ?? 0) . '.'
         );
     }
 
@@ -266,6 +287,27 @@ class ServiceDeskController extends Controller
             ->filter()
             ->values();
 
+        /*
+         | Opções para o seletor de e-mail.
+         |
+         | A fonte é o próprio histórico de chamados: só faz sentido oferecer
+         | e-mails que realmente aparecem como relator, senão o usuário cadastra
+         | um endereço que nunca vai filtrar nada. São poucas dezenas.
+         |
+         | Não exibimos relator_nome junto: o mesmo e-mail registra chamados de
+         | centenas de pessoas diferentes (é quem abre, não quem solicita), então
+         | qualquer nome escolhido seria enganoso.
+         */
+        $emailsDisponiveis = JiraIssue::query()
+            ->selectRaw('LOWER(relator_email) as email, COUNT(*) as total')
+            ->whereNotNull('relator_email')
+            ->where('relator_email', '!=', '')
+            ->groupBy('email')
+            ->orderByDesc('total')
+            ->get()
+            ->reject(fn ($linha) => $emails->contains($linha->email))
+            ->values();
+
         $nameTokens = collect([
             $user->name,
             ...$queueEmails->pluck('email')->map(fn (string $email) => str_replace('.', ' ', explode('@', $email)[0] ?? ''))->all(),
@@ -326,6 +368,7 @@ class ServiceDeskController extends Controller
             ->pluck('prioridade');
 
         return view('service-desk.my-queue', [
+            'emailsDisponiveis' => $emailsDisponiveis,
             'tickets' => $tickets,
             'filters' => $filters,
             'search' => $search,
@@ -371,12 +414,20 @@ class ServiceDeskController extends Controller
             'selected_matricula' => ['nullable', 'string', 'max:20'],
             'selected_nome' => ['nullable', 'string', 'max:255'],
             'selected_id_pessoa' => ['nullable', 'integer'],
+            'units' => ['nullable', 'array'],
+            'units.*' => ['string', 'max:255'],
         ]);
 
         $query = ServiceDeskEmail::query()->where('scope', $scope);
         $search = trim((string) ($filters['q'] ?? ''));
         $status = $filters['status'] ?? 'todos';
         $perPage = (int) ($filters['per_page'] ?? 10);
+        $units = collect($filters['units'] ?? [])
+            ->map(fn ($unit): string => trim((string) $unit))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         if ($search !== '') {
             $query->where(function ($q) use ($search): void {
@@ -395,18 +446,28 @@ class ServiceDeskController extends Controller
             $query->where('ativo', false);
         }
 
+        if ($units !== []) {
+            $query->whereIn('centro_custo', $units);
+        }
+
         $emails = $query->orderBy('email')
             ->paginate($perPage)
             ->withQueryString();
 
+        $emails->setCollection($emails->getCollection()->map(function (ServiceDeskEmail $email): ServiceDeskEmail {
+            $catalogName = $this->resolveCatalogCostCenterName($email->unicoop_sede, $email->area_sede);
+            if ($catalogName !== null) {
+                $email->setAttribute('centro_custo', $catalogName);
+            }
+
+            return $email;
+        }));
+
         $manualCostCenterEmailsQuery = CoretiGoogleEmail::query()
+            ->where('ativo', true)
             ->where(function ($query): void {
                 $query->whereNull('centro_custo')
-                    ->orWhereRaw("TRIM(COALESCE(centro_custo, '')) = ''")
-                    ->orWhereNull('unicoop')
-                    ->orWhereRaw("TRIM(COALESCE(unicoop, '')) = ''")
-                    ->orWhereNull('area')
-                    ->orWhereRaw("TRIM(COALESCE(area, '')) = ''");
+                    ->orWhereRaw("TRIM(COALESCE(centro_custo, '')) = ''");
             });
 
         $manualCostCenterEmailsCount = (clone $manualCostCenterEmailsQuery)->count();
@@ -418,6 +479,7 @@ class ServiceDeskController extends Controller
                 'nome',
                 'nome_usuario',
                 'centro_custo',
+                'centro_custo_nome',
                 'unicoop',
                 'area',
                 'mapeamento_status',
@@ -436,6 +498,14 @@ class ServiceDeskController extends Controller
             'filters' => $filters,
             'search' => $search,
             'status' => $status,
+            'units' => $units,
+            'unitOptions' => ServiceDeskEmail::query()
+                ->where('scope', $scope)
+                ->whereNotNull('centro_custo')
+                ->whereRaw("TRIM(centro_custo) <> ''")
+                ->distinct()
+                ->orderBy('centro_custo')
+                ->pluck('centro_custo'),
             'perPage' => $perPage,
             'collaboratorSearch' => $collaboratorSearch,
             'collaborators' => $collaborators,
@@ -447,9 +517,42 @@ class ServiceDeskController extends Controller
         ]);
     }
 
-    public function exportEmails(): StreamedResponse
+    public function exportEmails(Request $request): StreamedResponse
     {
+        $scope = trim((string) $request->query('scope', ''));
+        if ($scope !== '') {
+            $scope = $this->normalizeEmailScope($scope);
+        }
+
+        $status = (string) $request->query('status', 'todos');
+        if (! in_array($status, ['todos', 'ativos', 'inativos'], true)) {
+            $status = 'todos';
+        }
+
+        $search = trim((string) $request->query('q', ''));
+        $rawUnits = $request->query('units', []);
+        $units = collect(is_array($rawUnits) ? $rawUnits : [$rawUnits])
+            ->map(fn ($unit): string => trim((string) $unit))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         $emails = ServiceDeskEmail::query()
+            ->when($scope !== '', fn ($query) => $query->where('scope', $scope))
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($q) use ($search): void {
+                    $q->where('email', 'like', "%{$search}%")
+                        ->orWhere('matricula', 'like', "%{$search}%")
+                        ->orWhere('colaborador_nome', 'like', "%{$search}%")
+                        ->orWhere('centro_custo', 'like', "%{$search}%")
+                        ->orWhere('unicoop_sede', 'like', "%{$search}%")
+                        ->orWhere('area_sede', 'like', "%{$search}%");
+                });
+            })
+            ->when($status === 'ativos', fn ($query) => $query->where('ativo', true))
+            ->when($status === 'inativos', fn ($query) => $query->where('ativo', false))
+            ->when($units !== [], fn ($query) => $query->whereIn('centro_custo', $units))
             ->orderBy('scope')
             ->orderBy('email')
             ->get([
@@ -487,12 +590,14 @@ class ServiceDeskController extends Controller
             ], ';');
 
             foreach ($emails as $email) {
+                $catalogName = $this->resolveCatalogCostCenterName($email->unicoop_sede, $email->area_sede);
+
                 fputcsv($out, [
                     $this->emailScopeLabel((string) $email->scope),
                     $email->email,
                     $email->matricula,
                     $email->colaborador_nome,
-                    $email->centro_custo,
+                    $catalogName ?? $email->centro_custo,
                     $email->unicoop_sede,
                     $email->area_sede,
                     optional($email->data_inclusao)->format('d/m/Y'),
@@ -606,6 +711,7 @@ class ServiceDeskController extends Controller
             'scope' => $scope,
             'scopeLabel' => $this->emailScopeLabel($scope),
             'emailRecord' => $email,
+            'currentCostCenterName' => $this->resolveCatalogCostCenterName($email->unicoop_sede, $email->area_sede),
             'costCenterRecords' => $this->intranetCostCenterRecords(),
             'cristalinaIiAreaOptions' => $this->cristalinaIiAreaOptions(),
         ]);
@@ -672,75 +778,109 @@ class ServiceDeskController extends Controller
         return back()->with('success', 'E-mail removido com sucesso.');
     }
 
+    public function updateCoretiGoogleEmail(Request $request, CoretiGoogleEmail $email): RedirectResponse
+    {
+        $data = $request->validate([
+            'centro_custo' => ['nullable', 'string', 'max:50'],
+            'centro_custo_nome' => ['nullable', 'string', 'max:255'],
+            'unicoop' => ['nullable', 'string', 'max:10'],
+            'area' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $centroCusto = trim((string) ($data['centro_custo'] ?? '')) ?: null;
+        $centroCustoNome = trim((string) ($data['centro_custo_nome'] ?? '')) ?: null;
+        $unicoop = trim((string) ($data['unicoop'] ?? '')) ?: null;
+        $area = trim((string) ($data['area'] ?? '')) ?: null;
+
+        if ($unicoop !== null && $area !== null) {
+            $unicoopDigits = preg_replace('/\D+/', '', $unicoop) ?: '';
+            $areaDigits = preg_replace('/\D+/', '', $area) ?: '';
+            $unicoop = $unicoopDigits !== '' ? str_pad(ltrim($unicoopDigits, '0') ?: '0', 2, '0', STR_PAD_LEFT) : null;
+            $area = $areaDigits !== '' ? str_pad(ltrim($areaDigits, '0') ?: '0', 3, '0', STR_PAD_LEFT) : null;
+            $centroCusto = ($unicoop !== null && $area !== null) ? $unicoop . '.' . $area : $centroCusto;
+
+            $catalogName = $this->resolveCatalogCostCenterName($unicoop, $area);
+            if ($catalogName === null) {
+                return back()->withErrors(['centro_custo' => 'O centro de custo informado não existe no catálogo coreti_cost_centers.']);
+            }
+
+            $centroCustoNome = $catalogName;
+        }
+
+        $complete = $centroCusto !== null && $unicoop !== null && $area !== null;
+
+        $email->update([
+            'centro_custo' => $centroCusto,
+            'centro_custo_nome' => $centroCustoNome,
+            'unicoop' => $unicoop,
+            'area' => $area,
+            'centro_custo_manual' => true,
+            'centro_custo_manual_at' => now(),
+            'mapeamento_status' => $complete ? 'mapeado' : 'pendente',
+            'mapeamento_motivo' => $complete ? null : 'Rateio manual incompleto.',
+            'atualizado_rateio_em' => now(),
+        ]);
+
+        return back()->with('success', 'Rateio do e-mail atualizado com sucesso.');
+    }
+
     private function searchCollaborators(string $search)
     {
-        return DB::connection('intranet_cocari')
-            ->table('cadColaborador as c')
-            ->leftJoin('gasUsuario as u', 'u.IdPessoa', '=', 'c.IdPessoa')
-            ->leftJoin('cadCentroCustoRh as rh', 'rh.IdCentroCusto', '=', 'c.CentroCusto')
-            ->leftJoin('cadCentroCustos as cc', 'cc.IdCCusto', '=', 'c.CentroCusto')
-            ->select([
-                DB::raw('c.IdPessoa as matricula'),
-                DB::raw('c.Nome as nome'),
-                'c.Email as email',
-                'c.IdPessoa as id_pessoa',
-                'u.UsuarioAd as usuario_ad',
-                DB::raw('COALESCE(rh.Nome, cc.Nome, c.CentroCusto) as centro_custo'),
-            ])
+        $search = trim($search);
+
+        return CoretiGoogleEmail::query()
             ->where(function ($query) use ($search): void {
-                $query->where('c.Nome', 'like', "%{$search}%")
-                    ->orWhere('c.Matricula', 'like', "%{$search}%")
-                    ->orWhere('c.IdPessoa', 'like', "%{$search}%")
-                    ->orWhere('u.Nome', 'like', "%{$search}%")
-                    ->orWhere('u.IdUsuario', 'like', "%{$search}%")
-                    ->orWhere('u.UsuarioAd', 'like', "%{$search}%");
+                $query->where('nome', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('matricula', 'like', "%{$search}%")
+                    ->orWhere('nome_usuario', 'like', "%{$search}%");
             })
             ->orderBy('nome')
             ->limit(12)
-            ->get();
+            ->get()
+            ->map(function (CoretiGoogleEmail $email): object {
+                return (object) [
+                    'matricula' => $email->matricula,
+                    'nome' => $email->nome,
+                    'email' => $email->email,
+                    'id_pessoa' => $email->matricula,
+                    'usuario_ad' => $email->nome_usuario,
+                    'centro_custo' => $this->resolveCatalogCostCenterName($email->unicoop, $email->area)
+                        ?? $email->nome_local
+                        ?? $email->centro_custo_nome
+                        ?? $email->centro_custo,
+                    'unicoop_sede' => $email->unicoop,
+                    'area_sede' => $email->area,
+                ];
+            });
     }
 
     private function findCollaboratorByMatricula(string $matricula): ?object
     {
         try {
-            $collaborator = DB::connection('intranet_cocari')
-                ->table('cadColaborador as c')
-                ->leftJoin('gasUsuario as u', 'u.IdPessoa', '=', 'c.IdPessoa')
-                ->leftJoin('cadCentroCustoRh as rh', 'rh.IdCentroCusto', '=', 'c.CentroCusto')
-                ->leftJoin('cadCentroCustos as cc', 'cc.IdCCusto', '=', 'c.CentroCusto')
-                ->select([
-                    DB::raw('c.IdPessoa as matricula'),
-                    DB::raw('c.Nome as nome'),
-                    'c.Email as email',
-                    'c.IdPessoa as id_pessoa',
-                    'u.UsuarioAd as usuario_ad',
-                    DB::raw('COALESCE(rh.Nome, cc.Nome, c.CentroCusto) as centro_custo'),
-                ])
-                ->where(function ($query) use ($matricula): void {
-                    $query->where('c.IdPessoa', $matricula);
-                })
+            $email = CoretiGoogleEmail::query()
+                ->where('matricula', $matricula)
+                ->orderByRaw("CASE WHEN mapeamento_status = 'mapeado' THEN 0 ELSE 1 END")
+                ->orderByDesc('updated_at')
                 ->first();
 
-            if (! $collaborator) {
+            if (! $email) {
                 return null;
             }
 
-            $org = app(GoogleWorkspaceDryRunSyncService::class)
-                ->resolveServiceDeskIntranetDataByMatricula($matricula);
-
-            if ($org !== null) {
-                $collaborator->matricula = $org['matricula'] ?? $collaborator->matricula;
-                $collaborator->id_pessoa = $org['id_pessoa'] ?? $collaborator->id_pessoa;
-                $collaborator->nome = $org['colaborador_nome'] ?? $collaborator->nome;
-                $collaborator->centro_custo = $org['centro_custo'] ?? $collaborator->centro_custo;
-                $collaborator->unicoop_sede = $org['unicoop_sede'] ?? null;
-                $collaborator->area_sede = $org['area_sede'] ?? null;
-            } else {
-                $collaborator->unicoop_sede = null;
-                $collaborator->area_sede = null;
-            }
-
-            return $collaborator;
+            return (object) [
+                'matricula' => $email->matricula,
+                'nome' => $email->nome,
+                'email' => $email->email,
+                'id_pessoa' => $email->matricula,
+                'usuario_ad' => $email->nome_usuario,
+                'centro_custo' => $this->resolveCatalogCostCenterName($email->unicoop, $email->area)
+                    ?? $email->nome_local
+                    ?? $email->centro_custo_nome
+                    ?? $email->centro_custo,
+                'unicoop_sede' => $email->unicoop,
+                'area_sede' => $email->area,
+            ];
         } catch (Throwable) {
             return null;
         }
@@ -770,44 +910,60 @@ class ServiceDeskController extends Controller
 
     private function intranetCostCenterRecords()
     {
-        $units = DB::table('unidades')
-            ->select([
-                DB::raw('unidade as name'),
-                'unicoop',
-                'area',
-            ])
-            ->whereNotNull('unidade');
-
-        $departments = DB::table('departamentos')
-            ->select([
-                DB::raw('nome as name'),
-                'unicoop',
-                'area',
-            ])
-            ->where('ativo', 1);
-
-        $records = DB::query()
-            ->fromSub($units->unionAll($departments), 'intranet_cost_centers')
-            ->select(['name', 'unicoop', 'area'])
+        $records = CoretiCostCenter::query()
+            ->active()
             ->orderBy('name')
-            ->get();
+            ->orderBy('code')
+            ->get(['code', 'name'])
+            ->map(function (CoretiCostCenter $center): object {
+                [$unicoop, $area] = $this->splitCoretiCostCenterCode($center->code);
 
-        return $records
-            ->groupBy('name')
-            ->map(function ($group, $name) {
-                $first = $group->first();
-
-                if ($name === 'Cristalina II') {
-                    return (object) [
-                        'name' => $name,
-                        'unicoop' => $first->unicoop,
-                        'area' => null,
-                    ];
-                }
-
-                return $first;
+                return (object) [
+                    'name' => trim((string) $center->name),
+                    'display_name' => trim((string) $center->name) . ' - ' . $center->code,
+                    'unicoop' => $unicoop,
+                    'area' => $area,
+                    'source' => 'coreti_cost_centers',
+                    'code' => trim((string) $center->code),
+                    'office_key' => mb_strtolower(trim((string) $center->name)) . '|' . $unicoop . '|' . $area,
+                ];
             })
+            ->filter(fn (object $item): bool => $item->name !== '' && $item->area !== null && $item->area !== '000')
             ->values();
+
+        return $records;
+    }
+
+    /** @return array{0:?string,1:?string} */
+    private function splitCoretiCostCenterCode(?string $code): array
+    {
+        if (! preg_match('/^\s*(\d{1,2})\s*[.\/-]\s*(\d{1,3})\s*$/', (string) $code, $matches)) {
+            return [null, null];
+        }
+
+        $unicoop = str_pad((string) ((int) $matches[1]), 2, '0', STR_PAD_LEFT);
+        $area = str_pad((string) ((int) $matches[2]), 3, '0', STR_PAD_LEFT);
+
+        return [$unicoop, $area];
+    }
+
+    private function resolveCatalogCostCenterName(?string $unicoop, ?string $area): ?string
+    {
+        $unicoop = preg_replace('/\D+/', '', trim((string) $unicoop)) ?: '';
+        $area = preg_replace('/\D+/', '', trim((string) $area)) ?: '';
+
+        if ($unicoop === '' || $area === '') {
+            return null;
+        }
+
+        $code = str_pad((string) ((int) $unicoop), 2, '0', STR_PAD_LEFT)
+            . '.'
+            . str_pad((string) ((int) $area), 3, '0', STR_PAD_LEFT);
+
+        return CoretiCostCenter::query()
+            ->active()
+            ->where('code', $code)
+            ->value('name');
     }
 
     private function findCostCenter(string $scope, string $value, ?string $area = null): ?array
@@ -829,52 +985,24 @@ class ServiceDeskController extends Controller
             return null;
         }
 
-        $areaNormalized = $this->normalizeAreaValue($area);
+        $record = CoretiCostCenter::query()
+            ->active()
+            ->where(function ($query) use ($normalized): void {
+                $query->where('name', $normalized)->orWhere('code', $normalized);
+            })
+            ->first(['code', 'name']);
 
-        $unidadeQuery = DB::table('unidades')
-            ->select([
-                DB::raw('unidade as name'),
-                'unicoop',
-                'area',
-            ])
-            ->where('unidade', $normalized);
+        if ($record) {
+            [$unicoop, $recordArea] = $this->splitCoretiCostCenterCode($record->code);
+            if ($recordArea === null || $recordArea === '000' || ($area !== null && trim($area) !== $recordArea)) {
+                return null;
+            }
 
-        if ($areaNormalized !== null) {
-            $unidadeQuery->whereRaw('TRIM(area) = ?', [$areaNormalized]);
-        }
-
-        $unidade = $unidadeQuery->first();
-
-        if ($unidade) {
             return [
                 'id' => null,
-                'centro_custo' => $unidade->name,
-                'unicoop_sede' => $unidade->unicoop,
-                'area_sede' => $unidade->area,
-            ];
-        }
-
-        $departamentoQuery = DB::table('departamentos')
-            ->select([
-                DB::raw('nome as name'),
-                'unicoop',
-                'area',
-            ])
-            ->where('ativo', 1)
-            ->where('nome', $normalized);
-
-        if ($areaNormalized !== null) {
-            $departamentoQuery->whereRaw('TRIM(area) = ?', [$areaNormalized]);
-        }
-
-        $departamento = $departamentoQuery->first();
-
-        if ($departamento) {
-            return [
-                'id' => null,
-                'centro_custo' => $departamento->name,
-                'unicoop_sede' => $departamento->unicoop,
-                'area_sede' => $departamento->area,
+                'centro_custo' => $record->name,
+                'unicoop_sede' => $unicoop,
+                'area_sede' => $recordArea,
             ];
         }
 
@@ -953,6 +1081,8 @@ class ServiceDeskController extends Controller
             'centro_custo_nome' => $data['centro_custo'] ?? null,
             'unicoop' => $data['unicoop_sede'] ?? null,
             'area' => $data['area_sede'] ?? null,
+            'centro_custo_manual' => $data['centro_custo_manual'] ?? false,
+            'centro_custo_manual_at' => $data['centro_custo_manual_at'] ?? null,
             'mapeamento_status' => 'mapeado',
             'mapeamento_motivo' => null,
         ]);
@@ -977,6 +1107,11 @@ class ServiceDeskController extends Controller
         $centroNome = trim((string) ($data['centro_custo_nome'] ?? '')) ?: null;
         $centroCodigo = ($unicoop !== '' && $area !== '') ? ltrim($unicoop, '0') . '.' . ltrim($area, '0') : null;
 
+        $catalogName = $this->resolveCatalogCostCenterName($unicoop, $area);
+        if ($catalogName !== null) {
+            $centroNome = $catalogName;
+        }
+
         if ($unicoop !== '') {
             $unicoop = str_pad(ltrim(preg_replace('/\D+/', '', $unicoop) ?: '', '0') ?: '0', 2, '0', STR_PAD_LEFT);
         }
@@ -995,6 +1130,8 @@ class ServiceDeskController extends Controller
             'area' => $area !== '' ? $area : null,
             'centro_custo' => $centroCodigo,
             'centro_custo_nome' => $centroNome,
+            'centro_custo_manual' => (bool) ($data['centro_custo_manual'] ?? false),
+            'centro_custo_manual_at' => ! empty($data['centro_custo_manual']) ? ($data['centro_custo_manual_at'] ?? now()) : null,
             'mapeamento_status' => 'mapeado',
             'mapeamento_motivo' => null,
             'atualizado_rateio_em' => now(),

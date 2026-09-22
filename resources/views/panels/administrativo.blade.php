@@ -8,13 +8,14 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             @php
-                $options = [
-                    ['title' => 'Visão geral', 'href' => route('administrativo.visao-geral')],
-                    ['title' => 'Relatórios', 'href' => route('administrativo.relatorios')],
-                    ['title' => 'Configurações', 'href' => route('administrativo.configuracoes')],
-                    ['title' => 'Solicitações', 'href' => route('administrativo.solicitacoes')],
-                ];
-            @endphp
+            $options = [
+                ['title' => 'Visão geral', 'href' => route('administrativo.visao-geral')],
+                ['title' => 'Relatórios', 'href' => route('administrativo.relatorios')],
+                ['title' => 'Configurações', 'href' => route('administrativo.configuracoes')],
+                ['title' => 'Solicitações', 'href' => route('administrativo.solicitacoes')],
+                ['title' => 'Cartão TI', 'href' => route('administrativo.cartao-ti.index')],
+            ];
+        @endphp
 
             @include('partials.panel-dropdown', ['label' => 'Administrativo', 'options' => $options])
         </div>

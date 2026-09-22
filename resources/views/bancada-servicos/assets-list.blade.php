@@ -48,7 +48,7 @@
                 </form>
             </div>
             <div class="w-full max-w-full overflow-x-auto">
-                <table class="min-w-[1200px] w-full text-sm">
+                <table class="{{ $isBackup ? 'min-w-[1650px]' : 'min-w-[1200px]' }} w-full text-sm">
                     <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
                         <tr>
                             <th class="px-3 py-3">Tipo</th>
@@ -66,10 +66,11 @@
                             @endif
                             @if($isBackup)
                                 <th class="px-3 py-3">Localização backup</th>
+                                <th class="px-3 py-3">Emprestado para</th>
                                 <th class="px-3 py-3">Data backup</th>
                             @endif
-                            <th class="px-3 py-3">Observação</th>
-                            <th class="px-3 py-3">Ações</th>
+                            <th class="px-3 py-3 {{ $isBackup ? 'w-[230px]' : '' }}">Observação</th>
+                            <th class="sticky right-0 z-20 min-w-[350px] bg-[#033151] px-3 py-3">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -155,7 +156,7 @@
                                                 $statusLockMessage = 'Aguardando ação do Administrativo';
                                             }
                                         } elseif ($statusNorm === 'Pronto para entrega') {
-                                            if (($asset->origem_tipo ?? 'unidade') === 'sede') {
+                                            if (! app(\App\Services\BancadaStatusFlowService::class)->requiresFiscalFlow($asset)) {
                                                 $statusBadgeLabel = 'Pronto';
                                                 $statusBadgeDescription = 'Liberado para entrega';
                                                 $statusBadgeClass = 'bg-emerald-100 text-emerald-800';
@@ -348,10 +349,13 @@
                                 @endif
                                 @if($isBackup)
                                     <td class="px-3 py-3 break-words">{{ $asset->backup_localizacao ?: '-' }}</td>
+                                    <td class="px-3 py-3 break-words">{{ $asset->backup_emprestado_para ?: '-' }}</td>
                                     <td class="px-3 py-3">{{ optional($asset->backup_data_formatado)->format('d/m/Y') ?: '-' }}</td>
                                 @endif
-                                <td class="px-3 py-3 break-words">{{ $asset->observacao ?: '-' }}</td>
-                                <td class="px-3 py-3" x-data="{ editModalOpen: false, editOrigem: @js($asset->origem_tipo ?: 'unidade'), backupModalOpen: false }">
+                                <td class="{{ $isBackup ? 'max-w-[230px]' : '' }} px-3 py-3 break-words" title="{{ $asset->observacao ?: '' }}">
+                                    <div @if($isBackup) style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;" @endif>{{ $asset->observacao ?: '-' }}</div>
+                                </td>
+                                <td class="sticky right-0 z-10 min-w-[350px] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)] group-odd:bg-slate-50 group-even:bg-white" x-data="{ editModalOpen: false, editOrigem: @js($asset->origem_tipo ?: 'unidade'), backupModalOpen: false, loanModalOpen: false }">
                                     @if($scope === 'descartados')
                                         <form method="POST" action="{{ route('bancada-servicos.assets.discard.update', $asset) }}" class="mb-2 space-y-2 rounded-md border border-slate-200 p-2">
                                             @csrf
@@ -365,7 +369,7 @@
                                     @endif
                                     <div class="mb-2">
                                         @if($scope === 'descartados')
-                                        @elseif(in_array($asset->entrada_status, ['Aguardando Entrada', 'Aguardando Entrada Fiscal'], true))
+                                        @elseif(in_array($asset->entrada_status, ['Aguardando Entrada', 'Aguardando Entrada Fiscal'], true) && app(\App\Services\BancadaStatusFlowService::class)->requiresFiscalFlow($asset))
                                             <button type="button" disabled class="inline-flex min-h-8 cursor-not-allowed items-center justify-center rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700 opacity-100" title="Aguardando entrada automática no Administrativo">
                                                 Aguardando entrada (automático)
                                             </button>
@@ -375,7 +379,7 @@
                                             </button>
                                         @endif
                                     </div>
-                                    <div class="inline-flex items-center gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
                                         @if($isBackup)
                                             <form method="POST" action="{{ route('bancada-servicos.assets.backup.availability.update', $asset) }}">
                                                 @csrf
@@ -394,6 +398,9 @@
                                             </button>
                                         @endif
                                         @if($isBackup)
+                                            <button type="button" @click="loanModalOpen = true; $nextTick(() => { if ($refs.loanDestination) $refs.loanDestination.value = ''; })" class="inline-flex min-h-8 items-center justify-center rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100">
+                                                Emprestar
+                                            </button>
                                             <button type="button" @click="backupModalOpen = true" class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-[#033151] hover:bg-slate-50 hover:text-[#02243e]" title="Editar backup" aria-label="Editar backup">
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7h18M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7Z" />
@@ -426,6 +433,42 @@
                                             </svg>
                                         </button>
                                     </div>
+                                    @if($isBackup)
+                                        <template x-teleport="body">
+                                        <div x-cloak x-show="loanModalOpen" x-transition.opacity class="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-900/60" style="width:100vw;min-height:100vh;padding:1rem;box-sizing:border-box;" @keydown.escape.window="loanModalOpen=false">
+                                            <div class="my-auto overflow-hidden rounded-lg bg-white shadow-2xl" style="width:min(100%, 32rem);max-width:32rem;max-height:calc(100vh - 2rem);box-sizing:border-box;" @click.outside="loanModalOpen=false">
+                                                <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                                                    <h3 class="text-lg font-bold text-slate-900">Emprestar equipamento | {{ $asset->plaqueta }}</h3>
+                                                    <button type="button" @click="loanModalOpen=false" class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Fechar</button>
+                                                </div>
+                                                <form method="POST" action="{{ route('bancada-servicos.assets.backup.loan', $asset) }}" class="space-y-4 px-5 py-4">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <div>
+                                                        <label class="text-sm font-medium text-slate-700">Para onde foi emprestado?</label>
+                                                        <select x-ref="loanDestination" name="backup_emprestado_para" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                            <option value="" selected>Selecione uma unidade ou departamento</option>
+                                                            <optgroup label="Unidades">
+                                                                @foreach(($unitOptionsByOrigin['unidade'] ?? []) as $unitOption)
+                                                                    <option value="{{ $unitOption }}">{{ $unitOption }}</option>
+                                                                @endforeach
+                                                            </optgroup>
+                                                            <optgroup label="Departamentos">
+                                                                @foreach(($unitOptionsByOrigin['sede'] ?? []) as $departmentOption)
+                                                                    <option value="{{ $departmentOption }}">{{ $departmentOption }}</option>
+                                                                @endforeach
+                                                            </optgroup>
+                                                        </select>
+                                                    </div>
+                                                    <div class="flex justify-end gap-2 border-t border-slate-200 pt-3">
+                                                        <button type="button" @click="loanModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
+                                                        <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Registrar empréstimo</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        </template>
+                                    @endif
                                     @if($isBackup)
                                         <div x-cloak x-show="backupModalOpen" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4" @keydown.escape.window="backupModalOpen=false">
                                             <div class="w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-2xl" @click.outside="backupModalOpen=false">
@@ -524,7 +567,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $showTicColumn ? ($isBackup ? 13 : 11) : ($isBackup ? 12 : 10) }}" class="px-4 py-6 text-center text-slate-500">Nenhum equipamento encontrado.</td></tr>
+                            <tr><td colspan="{{ $showTicColumn ? ($isBackup ? 14 : 11) : ($isBackup ? 13 : 10) }}" class="px-4 py-6 text-center text-slate-500">Nenhum equipamento encontrado.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

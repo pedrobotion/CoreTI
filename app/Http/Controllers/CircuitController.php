@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\CircuitUnit;
 use App\Models\CircuitIncident;
 use App\Models\CircuitOperator;
-use App\Models\Unidade;
+use App\Models\OrganizationUnit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -40,11 +40,11 @@ class CircuitController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'operadora' => ['nullable', 'string', 'max:50'],
             'servico' => ['nullable', 'string', 'max:255'],
-            'id_unidades' => ['nullable', 'integer', 'exists:unidades,id_unidades'],
+            'organization_unit_id' => ['nullable', 'integer', 'exists:organization_units,id'],
             'per_page' => ['nullable', 'integer', 'in:5,10,15,25,50'],
         ]);
 
-        $query = CircuitUnit::query()->with('unidade');
+        $query = CircuitUnit::query()->with('organizationUnit');
         if (Schema::hasTable('circuit_incidents')) {
             $query->with('openIncident');
         }
@@ -70,15 +70,15 @@ class CircuitController extends Controller
             $query->where('servico', $filters['servico']);
         }
 
-        if (! empty($filters['id_unidades'])) {
-            $query->where('id_unidades', (int) $filters['id_unidades']);
+        if (! empty($filters['organization_unit_id'])) {
+            $query->where('organization_unit_id', (int) $filters['organization_unit_id']);
         }
 
         $units = $query->orderBy('unidades_circuitos')
             ->paginate($perPage)
             ->withQueryString();
 
-        $unidades = Unidade::orderBy('unidade')->get(['id_unidades', 'unidade']);
+        $unidades = OrganizationUnit::query()->active()->orderBy('name')->get(['id', 'name', 'address']);
         $operadoras = $this->operatorOptions();
         $servicos = CircuitUnit::query()->select('servico')->distinct()->orderBy('servico')->pluck('servico');
 
@@ -151,7 +151,7 @@ class CircuitController extends Controller
 
     public function createUnit()
     {
-        $unidades = \App\Models\Unidade::orderBy('unidade')->get();
+        $unidades = OrganizationUnit::query()->active()->orderBy('name')->get(['id', 'name', 'address']);
         $operadorasCadastro = $this->operatorOptions();
         return view('circuits.units.create', compact('unidades', 'operadorasCadastro'));
     }
@@ -159,16 +159,16 @@ class CircuitController extends Controller
     public function lookupUnitUf(Request $request)
     {
         $data = $request->validate([
-            'id_unidades' => ['required', 'integer', 'exists:unidades,id_unidades'],
+            'organization_unit_id' => ['required', 'integer', 'exists:organization_units,id'],
         ]);
 
-        $unitId = (int) $data['id_unidades'];
+        $unitId = (int) $data['organization_unit_id'];
 
-        $unit = Unidade::query()
-            ->where('id_unidades', $unitId)
-            ->first(['endereco']);
+        $unit = OrganizationUnit::query()
+            ->whereKey($unitId)
+            ->first(['address']);
 
-        $endereco = trim((string) ($unit?->endereco ?? ''));
+        $endereco = trim((string) ($unit?->address ?? ''));
         $uf = null;
 
         return response()->json([
@@ -187,14 +187,14 @@ class CircuitController extends Controller
             'contato' => 'required|string|max:50',
             'contato_whatsapp' => ['nullable', 'boolean'],
             'informacoes_adicionais' => ['nullable', 'string', 'max:5000'],
-            'id_unidades' => 'required|integer|exists:unidades,id_unidades',
+            'organization_unit_id' => 'required|integer|exists:organization_units,id',
         ]);
         $data['uf'] = '';
         $data['contato_whatsapp'] = $request->boolean('contato_whatsapp');
 
-        $data['unidades_circuitos'] = Unidade::query()
-            ->where('id_unidades', $data['id_unidades'])
-            ->value('unidade');
+        $data['unidades_circuitos'] = OrganizationUnit::query()
+            ->whereKey($data['organization_unit_id'])
+            ->value('name');
 
         CircuitUnit::create($data);
 
@@ -204,7 +204,7 @@ class CircuitController extends Controller
 
     public function editUnit(CircuitUnit $unit)
     {
-        $unidades = \App\Models\Unidade::orderBy('unidade')->get();
+        $unidades = OrganizationUnit::query()->active()->orderBy('name')->get(['id', 'name', 'address']);
         $operadorasCadastro = $this->operatorOptions();
         return view('circuits.units.edit', compact('unit', 'unidades', 'operadorasCadastro'));
     }
@@ -218,14 +218,14 @@ class CircuitController extends Controller
             'contato' => 'required|string|max:50',
             'contato_whatsapp' => ['nullable', 'boolean'],
             'informacoes_adicionais' => ['nullable', 'string', 'max:5000'],
-            'id_unidades' => 'required|integer|exists:unidades,id_unidades',
+            'organization_unit_id' => 'required|integer|exists:organization_units,id',
         ]);
         $data['uf'] = '';
         $data['contato_whatsapp'] = $request->boolean('contato_whatsapp');
 
-        $data['unidades_circuitos'] = Unidade::query()
-            ->where('id_unidades', $data['id_unidades'])
-            ->value('unidade');
+        $data['unidades_circuitos'] = OrganizationUnit::query()
+            ->whereKey($data['organization_unit_id'])
+            ->value('name');
 
         $unit->update($data);
 

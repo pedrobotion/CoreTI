@@ -213,6 +213,31 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Guarda de comandos perigosos
+    |--------------------------------------------------------------------------
+    |
+    | A credencial da aplicação tem ALL PRIVILEGES ON *.* no servidor de banco.
+    | Enquanto ela não for escopada, este guarda registra (e opcionalmente
+    | recusa) comandos que nenhuma tela emite — DROP DATABASE, CREATE USER,
+    | GRANT, SHUTDOWN, LOAD DATA, INTO OUTFILE — quando chegam pela conexão
+    | durante uma requisição HTTP.
+    |
+    | Começa em modo observação: 'bloquear' => false apenas anota em log
+    | (nível critical). Acompanhe por alguns dias e, sem falso positivo,
+    | ligue DB_GUARDA_BLOQUEAR=true.
+    |
+    | Não substitui a credencial escopada: quem executar código no servidor
+    | lê o .env e conecta direto, sem passar por aqui.
+    |
+    */
+
+    'guarda_comandos_perigosos' => [
+        'ativo' => filter_var(env('DB_GUARDA_ATIVO', true), FILTER_VALIDATE_BOOL),
+        'bloquear' => filter_var(env('DB_GUARDA_BLOQUEAR', true), FILTER_VALIDATE_BOOL),
+    ],
+
     'migrations' => [
         'table' => 'migrations',
         'update_date_on_publish' => true,

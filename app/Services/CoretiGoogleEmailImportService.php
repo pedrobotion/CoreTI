@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\CoretiGoogleEmail;
+use App\Models\CoretiRateioLocal;
+use App\Models\CoretiCostCenter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -12,8 +14,14 @@ use App\Services\CoretiRateioLocalService;
 
 class CoretiGoogleEmailImportService
 {
+    private ?array $adUsersCache = null;
+
+    /** @var array<string, array<string, mixed>|null> */
+    private array $adRateioByEmailCache = [];
+
     public function __construct(
         private readonly CoretiRateioLocalService $rateioLocalService,
+        private readonly AdUserCostCenterResolverService $adUserCostCenterResolver,
     ) {
     }
 
@@ -61,11 +69,16 @@ class CoretiGoogleEmailImportService
                 'status_google' => trim((string) ($row[$columns['status']] ?? '')) ?: null,
                 'nome_usuario' => $this->extractUsername($email),
                 'importado_em' => now(),
+                'centro_custo_manual' => false,
+                'centro_custo_manual_at' => null,
             ];
 
             $existing = CoretiGoogleEmail::query()->where('email', $email)->first();
             $mapped = $this->resolveRowMapping($data, $adUsers);
             $payload = array_merge($data, $mapped['payload']);
+            if ($existing !== null && $this->shouldPreserveExistingRateio($existing, $payload)) {
+                $payload = $this->preserveExistingRateio($existing, $payload);
+            }
 
             if ($existing) {
                 $existing->update($payload);
@@ -108,7 +121,7 @@ class CoretiGoogleEmailImportService
      */
     public function previewFromGoogleUsers(array $users): array
     {
-        return $this->processGoogleUsers($users, false);
+        return $this->processGoogleUsers($users, false, false);
     }
 
     /**
@@ -116,7 +129,7 @@ class CoretiGoogleEmailImportService
      */
     public function importFromGoogleUsers(array $users): array
     {
-        return $this->processGoogleUsers($users, true);
+        return $this->processGoogleUsers($users, true, true);
     }
 
     public function remapRateio(bool $dryRun = true): array
@@ -154,6 +167,9 @@ class CoretiGoogleEmailImportService
             $mapped = $this->resolveRowMapping($data, $adUsers);
             $payload = array_merge($data, $mapped['payload']);
             unset($payload['email']);
+            if ($this->shouldPreserveExistingRateio($row, $payload)) {
+                $payload = $this->preserveExistingRateio($row, $payload);
+            }
 
             if ($mapped['found_ad']) {
                 $summary['found_ad']++;
@@ -308,7 +324,7 @@ class CoretiGoogleEmailImportService
     /**
      * @param array<int, array<string, mixed>> $users
      */
-    private function processGoogleUsers(array $users, bool $persist): array
+    private function processGoogleUsers(array $users, bool $persist, bool $deactivateMissing): array
     {
         $adUsers = $this->loadAdUsers();
         $existingRows = CoretiGoogleEmail::query()
@@ -325,6 +341,7 @@ class CoretiGoogleEmailImportService
             'sem_ad' => 0,
             'sem_centro_custo' => 0,
             'center_cost_changes' => 0,
+            'deactivated' => 0,
             'ja_correto' => 0,
             'reasons' => [],
         ];
@@ -363,18 +380,25 @@ class CoretiGoogleEmailImportService
                 'email' => $email,
                 'nome' => trim((string) ($user['name'] ?? $user['nome'] ?? $user['display_name'] ?? '')) ?: null,
                 'status_google' => $statusGoogle,
+                'ativo' => ! array_key_exists('active', $user) || (bool) ($user['active'] ?? true),
                 'nome_usuario' => $this->extractUsername($email),
+                'matricula' => $this->normalizeMatricula($user['matricula'] ?? $user['employeeId'] ?? $user['employee_id'] ?? $user['employeeid'] ?? null),
                 'importado_em' => now(),
+                'centro_custo_manual' => false,
+                'centro_custo_manual_at' => null,
             ];
 
             $existing = $existingRows->get($email);
             $mapped = $this->resolveRowMapping($row, $adUsers);
             $payload = array_merge($row, $mapped['payload']);
             $legacyOverride = $this->resolveLegacyServiceDeskRateio($email);
-            if ($legacyOverride !== null) {
+            if (! $mapped['found_ad'] && $legacyOverride !== null) {
                 $payload = array_merge($payload, $legacyOverride);
                 $mapped['status'] = 'mapeado';
                 $mapped['reason'] = null;
+            }
+            if ($existing !== null && $this->shouldPreserveExistingRateio($existing, $payload)) {
+                $payload = $this->preserveExistingRateio($existing, $payload);
             }
             $comparisonPayload = $this->payloadForComparison($payload);
             $existingHasCompleteRateio = $existing ? $this->hasCompleteRateio($existing) : false;
@@ -415,7 +439,9 @@ class CoretiGoogleEmailImportService
                     }
                     if ($this->normalizeComparableValue($current) !== $this->normalizeComparableValue($value)) {
                         $dirty[$key] = $value;
-                        if (in_array($key, ['tipo_local', 'nome_local', 'nome_local_normalizado', 'unicoop', 'area', 'centro_custo', 'centro_custo_nome'], true)) {
+                        // A missing display label is not a cost-center change.
+                        // Count only the allocation dimensions themselves.
+                        if (in_array($key, ['unicoop', 'area', 'centro_custo'], true)) {
                             $centerCostChanged = true;
                         }
                     }
@@ -484,6 +510,16 @@ class CoretiGoogleEmailImportService
             $email = mb_strtolower(trim((string) $row->email));
             if (! $googleEmailSet->has($email)) {
                 $details['missing_in_google'][] = $email;
+
+                // Only a persisted, complete Graph import may deactivate absent rows.
+                // Preview and file imports keep the historical row untouched.
+                if ($persist && $deactivateMissing && (bool) $row->ativo) {
+                    $row->forceFill([
+                        'ativo' => false,
+                        'status_google' => 'removido',
+                    ])->save();
+                    $summary['deactivated']++;
+                }
             }
 
             if ((string) $row->ativo === '1' || (bool) $row->ativo) {
@@ -531,7 +567,9 @@ class CoretiGoogleEmailImportService
         return [
             'nome' => $payload['nome'] ?? null,
             'status_google' => $payload['status_google'] ?? null,
+            'ativo' => $payload['ativo'] ?? true,
             'nome_usuario' => $payload['nome_usuario'] ?? null,
+            'matricula' => $payload['matricula'] ?? null,
             'ad_user_id' => $payload['ad_user_id'] ?? null,
             'ad_unidade_setor_original' => $payload['ad_unidade_setor_original'] ?? null,
             'tipo_local' => $payload['tipo_local'] ?? null,
@@ -541,6 +579,8 @@ class CoretiGoogleEmailImportService
             'area' => $payload['area'] ?? null,
             'centro_custo' => $payload['centro_custo'] ?? null,
             'centro_custo_nome' => $payload['centro_custo_nome'] ?? null,
+            'centro_custo_manual' => $payload['centro_custo_manual'] ?? null,
+            'centro_custo_manual_at' => $payload['centro_custo_manual_at'] ?? null,
             'mapeamento_status' => $payload['mapeamento_status'] ?? null,
             'mapeamento_motivo' => $payload['mapeamento_motivo'] ?? null,
             'atualizado_rateio_em' => $payload['atualizado_rateio_em'] ?? null,
@@ -573,6 +613,46 @@ class CoretiGoogleEmailImportService
         return $centro !== '' && $unicoop !== '' && $area !== '';
     }
 
+    private function shouldPreserveExistingRateio(mixed $existing, array $incomingPayload): bool
+    {
+        if (! $existing) {
+            return false;
+        }
+
+        if ((bool) ($existing->centro_custo_manual ?? false)) {
+            return true;
+        }
+
+        $incomingHasRateio = trim((string) ($incomingPayload['centro_custo'] ?? '')) !== ''
+            || trim((string) ($incomingPayload['unicoop'] ?? '')) !== ''
+            || trim((string) ($incomingPayload['area'] ?? '')) !== '';
+
+        return $this->hasCompleteRateio($existing) && ! $incomingHasRateio;
+    }
+
+    private function preserveExistingRateio(mixed $existing, array $payload): array
+    {
+        foreach ([
+            'tipo_local',
+            'nome_local',
+            'nome_local_normalizado',
+            'unicoop',
+            'area',
+            'centro_custo',
+            'centro_custo_nome',
+        ] as $field) {
+            $payload[$field] = $existing->{$field} ?? $payload[$field] ?? null;
+        }
+
+        $payload['centro_custo_manual'] = true;
+        $payload['centro_custo_manual_at'] = $existing->centro_custo_manual_at ?? now();
+        $payload['mapeamento_status'] = 'mapeado';
+        $payload['mapeamento_motivo'] = null;
+        $payload['atualizado_rateio_em'] = $existing->atualizado_rateio_em ?? now();
+
+        return $payload;
+    }
+
     private function resolveLegacyServiceDeskRateio(string $email): ?array
     {
         $legacy = DB::table('service_desk_emails')
@@ -595,21 +675,37 @@ class CoretiGoogleEmailImportService
             return null;
         }
 
+        $matricula = trim((string) ($legacy->matricula ?? '')) ?: null;
+        $manualDetec = $this->resolveManualDetecRateioByCollaboratorName($legacy->colaborador_nome ?? null);
+        if ($manualDetec !== null) {
+            if ($matricula !== null) {
+                $manualDetec['matricula'] = $matricula;
+            }
+
+            return $manualDetec;
+        }
+
         $unicoop = $this->padCenterComponent((string) ($legacy->unicoop_sede ?? ''), 2);
         $area = $this->padCenterComponent((string) ($legacy->area_sede ?? ''), 3);
+        // A matrícula é uma identificação útil mesmo quando o rateio legado
+        // ainda está incompleto. Preserve-a para que o próximo ciclo consiga
+        // localizar o colaborador e completar a unidade/centro de custo.
         if ($unicoop === null || $area === null) {
-            return null;
+            return $matricula !== null ? ['matricula' => $matricula] : null;
         }
 
         $legacyName = trim((string) ($legacy->centro_custo ?? '')) ?: null;
 
         return [
+            'matricula' => $matricula,
             'nome_local' => $legacyName,
             'nome_local_normalizado' => $legacyName !== null ? $this->rateioLocalService->normalizeLocalName($legacyName) : null,
             'unicoop' => $unicoop,
             'area' => $area,
             'centro_custo' => $unicoop . '.' . $area,
             'centro_custo_nome' => $legacyName,
+            'centro_custo_manual' => (bool) ($legacy->centro_custo_manual ?? false),
+            'centro_custo_manual_at' => $legacy->centro_custo_manual_at ?? null,
             'mapeamento_status' => 'mapeado',
             'mapeamento_motivo' => null,
             'atualizado_rateio_em' => now(),
@@ -728,20 +824,215 @@ class CoretiGoogleEmailImportService
         return mb_strtolower(trim($email));
     }
 
+    private function normalizeMatricula(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (in_array(mb_strtolower($value), ['?', '-', '--', 'null', 'n/a', 'na'], true)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function resolveCoretiLocalByComponents(?string $unicoop, ?string $area): ?CoretiRateioLocal
+    {
+        $unicoop = $this->normalizeCenterComponent($unicoop);
+        $area = $this->normalizeCenterComponent($area);
+
+        if ($unicoop === null || $area === null) {
+            return null;
+        }
+
+        return CoretiRateioLocal::query()
+            ->where('ativo', true)
+            ->where('unicoop', $this->padCenterComponent($unicoop, 2))
+            ->where('area', $this->padCenterComponent($area, 3))
+            ->first();
+    }
+
+    private function normalizeCenterComponent(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+        if ($value === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value) ?: '';
+        if ($digits === '') {
+            return null;
+        }
+
+        $digits = ltrim($digits, '0');
+        if ($digits === '') {
+            $digits = '0';
+        }
+
+        return $digits;
+    }
+
+    private function resolveIntranetDataByMatricula(string $matricula): ?array
+    {
+        $matricula = trim($matricula);
+        if ($matricula === '') {
+            return null;
+        }
+
+        $row = CoretiGoogleEmail::query()
+            ->where('matricula', $matricula)
+            ->whereNotNull('centro_custo')
+            ->orderByRaw("CASE WHEN mapeamento_status = 'mapeado' THEN 0 ELSE 1 END")
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if (! $row) {
+            $hrRateio = app(OrganizationLookupService::class)->resolveRateioByEmployeeNumber($matricula);
+            if ($hrRateio === null) {
+                return null;
+            }
+
+            return array_merge($hrRateio, [
+                'nome_local' => $hrRateio['centro_custo_nome'] ?? $hrRateio['centro_custo'] ?? null,
+                'nome_local_normalizado' => $this->rateioLocalService->normalizeLocalName($hrRateio['centro_custo_nome'] ?? $hrRateio['centro_custo'] ?? ''),
+                'centro_custo' => $hrRateio['centro_custo_codigo'] ?? null,
+                'centro_custo_nome' => $hrRateio['centro_custo_nome'] ?? $hrRateio['centro_custo'] ?? null,
+            ]);
+        }
+
+        return [
+            'matricula' => (string) ($row->matricula ?? $matricula),
+            'id_pessoa' => $row->matricula ?? null,
+            'colaborador_nome' => trim((string) ($row->nome ?? '')) ?: null,
+            'centro_custo' => $row->nome_local ?? $row->centro_custo_nome ?? $row->centro_custo,
+            'unicoop_sede' => $row->unicoop,
+            'area_sede' => $row->area,
+        ];
+    }
+
+    private function parseIntranetCentroCusto(?string $value): ?array
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^(\d+)\.(\d+)$/', $value, $matches)) {
+            $unicoop = $this->padCenterComponent($matches[1], 2);
+            $area = $this->padCenterComponent($matches[2], 3);
+
+            if ($unicoop === null || $area === null) {
+                return null;
+            }
+
+            return [
+                'unicoop' => $unicoop,
+                'area' => $area,
+                'centro_custo' => $unicoop . '.' . $area,
+            ];
+        }
+
+        $digits = preg_replace('/\D+/', '', $value) ?: '';
+        if ($digits === '' || strlen($digits) <= 3) {
+            return null;
+        }
+
+        $area = substr($digits, -3);
+        $unicoop = substr($digits, 0, -3);
+        $unicoop = $this->padCenterComponent($unicoop, 2);
+        $area = $this->padCenterComponent($area, 3);
+
+        if ($unicoop === null || $area === null) {
+            return null;
+        }
+
+        return [
+            'unicoop' => $unicoop,
+            'area' => $area,
+            'centro_custo' => $unicoop . '.' . $area,
+        ];
+    }
+
     private function extractUsername(string $email): string
     {
         return trim((string) Str::of($email)->before('@'));
     }
 
+    /**
+     * Resolve the official rateio for an existing ServiceDesk e-mail using
+     * the AD as the organizational source of truth.
+     */
+    public function resolveAdRateioByEmail(string $email): ?array
+    {
+        $email = $this->normalizeEmail($email);
+        if ($email === '') {
+            return null;
+        }
+
+        $adUser = $this->findAdUser($email);
+        if ($adUser === null) {
+            return null;
+        }
+
+        // Cache per e-mail, never per unit. The payload also carries the
+        // user's AD id and matricula; caching by unit can leak one employee's
+        // identity into another employee in the same unit.
+        $emailKey = $this->normalizeEmail($email);
+        if ($emailKey !== '' && array_key_exists($emailKey, $this->adRateioByEmailCache)) {
+            $payload = $this->adRateioByEmailCache[$emailKey];
+            if ($payload === null) {
+                return null;
+            }
+
+            return [
+                'payload' => $payload,
+                'ad_user_id' => $adUser->id,
+                'ad_user_name' => $adUser->nome_completo,
+            ];
+        }
+
+        $row = [
+            'email' => $email,
+            'nome_usuario' => $this->extractUsername($email),
+        ];
+        $mapped = $this->resolveRowMapping($row, $this->loadAdUsers());
+
+        if (! $mapped['found_ad'] || ($mapped['status'] ?? null) !== 'mapeado') {
+            if ($emailKey !== '') {
+                $this->adRateioByEmailCache[$emailKey] = null;
+            }
+
+            return null;
+        }
+
+        if ($emailKey !== '') {
+            $this->adRateioByEmailCache[$emailKey] = $mapped['payload'];
+        }
+
+        return [
+            'payload' => $mapped['payload'],
+            'ad_user_id' => $mapped['payload']['ad_user_id'] ?? null,
+            'ad_user_name' => $adUser?->nome_completo,
+        ];
+    }
+
     private function loadAdUsers(): array
     {
+        if ($this->adUsersCache !== null) {
+            return $this->adUsersCache;
+        }
+
         $adUsers = DB::table('ad_users')
-            ->select(['id', 'nome_usuario', 'email', 'unidade_setor'])
+            ->select(['id', 'nome_completo', 'nome_usuario', 'email', 'matricula', 'centro_custo', 'Unicoop', 'Área', 'Cargo', 'unidade_setor', 'unidade_principal', 'e_ativo'])
             ->get();
 
         $lookup = [
             'by_email' => [],
             'by_username' => [],
+            'by_matricula' => [],
         ];
 
         foreach ($adUsers as $row) {
@@ -758,9 +1049,38 @@ class CoretiGoogleEmailImportService
                     $lookup['by_username'][$username . '@cocari.com.br'] = $row;
                 }
             }
+
+            $matriculaKey = $this->normalizeMatriculaKey($row->matricula ?? null);
+            if ($matriculaKey !== null) {
+                $lookup['by_matricula'][$matriculaKey][] = $row;
+            }
         }
 
-        return $lookup;
+        return $this->adUsersCache = $lookup;
+    }
+
+    private function findAdUser(string $email): ?object
+    {
+        $email = $this->normalizeEmail($email);
+        $lookup = $this->loadAdUsers();
+        $user = $lookup['by_email'][$email] ?? null;
+
+        if ($user === null) {
+            $user = $lookup['by_username'][$this->extractUsername($email)] ?? null;
+        }
+
+        return $user;
+    }
+
+    private function normalizeMatriculaKey(mixed $value): ?string
+    {
+        $value = $this->normalizeMatricula($value);
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $value) ?: '';
+        return $digits === '' ? null : (ltrim($digits, '0') ?: '0');
     }
 
     private function resolveRowMapping(array $row, array $adUsers): array
@@ -768,6 +1088,7 @@ class CoretiGoogleEmailImportService
         $result = [
             'payload' => [
                 'ad_user_id' => null,
+                'matricula' => null,
                 'ad_unidade_setor_original' => null,
                 'tipo_local' => null,
                 'nome_local' => null,
@@ -776,6 +1097,8 @@ class CoretiGoogleEmailImportService
                 'area' => null,
                 'centro_custo' => null,
                 'centro_custo_nome' => null,
+                'centro_custo_manual' => false,
+                'centro_custo_manual_at' => null,
                 'mapeamento_status' => 'pendente',
                 'mapeamento_motivo' => null,
                 'atualizado_rateio_em' => null,
@@ -787,9 +1110,11 @@ class CoretiGoogleEmailImportService
 
         $email = $this->normalizeEmail($row['email'] ?? '');
         $nomeUsuario = trim((string) ($row['nome_usuario'] ?? '')) ?: $this->extractUsername($email);
+        $matricula = $this->normalizeMatricula($row['matricula'] ?? null);
         $isCocari = str_ends_with($email, '@cocari.com.br');
 
         $adUser = null;
+        $adLookupReason = null;
         if ($email !== '') {
             $adUser = $adUsers['by_email'][$email] ?? null;
             if ($adUser === null && $isCocari && $nomeUsuario !== '') {
@@ -797,14 +1122,159 @@ class CoretiGoogleEmailImportService
             }
         }
 
+        // The matricula supplied by Google is the authoritative identity key.
+        // It must exist in AD before organizational data is accepted.
+        if ($matricula !== null) {
+            $matriculaKey = $this->normalizeMatriculaKey($matricula);
+            $matriculaMatches = $matriculaKey !== null
+                ? ($adUsers['by_matricula'][$matriculaKey] ?? [])
+                : [];
+
+            if (count($matriculaMatches) === 1) {
+                $adUser = $matriculaMatches[0];
+            } elseif (count($matriculaMatches) > 1) {
+                $adUser = null;
+                $adLookupReason = 'matrícula ambígua no AD';
+            } else {
+                $adUser = null;
+                $adLookupReason = 'matrícula não encontrada no AD';
+            }
+        }
+
         if ($adUser !== null) {
             $result['found_ad'] = true;
             $result['payload']['ad_user_id'] = $adUser->id;
             $result['payload']['ad_unidade_setor_original'] = trim((string) ($adUser->unidade_setor ?? '')) ?: null;
+            if ($matricula === null && trim((string) ($adUser->matricula ?? '')) !== '') {
+                $matricula = $this->normalizeMatricula($adUser->matricula);
+                $result['payload']['matricula'] = $matricula;
+            }
+        }
+
+        if ($matricula !== null) {
+            $result['payload']['matricula'] = $matricula;
+        }
+
+        // The AD record is the identity bridge: once its matricula is known,
+        // use that key to enrich the e-mail with the official organization
+        // snapshot instead of relying on the display name or unit text.
+        $matricula = $this->normalizeMatricula($matricula ?? ($adUser->matricula ?? null));
+        if ($matricula !== null) {
+            $result['payload']['matricula'] = $matricula;
+        }
+
+        $adCostCenter = $this->adUserCostCenterResolver->resolve($matricula);
+        $isCristalinaIi = $this->isCristalinaIi((string) ($result['payload']['ad_unidade_setor_original'] ?? ''));
+        $adUnicoop = $adUser !== null ? $this->padCenterComponent($adUser->{'Unicoop'} ?? null, 2) : null;
+        $adArea = $adUser !== null ? $this->padCenterComponent($adUser->{'Área'} ?? null, 3) : null;
+
+        if ($adUser !== null && $adUnicoop !== null && $adArea !== null && ! $isCristalinaIi) {
+            $rateio = $this->buildRateioPayloadFromAdComponents($adUnicoop, $adArea);
+            $result['payload'] = array_merge($result['payload'], $rateio);
+            $result['payload']['mapeamento_status'] = $rateio['centro_custo_nome'] !== null ? 'mapeado' : 'pendente';
+            $result['payload']['mapeamento_motivo'] = $rateio['centro_custo_nome'] !== null
+                ? null
+                : 'unicoop/área do AD não encontrados no catálogo de rateio';
+            $result['payload']['atualizado_rateio_em'] = now();
+            $result['status'] = $result['payload']['mapeamento_status'];
+            return $result;
+        }
+
+        if (($adCostCenter['found'] ?? false) === true && $adUser !== null && ! $isCristalinaIi) {
+            $rateio = $this->buildRateioPayloadFromCostCenterCode(
+                $adCostCenter['code'],
+                $adCostCenter['name'],
+                (string) ($result['payload']['ad_unidade_setor_original'] ?? '')
+            );
+
+            $result['payload'] = array_merge($result['payload'], $rateio);
+            $result['payload']['mapeamento_status'] = $rateio['centro_custo_nome'] !== null ? 'mapeado' : 'pendente';
+            $result['payload']['mapeamento_motivo'] = $rateio['centro_custo_nome'] !== null
+                ? null
+                : ($adCostCenter['message'] ?? 'Centro de custo do AD não encontrado no catálogo do CoreTI.');
+            $result['payload']['atualizado_rateio_em'] = now();
+            $result['status'] = $result['payload']['mapeamento_status'];
+            return $result;
+        }
+
+        // If the AD has no explicit cost center, the matricula still gives us
+        // a deterministic lookup in the local HR snapshot. This also fills
+        // the dimensions that cannot be inferred from unidade_setor alone.
+        if ($adUser !== null && $matricula !== null && ! $isCristalinaIi) {
+            $matriculaRateio = app(OrganizationLookupService::class)
+                ->resolveRateioByEmployeeNumber($matricula);
+
+            if ($matriculaRateio !== null) {
+                $rateio = $this->buildRateioPayloadFromMatricula($matriculaRateio);
+                $result['payload'] = array_merge($result['payload'], $rateio);
+                $result['payload']['mapeamento_status'] = 'mapeado';
+                $result['payload']['mapeamento_motivo'] = null;
+                $result['payload']['atualizado_rateio_em'] = now();
+                $result['status'] = 'mapeado';
+                return $result;
+            }
+        }
+
+        $manualDetec = $adLookupReason === null
+            ? $this->resolveManualDetecRateioByCollaboratorName($row['nome'] ?? null)
+            : null;
+        if ($manualDetec !== null) {
+            $result['payload'] = array_merge($result['payload'], $manualDetec);
+            $result['payload']['mapeamento_status'] = 'mapeado';
+            $result['payload']['mapeamento_motivo'] = null;
+            $result['payload']['atualizado_rateio_em'] = now();
+            $result['status'] = 'mapeado';
+            return $result;
+        }
+
+        // For an AD match, organizational data must be resolved below from
+        // ad_users.unidade_setor. The intranet fallback is only valid for
+        // records that were not found in AD.
+        $intranetData = null;
+        if (! $result['found_ad'] && $matricula === null) {
+            if (trim((string) ($row['nome'] ?? '')) !== '') {
+                $intranetData = app(OrganizationLookupService::class)
+                    ->resolveRateioByCollaboratorName((string) $row['nome']);
+            }
+        }
+        if ($intranetData !== null) {
+            $result['payload']['matricula'] = $intranetData['matricula'] ?? $matricula;
+
+            $local = $this->resolveCoretiLocalByComponents(
+                $intranetData['unicoop_sede'] ?? null,
+                $intranetData['area_sede'] ?? null
+            );
+
+            if ($local instanceof CoretiRateioLocal) {
+                $result['payload']['tipo_local'] = $local->tipo_local;
+                $result['payload']['nome_local'] = $local->nome_local;
+                $result['payload']['nome_local_normalizado'] = $local->nome_normalizado;
+                $result['payload']['unicoop'] = $this->padCenterComponent($local->unicoop, 2);
+                $result['payload']['area'] = $this->padCenterComponent($local->area, 3);
+                $result['payload']['centro_custo'] = $local->centro_custo;
+                $result['payload']['centro_custo_nome'] = $local->centro_custo_nome;
+                $result['payload']['mapeamento_status'] = 'mapeado';
+                $result['payload']['mapeamento_motivo'] = null;
+                $result['payload']['atualizado_rateio_em'] = now();
+                $result['status'] = 'mapeado';
+            } elseif (trim((string) ($intranetData['centro_custo'] ?? '')) !== '') {
+                $result['payload']['centro_custo'] = trim((string) $intranetData['centro_custo']);
+                $result['payload']['unicoop'] = $intranetData['unicoop_sede'] ?? null;
+                $result['payload']['area'] = $intranetData['area_sede'] ?? null;
+                $result['payload']['mapeamento_status'] = 'mapeado';
+                $result['payload']['mapeamento_motivo'] = null;
+                $result['payload']['atualizado_rateio_em'] = now();
+                $result['status'] = 'mapeado';
+            }
+        }
+
+        if (($result['payload']['mapeamento_status'] ?? null) === 'mapeado') {
+            return $result;
         }
 
         if (! $result['found_ad']) {
-            $reason = $email === '' ? 'e-mail ausente' : ($isCocari ? 'usuário não encontrado no AD' : 'domínio não suportado');
+            $reason = $adLookupReason
+                ?? ($email === '' ? 'e-mail ausente' : ($isCocari ? 'usuário não encontrado no AD' : 'domínio não suportado'));
             $result['reason'] = $reason;
             $result['payload']['mapeamento_status'] = 'pendente';
             $result['payload']['mapeamento_motivo'] = $reason;
@@ -886,14 +1356,176 @@ class CoretiGoogleEmailImportService
         $result['payload']['nome_local_normalizado'] = $rateio['nome_normalizado'];
         $result['payload']['unicoop'] = $this->padCenterComponent($rateio['unicoop'], 2);
         $result['payload']['area'] = $this->padCenterComponent($rateio['area'], 3);
-        $result['payload']['centro_custo'] = $rateio['centro_custo'];
-        $result['payload']['centro_custo_nome'] = $rateio['centro_custo_nome'];
+        $parsedCenter = $this->parseIntranetCentroCusto((string) ($rateio['centro_custo'] ?? ''));
+        $catalogName = $this->resolveCostCenterCatalogName($parsedCenter['centro_custo'] ?? null);
+        if ($catalogName === null) {
+            $result['reason'] = 'centro de custo não encontrado no catálogo coreti_cost_centers';
+            $result['payload']['mapeamento_status'] = 'pendente';
+            $result['payload']['mapeamento_motivo'] = $result['reason'];
+            return $result;
+        }
+
+        $result['payload']['centro_custo'] = $parsedCenter['centro_custo'];
+        $result['payload']['centro_custo_nome'] = $catalogName;
+        $result['payload']['nome_local'] = $catalogName;
+        $result['payload']['nome_local_normalizado'] = $this->rateioLocalService->normalizeLocalName($catalogName);
         $result['payload']['mapeamento_status'] = 'mapeado';
         $result['payload']['mapeamento_motivo'] = null;
         $result['payload']['atualizado_rateio_em'] = now();
         $result['status'] = 'mapeado';
 
         return $result;
+    }
+
+    /**
+     * Convert an AD cost-center code into the complete CoreTI rateio shape.
+     * The code remains a string so leading zeroes are never lost.
+     */
+    private function buildRateioPayloadFromCostCenterCode(?string $code, ?string $catalogName, string $adUnit): array
+    {
+        $parsed = $this->parseIntranetCentroCusto($code);
+        if ($parsed === null) {
+            return [
+                'unicoop' => null,
+                'area' => null,
+                'centro_custo' => $code !== null ? trim($code) : null,
+                'centro_custo_nome' => $catalogName !== null ? trim($catalogName) : null,
+                'tipo_local' => null,
+                'nome_local' => $catalogName !== null ? trim($catalogName) : null,
+                'nome_local_normalizado' => $catalogName !== null
+                    ? $this->rateioLocalService->normalizeLocalName($catalogName)
+                    : null,
+            ];
+        }
+
+        $local = $this->resolveCoretiLocalByComponents($parsed['unicoop'], $parsed['area']);
+        $name = $this->resolveCostCenterCatalogName($parsed['centro_custo']);
+        $name = $name !== null ? trim($name) : null;
+
+        return [
+            'tipo_local' => $local?->tipo_local,
+            'nome_local' => $local?->nome_local ?: $name ?: $this->mapUnidadeSetorName($adUnit),
+            'nome_local_normalizado' => $local?->nome_normalizado
+                ?: ($name !== null ? $this->rateioLocalService->normalizeLocalName($name) : null),
+            'unicoop' => $local?->unicoop
+                ? $this->padCenterComponent($local->unicoop, 2)
+                : $parsed['unicoop'],
+            'area' => $local?->area
+                ? $this->padCenterComponent($local->area, 3)
+                : $parsed['area'],
+            'centro_custo' => $parsed['centro_custo'],
+            'centro_custo_nome' => $name,
+        ];
+    }
+
+    private function buildRateioPayloadFromMatricula(array $rateio): array
+    {
+        $unicoop = $this->padCenterComponent($rateio['unicoop_sede'] ?? null, 2);
+        $area = $this->padCenterComponent($rateio['area_sede'] ?? null, 3);
+        $center = $rateio['centro_custo_codigo'] ?? null;
+
+        if ($center !== null) {
+            $parsed = $this->parseIntranetCentroCusto((string) $center);
+            $center = $parsed['centro_custo'] ?? trim((string) $center);
+        }
+
+        if ($center === null && $unicoop !== null && $area !== null) {
+            $center = $unicoop . '.' . $area;
+        }
+
+        $name = $this->resolveCostCenterCatalogName($center);
+
+        return [
+            'tipo_local' => null,
+            'nome_local' => $name,
+            'nome_local_normalizado' => $name !== null
+                ? $this->rateioLocalService->normalizeLocalName($name)
+                : null,
+            'unicoop' => $unicoop,
+            'area' => $area,
+            'centro_custo' => $center,
+            'centro_custo_nome' => $name,
+        ];
+    }
+
+    private function resolveCostCenterCatalogName(?string $code): ?string
+    {
+        $parsed = $this->parseIntranetCentroCusto($code);
+        if ($parsed === null) {
+            return null;
+        }
+
+        return CoretiCostCenter::query()
+            ->active()
+            ->where('code', $parsed['centro_custo'])
+            ->value('name');
+    }
+
+    private function buildRateioPayloadFromAdComponents(string $unicoop, string $area): array
+    {
+        $unicoop = $this->padCenterComponent($unicoop, 2);
+        $area = $this->padCenterComponent($area, 3);
+        $local = $this->resolveCoretiLocalByComponents($unicoop, $area);
+        $center = $unicoop !== null && $area !== null ? $unicoop . '.' . $area : null;
+        $catalog = $center !== null
+            ? CoretiCostCenter::query()->active()->where('code', $center)->first()
+            : null;
+        // The AD dimensions are not enough on their own. The code must be
+        // present in the active CoreTI catalog before it is considered valid.
+        $name = $catalog?->name;
+
+        return [
+            'tipo_local' => $local?->tipo_local,
+            'nome_local' => $local?->nome_local ?: $name,
+            'nome_local_normalizado' => $local?->nome_normalizado
+                ?: ($name !== null ? $this->rateioLocalService->normalizeLocalName($name) : null),
+            'unicoop' => $unicoop,
+            'area' => $area,
+            'centro_custo' => $center,
+            'centro_custo_nome' => $name !== null ? trim((string) $name) : null,
+        ];
+    }
+
+    /**
+     * @return array{tipo_local:string,nome_local:string,nome_local_normalizado:string,unicoop:string,area:string,centro_custo:string,centro_custo_nome:string,centro_custo_manual:bool,centro_custo_manual_at:\DateTimeInterface|null}
+     */
+    private function resolveManualDetecRateioByCollaboratorName(mixed $name): ?array
+    {
+        $normalized = $this->normalizeComparisonValue($name ?? '');
+        if ($normalized === '') {
+            return null;
+        }
+
+        $manualNames = [
+            'franciele tonetto ribeiro viana',
+            'maria cristina de oliveira barbosa',
+            'fabio barbosa ribeiro',
+            'vinicius gabriel alves bernardino',
+            'rodrigo valentini rombaldi',
+            'andre de paula barbosa',
+            'ana isabelly tavares daghetti',
+            'bruna thais de morais pereira',
+            'edson aparecido bonilha',
+            'rafael herrig furlaneto',
+            'mateus cinquini benedetti',
+            'roberson de souza lima',
+        ];
+
+        if (! in_array($normalized, $manualNames, true)) {
+            return null;
+        }
+
+        return [
+            'tipo_local' => 'departamento',
+            'nome_local' => 'Detec',
+            'nome_local_normalizado' => $this->rateioLocalService->normalizeLocalName('Detec'),
+            'unicoop' => '01',
+            'area' => '191',
+            'centro_custo' => '01.191',
+            'centro_custo_nome' => 'Detec',
+            'centro_custo_manual' => true,
+            'centro_custo_manual_at' => now(),
+        ];
     }
 
     private function createSpreadsheetReader(string $fullPath)
@@ -926,6 +1558,39 @@ class CoretiGoogleEmailImportService
     {
         $normalized = $this->normalizeComparisonValue($value);
         $map = [
+            'aac' => 'Associação Atlética Cocari',
+            'associacao atletica cocari' => 'Associação Atlética Cocari',
+            'associação atlética cocari' => 'Associação Atlética Cocari',
+            'abatedouro' => 'UBP - Unidade de Beneficiamento de Pescado',
+            'aquidaban 2' => 'Aquidaban II',
+            'aquidaban ii' => 'Aquidaban II',
+            'caixa sao pedro' => 'Caixa de São Pedro',
+            'caixa são pedro' => 'Caixa de São Pedro',
+            'campo alegre' => 'Campo Alegre de Goiás',
+            'campo alegre ii' => 'Campo Alegre de Goiás',
+            'campo alegre de goias' => 'Campo Alegre de Goiás',
+            'campo alegre de goiás' => 'Campo Alegre de Goiás',
+            'controller' => 'Controladoria',
+            'corretora' => 'Corretora de Seguros',
+            'ctc' => 'CTC - Centro Tecnológico',
+            'ctc centro tecnologico' => 'CTC - Centro Tecnológico',
+            'ctc centro tecnológico' => 'CTC - Centro Tecnológico',
+            'fiação' => 'Fiação Cocari',
+            'fiacao' => 'Fiação Cocari',
+            'godoy moreira 2' => 'Godoy Moreira',
+            'loja' => 'Loja Agropecuária',
+            'manutencao' => 'Fiação Cocari',
+            'manutenção' => 'Fiação Cocari',
+            'marialva 2' => 'Marialva',
+            'ortigueira' => 'Ortigueira II',
+            'piscicultura' => 'UBP - Unidade de Beneficiamento de Pescado',
+            'raçao' => 'Fábrica de Ração',
+            'racao' => 'Fábrica de Ração',
+            'sao joao da alianca' => "São João D'Aliança",
+            'sao joao d alianca' => "São João D'Aliança",
+            'são joão da aliança' => "São João D'Aliança",
+            'centro de distribuicao' => 'CD - Centro de Distribuição de Insumos',
+            'centro de distribuição' => 'CD - Centro de Distribuição de Insumos',
             'almoxarifado' => 'Almoxarifado',
             'ambiental' => 'Meio Ambiente',
             'auditoria' => 'Auditoria Interna',
@@ -953,10 +1618,10 @@ class CoretiGoogleEmailImportService
             'recepcao' => 'Recepção',
             'rh' => 'Recursos Humanos',
             'seguranca patrimonial' => 'Segurança Patrimonial',
+            'seguranca_trabalho' => 'Segurança do Trabalho',
             'seguranca trabalho' => 'Segurança do Trabalho',
             'seguranca do trabalho' => 'Segurança do Trabalho',
             'transcocari' => 'Transcocari',
-            'centro de distribuicao' => 'Centro de Distribuição',
             'inovacao agricola' => 'Inovação Agrícola',
             'logistica' => 'Logística Integrada',
             'logistica integrada' => 'Logística Integrada',
@@ -968,11 +1633,28 @@ class CoretiGoogleEmailImportService
             'suporte tecnico' => 'Tecnologia da Informação',
             'cristalina i' => 'Cristalina I',
             'cristalina ii' => 'Cristalina II',
+            'sao jose' => 'Jandaia do Sul II',
+            'são josé' => 'Jandaia do Sul II',
             'loja rural agropecuaria' => 'Loja Rural Agropecuária',
             'loja rural agropecuária' => 'Loja Rural Agropecuária',
         ];
 
-        return $map[$normalized] ?? trim($value);
+        $candidate = $map[$normalized] ?? null;
+        if ($candidate !== null) {
+            return $candidate;
+        }
+
+        if (str_contains($normalized, 'campo alegre ii')) {
+            return 'Campo Alegre de Goiás';
+        }
+        if (str_contains($normalized, 'cristalina i')) {
+            return 'Cristalina';
+        }
+        if (str_contains($normalized, 'sao jose') || str_contains($normalized, 'são josé')) {
+            return 'Jandaia do Sul II';
+        }
+
+        return trim($value);
     }
 
     private function normalizeComparisonValue(string $value): string
@@ -1016,13 +1698,12 @@ class CoretiGoogleEmailImportService
             return null;
         }
 
-        $unitExists = DB::table('unidades')
-            ->whereRaw('LOWER(TRIM(unidade)) = ?', [$normalized])
-            ->exists();
+        $records = app(\App\Services\OrganizationLookupService::class)
+            ->costCenterOptions(false)
+            ->filter(fn ($item) => mb_strtolower(trim((string) $item->name)) === $normalized);
 
-        $deptExists = DB::table('departamentos')
-            ->whereRaw('LOWER(TRIM(nome)) = ?', [$normalized])
-            ->exists();
+        $unitExists = $records->contains(fn ($item) => ($item->source ?? null) === 'unidade');
+        $deptExists = $records->contains(fn ($item) => ($item->source ?? null) === 'departamento');
 
         if ($unitExists && $deptExists) {
             return 'ambiguous';
@@ -1070,6 +1751,7 @@ class CoretiGoogleEmailImportService
             'nome' => $payload['nome'] ?? null,
             'status_google' => $payload['status_google'] ?? null,
             'nome_usuario' => $payload['nome_usuario'] ?? null,
+            'matricula' => $payload['matricula'] ?? null,
             'ad_user_id' => $payload['ad_user_id'] ?? null,
             'ad_unidade_setor_original' => $payload['ad_unidade_setor_original'] ?? null,
             'nome_local_convertido' => $payload['nome_local'] ?? null,
@@ -1142,6 +1824,7 @@ class CoretiGoogleEmailImportService
         fputcsv($handle, ['Sem AD', $summary['sem_ad'] ?? 0], ';');
         fputcsv($handle, ['Sem centro de custo', $summary['sem_centro_custo'] ?? 0], ';');
         fputcsv($handle, ['Trocas de centro de custo', $summary['center_cost_changes'] ?? 0], ';');
+        fputcsv($handle, ['Desativados ausentes do Google', $summary['deactivated'] ?? 0], ';');
         foreach (($summary['reasons'] ?? []) as $reason => $count) {
             fputcsv($handle, ['Pendência: ' . $reason, $count], ';');
         }

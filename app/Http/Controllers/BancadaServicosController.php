@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -194,10 +195,8 @@ class BancadaServicosController extends Controller
         $unidade = trim((string) ($filters['unidade'] ?? ''));
         $equipments = BancadaEquipment::query()
             ->where(function ($q): void {
-                $q->where(function ($sq): void {
-                    $sq->where('status', BancadaStatusFlowService::STATUS_PRONTO_ENTREGA)
-                        ->where('origem_tipo', 'sede');
-                })->orWhere('status', BancadaStatusFlowService::STATUS_NOTA_FISCAL_EMITIDA);
+                $q->where('status', BancadaStatusFlowService::STATUS_PRONTO_ENTREGA)
+                    ->orWhere('status', BancadaStatusFlowService::STATUS_NOTA_FISCAL_EMITIDA);
             })
             ->when($search !== '', function ($q) use ($search): void {
                 $q->where(function ($sq) use ($search): void {
@@ -211,7 +210,14 @@ class BancadaServicosController extends Controller
             ->when($tipo !== '', fn ($q) => $q->where('tipo_equipamento', 'like', "%{$tipo}%"))
             ->when($unidade !== '', fn ($q) => $q->where('unidade_setor', 'like', "%{$unidade}%"))
             ->orderBy('updated_at')
-            ->get();
+            ->get()
+            ->filter(function (BancadaEquipment $equipment): bool {
+                $status = $this->statusFlow->normalizeStatus($equipment->status);
+
+                return $status === BancadaStatusFlowService::STATUS_NOTA_FISCAL_EMITIDA
+                    || ($status === BancadaStatusFlowService::STATUS_PRONTO_ENTREGA && ! $this->statusFlow->requiresFiscalFlow($equipment));
+            })
+            ->values();
         $routes = BancadaMaloteRoute::query()
             ->where('ativo', true)
             ->with('units')
@@ -221,7 +227,11 @@ class BancadaServicosController extends Controller
         $sede = [];
         $unassigned = [];
         foreach ($equipments as $equipment) {
-            if (($equipment->origem_tipo ?? null) === 'sede' || str_contains(mb_strtolower((string) $equipment->unidade_setor), 'sede')) {
+            if (
+                ($equipment->origem_tipo ?? null) === 'sede'
+                || $this->statusFlow->isFiscalExemptUnit($equipment->unidade_setor)
+                || str_contains(mb_strtolower((string) $equipment->unidade_setor), 'sede')
+            ) {
                 $sede[] = $equipment;
                 continue;
             }
@@ -372,7 +382,7 @@ class BancadaServicosController extends Controller
             $status === BancadaStatusFlowService::STATUS_PRONTO_ENTREGA || $status === BancadaStatusFlowService::STATUS_NOTA_FISCAL_EMITIDA,
             422
         );
-        abort_unless(($equipment->origem_tipo ?? 'unidade') === 'unidade', 422);
+        abort_unless($this->statusFlow->requiresFiscalFlow($equipment), 422);
         $route = $this->findActiveRouteForUnit($equipment->unidade_setor);
         if (! $route) {
             return back()->with('error', 'Rota não cadastrada para esta unidade/setor.');
@@ -418,39 +428,56 @@ class BancadaServicosController extends Controller
     public function storeAsset(Request $request)
     {
         $data = $this->validateAsset($request, true);
-        DB::transaction(function () use ($data): void {
-            $origin = (string) ($data['origem_tipo'] ?? 'unidade');
-            $data['status'] = $this->statusFlow->initialStatusForOrigin($origin);
-            $data['entrada_status'] = $this->statusFlow->initialEntryStatusForOrigin($origin);
-            if ($origin === 'sede') {
-                $data['entrada_realizada_em'] = now();
-            }
-            $asset = BancadaEquipment::create($data);
-            BancadaEquipmentStatusHistory::create([
-                'bancada_equipment_id' => $asset->id,
-                'status' => $asset->status,
-                'start_time' => now(),
-            ]);
-            $this->recordEquipmentEvent(
-                equipment: $asset,
-                action: 'cadastro_equipamento',
-                previousStatus: null,
-                newStatus: $asset->status,
-                module: 'Bancada',
-                observation: 'Equipamento cadastrado.',
-                metadata: [
+
+        try {
+            DB::transaction(function () use ($data): void {
+                $origin = (string) ($data['origem_tipo'] ?? 'unidade');
+                $unitName = (string) ($data['unidade_setor'] ?? '');
+                $data['status'] = $this->statusFlow->initialStatusFor($origin, $unitName);
+                $data['entrada_status'] = $this->statusFlow->initialEntryStatusFor($origin, $unitName);
+                if ($data['entrada_status'] === BancadaStatusFlowService::ENTRY_DONE) {
+                    $data['entrada_realizada_em'] = now();
+                }
+                $asset = BancadaEquipment::create($data);
+                BancadaEquipmentStatusHistory::create([
+                    'bancada_equipment_id' => $asset->id,
+                    'status' => $asset->status,
+                    'start_time' => now(),
+                ]);
+                $this->recordEquipmentEvent(
+                    equipment: $asset,
+                    action: 'cadastro_equipamento',
+                    previousStatus: null,
+                    newStatus: $asset->status,
+                    module: 'Bancada',
+                    observation: 'Equipamento cadastrado.',
+                    metadata: [
+                        'origem_tipo' => $asset->origem_tipo,
+                        'entrada_status' => $asset->entrada_status,
+                    ]
+                );
+                app(JiraAutomationService::class)->dispatch('equipamento_cadastrado', [
+                    'equipamento_id' => $asset->id,
+                    'tipo' => $asset->tipo_equipamento,
+                    'plaqueta' => $asset->plaqueta,
+                    'unidade_setor' => $asset->unidade_setor,
                     'origem_tipo' => $asset->origem_tipo,
-                    'entrada_status' => $asset->entrada_status,
-                ]
-            );
-            app(JiraAutomationService::class)->dispatch('equipamento_cadastrado', [
-                'equipamento_id' => $asset->id,
-                'tipo' => $asset->tipo_equipamento,
-                'plaqueta' => $asset->plaqueta,
-                'unidade_setor' => $asset->unidade_setor,
-                'origem_tipo' => $asset->origem_tipo,
+                ]);
+            });
+        } catch (\Throwable $exception) {
+            Log::error('bancada.equipment_create_failed', [
+                'user_id' => Auth::id(),
+                'plaqueta' => $request->input('plaqueta'),
+                'tipo_equipamento' => $request->input('tipo_equipamento'),
+                'origem_tipo' => $request->input('origem_tipo'),
+                'unidade_setor' => $request->input('unidade_setor'),
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
             ]);
-        });
+
+            return back()->withInput()->with('error', 'Não foi possível cadastrar o equipamento. Verifique os dados e tente novamente.');
+        }
+
         return redirect()->route('bancada-servicos.assets')->with('success', 'Equipamento cadastrado.');
     }
     public function editAsset(BancadaEquipment $equipment): View
@@ -490,7 +517,9 @@ class BancadaServicosController extends Controller
             'tic' => (string) ($equipment->tic ?? ''),
             'observacao' => (string) ($equipment->observacao ?? ''),
         ];
-        $equipment->update($data);
+        $equipment->fill($data);
+        $this->normalizeFiscalState($equipment);
+        $equipment->save();
         $after = [
             'tipo_equipamento' => (string) $equipment->tipo_equipamento,
             'plaqueta' => (string) $equipment->plaqueta,
@@ -781,6 +810,10 @@ class BancadaServicosController extends Controller
         $before = (bool) $equipment->backup_pronto_emprestimo;
         $after = ! $before;
         $equipment->backup_pronto_emprestimo = $after;
+        if ($after) {
+            $equipment->backup_emprestado_para = null;
+            $equipment->backup_emprestado_em = null;
+        }
         $equipment->save();
         $this->recordEquipmentEvent(
             equipment: $equipment,
@@ -795,6 +828,38 @@ class BancadaServicosController extends Controller
             ]
         );
         return back()->with('success', 'Disponibilidade de empréstimo atualizada.');
+    }
+
+    public function loanBackupEquipment(Request $request, BancadaEquipment $equipment)
+    {
+        abort_unless($equipment->status === BancadaStatusFlowService::STATUS_BACKUP, 404);
+
+        $data = $request->validate([
+            'backup_emprestado_para' => ['required', 'string', 'max:255'],
+        ]);
+
+        $destination = trim((string) $data['backup_emprestado_para']);
+        $before = $equipment->backup_emprestado_para;
+        $equipment->update([
+            'backup_emprestado_para' => $destination,
+            'backup_emprestado_em' => now(),
+            'backup_pronto_emprestimo' => false,
+        ]);
+
+        $this->recordEquipmentEvent(
+            equipment: $equipment,
+            action: 'backup_emprestado',
+            previousStatus: $equipment->status,
+            newStatus: $equipment->status,
+            module: 'Bancada',
+            observation: 'Equipamento de backup emprestado para ' . $destination . '.',
+            metadata: [
+                'destino_anterior' => $before,
+                'destino_novo' => $destination,
+            ]
+        );
+
+        return back()->with('success', 'Empréstimo do equipamento registrado.');
     }
     public function updateDiscardControls(Request $request, BancadaEquipment $equipment)
     {
@@ -989,6 +1054,7 @@ class BancadaServicosController extends Controller
             'data_emissao_entrada' => ['nullable', 'date'],
             'nota_valor_entrada' => ['nullable', 'string', 'max:40'],
             'nota_anexo_entrada' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+            'nota_observacao_entrada' => ['nullable', 'string', 'max:2000'],
             'nota_documento_saida' => ['nullable', 'string', 'max:255'],
             'nota_numero_saida' => ['nullable', 'string', 'max:80'],
             'nota_anexo_saida' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
@@ -1012,7 +1078,7 @@ class BancadaServicosController extends Controller
         try {
             DB::transaction(function () use ($request, $equipment, $data): void {
                 if ($data['action'] === 'entrada') {
-                    if (($equipment->origem_tipo ?? 'unidade') !== 'unidade') {
+                    if (! $this->statusFlow->requiresFiscalFlow($equipment)) {
                         throw new \DomainException('Entrada fiscal administrativa é aplicável somente para origem Unidade.');
                     }
                     if (! $this->isEntryFiscalPending($equipment)) {
@@ -1022,6 +1088,7 @@ class BancadaServicosController extends Controller
                     $equipment->nota_numero_entrada = trim((string) ($data['nota_numero_entrada'] ?? '')) ?: null;
                     $equipment->data_emissao_entrada = $data['data_emissao_entrada'] ?? null;
                     $equipment->nota_valor_entrada = $this->parseBrazilianMoney($data['nota_valor_entrada'] ?? null);
+                    $equipment->nota_observacao_entrada = trim((string) ($data['nota_observacao_entrada'] ?? '')) ?: null;
                     $equipment->entrada_status = BancadaStatusFlowService::ENTRY_DONE;
                     $equipment->entrada_realizada_em = now();
                     $event = $this->writeStatusChange(
@@ -1036,6 +1103,9 @@ class BancadaServicosController extends Controller
                             'numero_nota' => $equipment->nota_numero_entrada,
                             'data_emissao' => $equipment->data_emissao_entrada?->format('Y-m-d'),
                             'valor' => $equipment->nota_valor_entrada,
+                            // Vai para o histórico, para a observação não ficar
+                            // só no cadastro e sim registrada no evento.
+                            'observacao' => $equipment->nota_observacao_entrada,
                         ]
                     );
                     if ($request->hasFile('nota_anexo_entrada')) {
@@ -1253,7 +1323,7 @@ class BancadaServicosController extends Controller
                     return;
                 }
                 if ($data['action'] === 'nota_emitida') {
-                    if (($equipment->origem_tipo ?? 'unidade') !== 'unidade') {
+                    if (! $this->statusFlow->requiresFiscalFlow($equipment)) {
                         throw new \DomainException('Nota de saída é obrigatória apenas para origem Unidade.');
                     }
                     $equipment->nota_documento_saida = trim((string) ($data['nota_documento_saida'] ?? '')) ?: null;
@@ -1346,7 +1416,8 @@ class BancadaServicosController extends Controller
         if ($raw === '') {
             return null;
         }
-        $normalized = str_replace('.', '', $raw);
+        $normalized = preg_replace('/[^\d,.-]+/u', '', $raw) ?? '';
+        $normalized = str_replace('.', '', $normalized);
         $normalized = str_replace(',', '.', $normalized);
         if (! is_numeric($normalized)) {
             return null;
@@ -1415,7 +1486,10 @@ class BancadaServicosController extends Controller
                 $q->where('status', '!=', BancadaStatusFlowService::STATUS_NOTA_FISCAL_EMITIDA)
                     ->where(function ($sq): void {
                         $sq->where('status', '!=', BancadaStatusFlowService::STATUS_PRONTO_ENTREGA)
-                            ->orWhere('origem_tipo', 'unidade');
+                            ->orWhere(function ($readyForFiscal): void {
+                                $readyForFiscal->where('origem_tipo', 'unidade');
+                                $this->whereNotFiscalExemptUnit($readyForFiscal);
+                            });
                     });
             });
         }
@@ -1461,7 +1535,9 @@ class BancadaServicosController extends Controller
             ->whereIn('entrada_status', ['Aguardando Entrada', BancadaStatusFlowService::ENTRY_PENDING])
             ->where('origem_tipo', 'unidade')
             ->latest('updated_at')
-            ->get();
+            ->get()
+            ->filter(fn (BancadaEquipment $equipment) => $this->statusFlow->requiresFiscalFlow($equipment))
+            ->values();
         $pendingThirdParty = BancadaEquipment::query()
             ->where('status', BancadaStatusFlowService::STATUS_TERCEIROS)
             ->with(['attachments' => function ($query): void {
@@ -1490,7 +1566,9 @@ class BancadaServicosController extends Controller
                 });
             })
             ->latest('updated_at')
-            ->get();
+            ->get()
+            ->filter(fn (BancadaEquipment $equipment) => $this->statusFlow->requiresFiscalFlow($equipment))
+            ->values();
         $equipmentSearchRecord = null;
         $equipmentSearchExactMatch = false;
         $equipmentSearchResults = collect();
@@ -1625,12 +1703,20 @@ class BancadaServicosController extends Controller
         $data = $request->validate($rules);
         $data['backup_pronto_emprestimo'] = (bool) ($data['backup_pronto_emprestimo'] ?? false);
         $origin = $data['origem_tipo'] ?? 'unidade';
+        $unitName = (string) ($data['unidade_setor'] ?? '');
         $data['status'] = $this->statusFlow->normalizeStatus(
-            trim((string) ($data['status'] ?? '')) ?: $this->statusFlow->initialStatusForOrigin($origin)
-        ) ?? $this->statusFlow->initialStatusForOrigin($origin);
+            trim((string) ($data['status'] ?? '')) ?: $this->statusFlow->initialStatusFor($origin, $unitName)
+        ) ?? $this->statusFlow->initialStatusFor($origin, $unitName);
         $data['entrada_status'] = $this->statusFlow->normalizeEntryStatus(
-            trim((string) ($data['entrada_status'] ?? '')) ?: $this->statusFlow->initialEntryStatusForOrigin($origin)
+            trim((string) ($data['entrada_status'] ?? '')) ?: $this->statusFlow->initialEntryStatusFor($origin, $unitName)
         );
+        if ($this->statusFlow->isFiscalExemptUnit($unitName) || $origin === 'sede') {
+            $data['status'] = $data['status'] === BancadaStatusFlowService::STATUS_AGUARDANDO_ENTRADA_FISCAL
+                ? BancadaStatusFlowService::STATUS_EM_BANCADA
+                : $data['status'];
+            $data['entrada_status'] = BancadaStatusFlowService::ENTRY_DONE;
+            $data['entrada_realizada_em'] = $data['entrada_realizada_em'] ?? now();
+        }
         $originOptions = $this->equipmentUnitOptionsByOrigin();
         $allowed = collect($originOptions[$origin] ?? [])
             ->map(fn ($value) => mb_strtolower(trim((string) $value)))
@@ -1744,48 +1830,38 @@ class BancadaServicosController extends Controller
     }
     private function equipmentUnitOptionsByOrigin(): array
     {
-        $units = DB::table('unidades')
-            ->whereNotNull('unidade')
-            ->whereRaw('TRIM(unidade) <> ""')
-            ->orderBy('unidade')
-            ->pluck('unidade')
+        $organization = app(\App\Services\OrganizationLookupService::class);
+
+        $units = $organization->unitOptions()
+            ->pluck('name')
+            ->filter(fn ($name) => trim((string) $name) !== '')
             ->unique()
             ->values();
-        $departments = DB::table('departamentos')
-            ->whereNotNull('nome')
-            ->whereRaw('TRIM(nome) <> ""')
-            ->orderBy('nome')
-            ->pluck('nome')
+
+        $departments = $organization->departmentOptions()
+            ->pluck('name')
+            ->filter(fn ($name) => trim((string) $name) !== '')
             ->unique()
             ->values();
+
+        // Este departamento existe no catalogo operacional legado como uma
+        // opcao valida de rateio (01.175), embora nao esteja no snapshot de
+        // departamentos ativos usado pelo seletor principal.
+        if ($organization->findCostCenterByName('Ambulatório/Medicina') !== null
+            && ! $departments->contains('Ambulatório/Medicina')) {
+            $departments->push('Ambulatório/Medicina');
+        }
+        $departments = $departments->sort()->values();
+
         return [
             'unidade' => $units,
             'sede' => $departments,
         ];
     }
+
     private function maloteUnitOptions()
     {
-        try {
-            $conn = DB::connection('intranet_cocari');
-            if (! Schema::connection('intranet_cocari')->hasTable('cadUnicoop')) {
-                return collect($this->equipmentUnitOptionsByOrigin()['unidade']);
-            }
-            $query = $conn->table('cadUnicoop')
-                ->select('Nome')
-                ->whereNotNull('Nome')
-                ->where('Nome', '<>', '')
-                ->orderBy('Nome');
-            if (Schema::connection('intranet_cocari')->hasColumn('cadUnicoop', 'Ativo')) {
-                $query->where('Ativo', 1);
-            }
-            $units = $query->pluck('Nome')->filter(fn ($v) => trim((string) $v) !== '')->unique()->values();
-            if ($units->isEmpty()) {
-                return collect($this->equipmentUnitOptionsByOrigin()['unidade']);
-            }
-            return $units;
-        } catch (\Throwable $e) {
-            return collect($this->equipmentUnitOptionsByOrigin()['unidade']);
-        }
+        return collect($this->equipmentUnitOptionsByOrigin()['unidade']);
     }
     private function findActiveRouteForUnit(?string $unitLabel): ?BancadaMaloteRoute
     {
@@ -1878,6 +1954,10 @@ class BancadaServicosController extends Controller
     }
     private function isEntryFiscalPending(BancadaEquipment $equipment): bool
     {
+        if (! $this->statusFlow->requiresFiscalFlow($equipment)) {
+            return false;
+        }
+
         $normalizedStatus = $this->statusFlow->normalizeStatus((string) $equipment->status) ?? (string) $equipment->status;
         if ($normalizedStatus === BancadaStatusFlowService::STATUS_AGUARDANDO_ENTRADA_FISCAL) {
             return true;
@@ -1885,6 +1965,44 @@ class BancadaServicosController extends Controller
         $entryStatus = $this->statusFlow->normalizeEntryStatus((string) ($equipment->entrada_status ?? ''));
         return $entryStatus === BancadaStatusFlowService::ENTRY_PENDING;
     }
+
+    private function normalizeFiscalState(BancadaEquipment $equipment): void
+    {
+        if ($this->statusFlow->requiresFiscalFlow($equipment)) {
+            return;
+        }
+
+        if (($this->statusFlow->normalizeStatus($equipment->status) ?? $equipment->status) === BancadaStatusFlowService::STATUS_AGUARDANDO_ENTRADA_FISCAL) {
+            $equipment->status = BancadaStatusFlowService::STATUS_EM_BANCADA;
+        }
+
+        $equipment->entrada_status = BancadaStatusFlowService::ENTRY_DONE;
+        $equipment->entrada_realizada_em = $equipment->entrada_realizada_em ?: now();
+    }
+
+    private function whereNotFiscalExemptUnit($query): void
+    {
+        $query->where(function ($unitQuery): void {
+            $unitQuery->whereNull('unidade_setor')
+                ->orWhere(function ($knownUnitQuery): void {
+                    $knownUnitQuery->whereRaw(
+                        'LOWER(TRIM(unidade_setor)) NOT IN (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [
+                            'e-commerce',
+                            'e commerce',
+                            'cd - centro de distribuição de insumos',
+                            'cd - centro de distribuicao de insumos',
+                            'transcocari',
+                            'mandaguari',
+                            'ubc- unidade de beneficiamento de café',
+                            'ubc- unidade de beneficiamento de cafe',
+                            'ubc - unidade de beneficiamento de café',
+                        ]
+                    )->whereRaw('LOWER(TRIM(unidade_setor)) != ?', ['ubc - unidade de beneficiamento de cafe']);
+                });
+        });
+    }
+
     private function buildDeliveryRouteDashboardData(): array
     {
         $pendingCd = [
@@ -1899,6 +2017,10 @@ class BancadaServicosController extends Controller
             ->get();
         $today = today();
         foreach ($items as $equipment) {
+            if (! $this->statusFlow->requiresFiscalFlow($equipment)) {
+                continue;
+            }
+
             $route = $this->findActiveRouteForUnit($equipment->unidade_setor);
             $schedule = $route ? $this->deliveryScheduleService->nextDates($route, $today->toImmutable()) : null;
             $row = [

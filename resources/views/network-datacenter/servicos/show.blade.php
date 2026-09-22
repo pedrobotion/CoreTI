@@ -1,10 +1,6 @@
 <x-app-layout>
     <div class="mx-auto max-w-7xl space-y-6">
         <div class="flex items-start justify-between gap-3">
-            <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Network &amp; DataCenter</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950">Serviço de Conectividade</h1>
-            </div>
             <div class="flex gap-2">
                 <a href="{{ route('network-datacenter.servicos.edit', $servico) }}" class="inline-flex min-h-10 items-center justify-center rounded-md bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Editar</a>
                 <a href="{{ route('network-datacenter.servicos.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar</a>
@@ -47,10 +43,6 @@
                             <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Anexar ficha</button>
                         </form>
                     @endif
-                    <form method="POST" action="{{ route('network-datacenter.servicos.ficha.extract', $servico) }}">
-                        @csrf
-                        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Preencher dados com IA</button>
-                    </form>
                 </div>
             </section>
         </div>

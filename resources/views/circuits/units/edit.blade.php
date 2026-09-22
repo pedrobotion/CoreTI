@@ -17,7 +17,7 @@
                                 const enderecoInput = this.$refs.enderecoInput;
                                 if (!unitSelect || !unitSelect.value) return;
                                 try {
-                                    const response = await fetch(`${this.lookupUfUrl}?id_unidades=${encodeURIComponent(unitSelect.value)}`, { headers: { Accept: 'application/json' } });
+                                    const response = await fetch(`${this.lookupUfUrl}?organization_unit_id=${encodeURIComponent(unitSelect.value)}`, { headers: { Accept: 'application/json' } });
                                     const payload = await response.json();
                                     if (response.ok && payload.found) {
                                         if (enderecoInput && payload.endereco) {
@@ -45,15 +45,15 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Unidade</label>
-                            <select name="id_unidades" x-ref="unitSelect" @change="fillUfFromUnit" class="mt-1 block w-full rounded-md border-gray-200" required>
+                            <select name="organization_unit_id" x-ref="unitSelect" @change="fillUfFromUnit" class="mt-1 block w-full rounded-md border-gray-200" required>
                                 <option value="">Selecione uma unidade</option>
                                 @foreach ($unidades as $unidade)
-                                    <option value="{{ $unidade->id_unidades }}" @selected(old('id_unidades', $unit->id_unidades) == $unidade->id_unidades)>
-                                        {{ $unidade->unidade }}
+                                    <option value="{{ $unidade->id }}" @selected(old('organization_unit_id', $unit->organization_unit_id) == $unidade->id)>
+                                        {{ $unidade->name }}
                                     </option>
                                 @endforeach
                             </select>
-                            @error('id_unidades')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                            @error('organization_unit_id')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
                         </div>
 
                         <div>

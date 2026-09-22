@@ -1,4 +1,10 @@
 <x-app-layout>
+    @php
+        $catalogCostCenterName = $currentCostCenterName ?: '';
+        $catalogCostCenterOption = $catalogCostCenterName !== ''
+            ? $catalogCostCenterName . '|' . trim((string) $emailRecord->unicoop_sede) . '|' . trim((string) $emailRecord->area_sede)
+            : '';
+    @endphp
     <div class="mx-auto max-w-3xl">
         <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">ServiceDesk</p>
@@ -12,11 +18,12 @@
                     collaboratorUrl: @js(route('service-desk.emails.lookup.collaborator')),
                     costCenterUrl: @js(route('service-desk.emails.lookup.cost-center', $scope)),
                     cristalinaIiAreaOptions: @js($cristalinaIiAreaOptions),
+                    centroCustoOption: @js(old('centro_custo_option', $catalogCostCenterOption)),
                     idPessoa: @js(old('id_pessoa', $emailRecord->id_pessoa)),
                     matricula: @js(old('matricula', $emailRecord->matricula)),
                     nome: @js(old('colaborador_nome', $emailRecord->colaborador_nome)),
                     email: @js(old('email', $emailRecord->email)),
-                    centroCusto: @js(old('centro_custo', $emailRecord->centro_custo)),
+                    centroCusto: @js(old('centro_custo', $catalogCostCenterName)),
                     unicoop: @js(old('unicoop_sede', $emailRecord->unicoop_sede)),
                     area: @js(old('area_sede', $emailRecord->area_sede)),
                     manualCostCenter: false,
@@ -28,14 +35,16 @@
                     applyCostCenterFromSelect(event) {
                         const selected = event?.target?.options?.[event.target.selectedIndex];
                         if (!selected) return;
-                        this.centroCusto = selected.value || '';
+                        this.centroCustoOption = selected.value || '';
+                        this.centroCusto = selected.getAttribute('data-name') || '';
                         this.unicoop = selected.getAttribute('data-unicoop') || '';
                         this.area = selected.getAttribute('data-area') || '';
                         this.manualCostCenter = true;
                         if (this.isCristalinaIi()) {
-                            this.area = '';
-                            this.costCenterStatus = 'Selecione uma area para Cristalina II.';
-                            return;
+                            if (!this.area) {
+                                this.costCenterStatus = 'Selecione uma area para Cristalina II.';
+                                return;
+                            }
                         }
                         this.lookupCostCenter();
                     },
@@ -97,8 +106,8 @@
 
                             const costCenter = payload.cost_center;
                             this.centroCusto = costCenter.centro_custo || value;
-                            this.unicoop = costCenter.unicoop_sede || '';
-                            this.area = costCenter.area_sede || '';
+                            this.unicoop = costCenter.unicoop_sede || this.unicoop || '';
+                            this.area = costCenter.area_sede || this.area || '';
                             this.manualCostCenter = true;
                             this.costCenterStatus = 'Unicoop e area preenchidos.';
                         } catch (error) {
@@ -110,6 +119,7 @@
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="id_pessoa" x-model="idPessoa">
+                <input type="hidden" name="centro_custo" x-model="centroCusto">
                 <input type="hidden" name="centro_custo_manual" :value="manualCostCenter ? 1 : 0">
                 <input type="hidden" name="area_sede" x-model="area">
 
@@ -134,10 +144,10 @@
 
                 <div>
                     <label class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $scope === 'sede' ? 'Centro de custo' : 'Unidade' }}</label>
-                    <select name="centro_custo" x-model="centroCusto" @change="applyCostCenterFromSelect($event)" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                    <select name="centro_custo_option" x-model="centroCustoOption" @change="applyCostCenterFromSelect($event)" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                         <option value="">Selecione</option>
                         @foreach ($costCenterRecords as $costCenter)
-                            <option value="{{ $costCenter->name }}" data-unicoop="{{ $costCenter->unicoop }}" data-area="{{ $costCenter->area }}">
+                            <option value="{{ $costCenter->name }}|{{ $costCenter->unicoop }}|{{ $costCenter->area }}" data-name="{{ $costCenter->name }}" data-unicoop="{{ $costCenter->unicoop }}" data-area="{{ $costCenter->area }}">
                                 {{ $costCenter->name }}
                             </option>
                         @endforeach

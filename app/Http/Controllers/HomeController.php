@@ -4,14 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Application;
 use App\Models\CircuitUnit;
-use App\Models\Unidade;
+use App\Models\OrganizationUnit;
 use App\Models\User;
+use App\Services\SyncStatusService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class HomeController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(SyncStatusService $syncStatus): View
     {
         $user = Auth::user();
         $isAdmin = $user?->role === 'admin';
@@ -21,6 +22,7 @@ class HomeController extends Controller
             || $user?->hasModuleAccess('aplicativos')
             || $user?->hasModuleAccess('bancada')
             || $user?->hasModuleAccess('administrativo')
+            || $user?->hasModuleAccess('coordenacao')
         );
 
         $stats = [
@@ -30,26 +32,12 @@ class HomeController extends Controller
             'admins' => User::where('role', 'admin')->count(),
             'applications_total' => Application::where('is_active', true)->count(),
             'circuits_total' => CircuitUnit::count(),
-            'units_total' => Unidade::count(),
+            'units_total' => OrganizationUnit::query()->active()->count(),
             'operators_total' => CircuitUnit::query()
                 ->whereNotNull('operadora')
                 ->distinct()
                 ->count('operadora'),
         ];
-
-        $operatorBreakdown = CircuitUnit::query()
-            ->selectRaw('operadora, COUNT(*) as total')
-            ->whereNotNull('operadora')
-            ->groupBy('operadora')
-            ->orderByDesc('total')
-            ->orderBy('operadora')
-            ->limit(5)
-            ->get();
-
-        $recentCircuits = CircuitUnit::with('unidade')
-            ->orderByDesc('id_circuitos')
-            ->limit(6)
-            ->get();
 
         $pendingUsers = $isAdmin
             ? User::where('is_active', false)->orderByDesc('created_at')->limit(5)->get()
@@ -57,8 +45,7 @@ class HomeController extends Controller
 
         return view('home', [
             'stats' => $stats,
-            'operatorBreakdown' => $operatorBreakdown,
-            'recentCircuits' => $recentCircuits,
+            'syncStatus' => $syncStatus->fontes($user),
             'pendingUsers' => $pendingUsers,
             'isAdmin' => $isAdmin,
             'hasAnyDashboardAccess' => $hasAnyDashboardAccess,

@@ -9,6 +9,9 @@ export default {
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
+        // Classes definidas em PHP (ex.: mapas de cor por status em Services e
+        // Support). Sem isto o JIT não as encontra e o estilo não é gerado.
+        './app/**/*.php',
     ],
 
     theme: {

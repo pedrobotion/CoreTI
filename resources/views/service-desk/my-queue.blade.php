@@ -10,18 +10,54 @@
 
         <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-wrap items-end gap-2">
-                <form method="POST" action="{{ route('service-desk.my-queue.emails.store') }}" class="grid flex-1 gap-2 sm:grid-cols-[minmax(240px,420px)_auto]">
+                <form
+                    method="POST"
+                    action="{{ route('service-desk.my-queue.emails.store') }}"
+                    class="grid flex-1 gap-2 sm:grid-cols-[minmax(240px,420px)_auto]"
+                    x-data="{ digitando: {{ $emailsDisponiveis->isEmpty() ? 'true' : 'false' }} }"
+                >
                     @csrf
-                    <input
-                        type="email"
+
+                    {{-- Seleção a partir dos e-mails que realmente aparecem nos chamados. --}}
+                    <select
+                        x-show="!digitando"
                         name="email"
-                        required
-                        placeholder="Cadastrar e-mail para filtrar minha fila"
+                        :required="!digitando"
+                        :disabled="digitando"
                         class="toolbar-input rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900"
                     >
+                        <option value="">Selecione um e-mail…</option>
+                        @foreach ($emailsDisponiveis as $disponivel)
+                            <option value="{{ $disponivel->email }}">
+                                {{ $disponivel->email }} ({{ $disponivel->total }} chamados)
+                            </option>
+                        @endforeach
+                    </select>
+
+                    {{-- Escape para e-mail que ainda não abriu chamado nenhum. --}}
+                    <input
+                        x-show="digitando"
+                        x-cloak
+                        type="email"
+                        name="email"
+                        :required="digitando"
+                        :disabled="!digitando"
+                        placeholder="Digite o e-mail"
+                        class="toolbar-input rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900"
+                    >
+
                     <button type="submit" class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
                         Cadastrar e-mail
                     </button>
+
+                    @if ($emailsDisponiveis->isNotEmpty())
+                        <button
+                            type="button"
+                            @click="digitando = !digitando"
+                            class="text-left text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline sm:col-span-2"
+                            x-text="digitando ? 'Escolher da lista' : 'Digitar outro e-mail'"
+                        ></button>
+                    @endif
                 </form>
             </div>
 

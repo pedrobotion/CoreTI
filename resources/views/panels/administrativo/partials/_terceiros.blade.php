@@ -187,6 +187,21 @@
 
                                                     <div class="rounded-md border border-slate-200 bg-white p-4" x-data="{
                                                         informacaoRecebida: @js(in_array((string) $item->terceiros_resultado, ['sem_conserto', 'negada', 'reprovada', 'reprovado'], true) ? 'sem_conserto' : ''),
+                                                        valorDisplay: '',
+                                                        init() {
+                                                            const raw = @js($item->terceiros_valor_reparo !== null ? (string) $item->terceiros_valor_reparo : '');
+                                                            this.valorDisplay = raw === '' ? '' : Number(raw).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                        },
+                                                        formatMoney() {
+                                                            const digits = (this.valorDisplay || '').replace(/\D/g, '');
+                                                            if (! digits) {
+                                                                this.valorDisplay = '';
+                                                                return;
+                                                            }
+
+                                                            const amount = Number(digits) / 100;
+                                                            this.valorDisplay = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                        },
                                                         showValor() {
                                                             return this.informacaoRecebida === 'orcamento_informado';
                                                         },
@@ -219,7 +234,19 @@
                                                             </div>
                                                             <div x-show="showValor()">
                                                                 <label class="text-sm font-medium">Valor do reparo / orçamento</label>
-                                                                <input name="terceiros_valor_reparo" placeholder="0,00" value="{{ $item->terceiros_valor_reparo !== null ? number_format((float) $item->terceiros_valor_reparo, 2, ',', '.') : '' }}" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                                <div class="mt-1 flex items-center gap-2">
+                                                                    <span class="inline-flex h-10 items-center rounded-md border border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-600">R$</span>
+                                                                    <input
+                                                                        name="terceiros_valor_reparo"
+                                                                        x-model="valorDisplay"
+                                                                        @input="formatMoney()"
+                                                                        placeholder="0,00"
+                                                                        inputmode="decimal"
+                                                                        x-bind:required="showValor()"
+                                                                        x-bind:disabled="!showValor()"
+                                                                        class="w-full rounded-md border-slate-300 text-sm"
+                                                                    >
+                                                                </div>
                                                             </div>
                                                             <div class="sm:col-span-2">
                                                                 <label class="text-sm font-medium">Observação do orçamento / reparo</label>

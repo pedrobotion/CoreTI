@@ -9,9 +9,9 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route('service-desk.emails.export') }}" class="toolbar-btn inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                <button type="button" onclick="openEmailExportModal()" class="toolbar-btn inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                     Exportar CSV
-                </a>
+                </button>
                 <button type="button" onclick="openEmailCreateModal()" class="toolbar-btn-primary inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
                     Adicionar e-mail
                 </button>
@@ -45,6 +45,7 @@
                                         <th class="px-4 py-3">Nome usuário</th>
                                         <th class="px-4 py-3">Centro atual</th>
                                         <th class="px-4 py-3">Status</th>
+                                        <th class="px-4 py-3">Ação</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-amber-100 dark:divide-amber-900/40">
@@ -57,10 +58,15 @@
                                             <td class="px-4 py-3 text-slate-700 dark:text-slate-300">
                                                 {{ $manualEmail->mapeamento_status ?? '-' }}
                                             </td>
+                                            <td class="px-4 py-3">
+                                                <button type="button" onclick="openModal('coreti-google-email-modal-{{ $manualEmail->id }}')" class="inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                                    Corrigir rateio
+                                                </button>
+                                            </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="5" class="px-4 py-6 text-center text-slate-500 dark:text-slate-400">Nenhum e-mail pendente de definição manual.</td>
+                                            <td colspan="6" class="px-4 py-6 text-center text-slate-500 dark:text-slate-400">Nenhum e-mail pendente de definição manual.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -174,6 +180,51 @@
         </section>
     </div>
 
+    @foreach($manualCostCenterEmails as $manualEmail)
+        <div id="coreti-google-email-modal-{{ $manualEmail->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
+            <div class="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900">Corrigir rateio do e-mail</h2>
+                        <p class="mt-1 text-sm text-slate-500">{{ $manualEmail->email }}</p>
+                    </div>
+                    <button type="button" onclick="closeModal('coreti-google-email-modal-{{ $manualEmail->id }}', true)" class="rounded-md border border-slate-200 px-2 py-1 text-slate-600 hover:bg-slate-100">Fechar</button>
+                </div>
+                <form method="POST" action="{{ route('service-desk.emails.coreti.update', $manualEmail) }}" class="grid gap-3">
+                    @csrf
+                    @method('PATCH')
+                    <label class="text-sm font-medium text-slate-700">Unidade/departamento e centro de custo
+                        <select onchange="applyCoretiRateio(this, '{{ $manualEmail->id }}')" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                            <option value="">Selecione uma opção oficial</option>
+                            @foreach($costCenterRecords as $costCenter)
+                                @php
+                                    $optionKey = trim((string) $costCenter->unicoop) . '|' . trim((string) $costCenter->area);
+                                    $currentKey = trim((string) $manualEmail->unicoop) . '|' . trim((string) $manualEmail->area);
+                                @endphp
+                                <option
+                                    value="{{ $optionKey }}"
+                                    data-name="{{ $costCenter->name }}"
+                                    data-unicoop="{{ $costCenter->unicoop }}"
+                                    data-area="{{ $costCenter->area }}"
+                                    @selected($optionKey === $currentKey)
+                                >{{ $costCenter->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <input type="hidden" id="coreti-centro-custo-{{ $manualEmail->id }}" name="centro_custo" value="{{ $manualEmail->centro_custo }}">
+                    <input type="hidden" id="coreti-centro-nome-{{ $manualEmail->id }}" name="centro_custo_nome" value="{{ $manualEmail->centro_custo_nome }}">
+                    <input type="hidden" id="coreti-unicoop-{{ $manualEmail->id }}" name="unicoop" value="{{ $manualEmail->unicoop }}">
+                    <input type="hidden" id="coreti-area-{{ $manualEmail->id }}" name="area" value="{{ $manualEmail->area }}">
+                    <p class="text-xs text-slate-500">As opções são carregadas das unidades e departamentos oficiais. A seleção preserva Unicoop e área.</p>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" onclick="closeModal('coreti-google-email-modal-{{ $manualEmail->id }}', true)" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
+                        <button type="submit" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Salvar rateio</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
+
     @foreach($emails as $email)
         <div id="email-edit-modal-{{ $email->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
             <div class="w-full max-w-6xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
@@ -190,6 +241,9 @@
                     collaboratorUrl: @js(route('service-desk.emails.lookup.collaborator')),
                     costCenterUrl: @js(route('service-desk.emails.lookup.cost-center', $scope)),
                     cristalinaIiAreaOptions: @js($cristalinaIiAreaOptions),
+                    centroCustoOption: @js(old('centro_custo_option', trim((string) $email->centro_custo) !== ''
+                        ? trim((string) $email->centro_custo) . '|' . trim((string) $email->unicoop_sede) . '|' . trim((string) $email->area_sede)
+                        : '')),
                     idPessoa: @js($email->id_pessoa),
                     matricula: @js($email->matricula),
                     nome: @js($email->colaborador_nome),
@@ -206,14 +260,16 @@
                     applyCostCenterFromSelect(event) {
                         const selected = event?.target?.options?.[event.target.selectedIndex];
                         if (!selected) return;
-                        this.centroCusto = selected.value || '';
+                        this.centroCustoOption = selected.value || '';
+                        this.centroCusto = selected.getAttribute('data-name') || '';
                         this.unicoop = selected.getAttribute('data-unicoop') || '';
                         this.area = selected.getAttribute('data-area') || '';
                         this.manualCostCenter = true;
                         if (this.isCristalinaIi()) {
-                            this.area = '';
-                            this.costCenterStatus = 'Selecione uma area para Cristalina II.';
-                            return;
+                            if (!this.area) {
+                                this.costCenterStatus = 'Selecione uma area para Cristalina II.';
+                                return;
+                            }
                         }
                         this.lookupCostCenter();
                     },
@@ -258,20 +314,21 @@
                                     this.costCenterStatus = payload.message || 'Centro de custo nao encontrado.';
                                     return;
                                 }
-                                const costCenter = payload.cost_center;
-                                this.centroCusto = costCenter.centro_custo || value;
-                                this.unicoop = costCenter.unicoop_sede || '';
-                                this.area = costCenter.area_sede || '';
-                                this.costCenterStatus = 'Unicoop e area preenchidos.';
-                            } catch (error) {
-                                this.costCenterStatus = 'Nao foi possivel consultar o centro de custo.';
-                            }
+                            const costCenter = payload.cost_center;
+                            this.centroCusto = costCenter.centro_custo || value;
+                            this.unicoop = costCenter.unicoop_sede || this.unicoop || '';
+                            this.area = costCenter.area_sede || this.area || '';
+                            this.costCenterStatus = 'Unicoop e area preenchidos.';
+                        } catch (error) {
+                            this.costCenterStatus = 'Nao foi possivel consultar o centro de custo.';
+                        }
                         },
                     }"
                 >
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="id_pessoa" x-model="idPessoa">
+                    <input type="hidden" name="centro_custo" x-model="centroCusto">
                     <input type="hidden" name="centro_custo_manual" :value="manualCostCenter ? 1 : 0">
 
                     <div>
@@ -288,10 +345,10 @@
                     </div>
                     <div>
                         <label class="text-sm font-medium text-slate-700">{{ $scope === 'sede' ? 'Centro de custo' : 'Unidade' }}</label>
-                        <select name="centro_custo" x-model="centroCusto" @change="applyCostCenterFromSelect($event)" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
+                        <select name="centro_custo_option" x-model="centroCustoOption" @change="applyCostCenterFromSelect($event)" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
                             <option value="">Selecione</option>
                             @foreach($costCenterRecords as $costCenter)
-                                <option value="{{ $costCenter->name }}" data-unicoop="{{ $costCenter->unicoop }}" data-area="{{ $costCenter->area }}">
+                                <option value="{{ $costCenter->name }}|{{ $costCenter->unicoop }}|{{ $costCenter->area }}" data-name="{{ $costCenter->name }}" data-unicoop="{{ $costCenter->unicoop }}" data-area="{{ $costCenter->area }}">
                                     {{ $costCenter->name }}
                                 </option>
                             @endforeach
@@ -347,6 +404,7 @@
                     matricula: @js(old('matricula', $filters['selected_matricula'] ?? '')),
                     nome: @js(old('colaborador_nome', $filters['selected_nome'] ?? '')),
                     email: @js(old('email', '')),
+                    centroCustoOption: @js(old('centro_custo_option', '')),
                     centroCusto: @js(old('centro_custo', '')),
                     unicoop: @js(old('unicoop_sede', '')),
                     area: @js(old('area_sede', '')),
@@ -359,14 +417,16 @@
                     applyCostCenterFromSelect(event) {
                         const selected = event?.target?.options?.[event.target.selectedIndex];
                         if (!selected) return;
-                        this.centroCusto = selected.value || '';
+                        this.centroCustoOption = selected.value || '';
+                        this.centroCusto = selected.getAttribute('data-name') || '';
                         this.unicoop = selected.getAttribute('data-unicoop') || '';
                         this.area = selected.getAttribute('data-area') || '';
                         this.manualCostCenter = !!this.centroCusto;
                         if (this.isCristalinaIi()) {
-                            this.area = '';
-                            this.costCenterStatus = 'Selecione uma area para Cristalina II.';
-                            return;
+                            if (!this.area) {
+                                this.costCenterStatus = 'Selecione uma area para Cristalina II.';
+                                return;
+                            }
                         }
                         this.lookupCostCenter();
                     },
@@ -419,8 +479,8 @@
                             }
                             const costCenter = payload.cost_center;
                             this.centroCusto = costCenter.centro_custo || value;
-                            this.unicoop = costCenter.unicoop_sede || '';
-                            this.area = costCenter.area_sede || '';
+                            this.unicoop = costCenter.unicoop_sede || this.unicoop || '';
+                            this.area = costCenter.area_sede || this.area || '';
                             this.manualCostCenter = true;
                             this.costCenterStatus = 'Unicoop e area preenchidos.';
                         } catch (error) {
@@ -431,6 +491,7 @@
             >
                 @csrf
                 <input type="hidden" name="id_pessoa" x-model="idPessoa">
+                <input type="hidden" name="centro_custo" x-model="centroCusto">
                 <input type="hidden" name="centro_custo_manual" :value="manualCostCenter ? 1 : 0">
                 <input type="hidden" name="area_sede" x-model="area">
 
@@ -455,10 +516,10 @@
 
                 <div>
                     <label class="text-sm font-medium text-slate-700">{{ $scope === 'sede' ? 'Centro de custo' : 'Unidade' }}</label>
-                    <select name="centro_custo" x-model="centroCusto" @change="applyCostCenterFromSelect($event)" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
+                    <select name="centro_custo_option" x-model="centroCustoOption" @change="applyCostCenterFromSelect($event)" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
                         <option value="">Selecione</option>
                         @foreach ($costCenterRecords as $costCenter)
-                            <option value="{{ $costCenter->name }}" data-unicoop="{{ $costCenter->unicoop }}" data-area="{{ $costCenter->area }}">
+                            <option value="{{ $costCenter->name }}|{{ $costCenter->unicoop }}|{{ $costCenter->area }}" data-name="{{ $costCenter->name }}" data-unicoop="{{ $costCenter->unicoop }}" data-area="{{ $costCenter->area }}">
                                 {{ $costCenter->name }}
                             </option>
                         @endforeach
@@ -505,7 +566,87 @@
         </div>
     </div>
 
+    <div id="email-export-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="email-export-modal-title">
+        <div class="w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+                <div>
+                    <h2 id="email-export-modal-title" class="text-lg font-bold text-slate-950 dark:text-white">Exportar e-mails</h2>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Escolha todas as unidades ou selecione apenas as que deseja exportar.</p>
+                </div>
+                <button type="button" onclick="closeEmailExportModal()" class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Fechar">&times;</button>
+            </div>
+
+            <form method="GET" action="{{ route('service-desk.emails.export') }}" onsubmit="prepareEmailExportForm()" class="space-y-5 p-5">
+                <input type="hidden" name="scope" value="{{ $scope }}">
+                <input type="hidden" name="status" value="{{ $status }}">
+                <input type="hidden" name="q" value="{{ $search }}">
+
+                <label class="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+                    <input id="email-export-all" type="checkbox" onchange="toggleEmailExportUnits()" class="mt-0.5 rounded border-slate-300 text-slate-900 focus:ring-slate-900" @checked(($units ?? []) === [])>
+                    <span>
+                        <span class="block text-sm font-semibold text-slate-900 dark:text-white">Todas as unidades</span>
+                        <span class="mt-1 block text-xs text-slate-500 dark:text-slate-400">Inclui todas as unidades do escopo atual, respeitando os filtros de status e busca.</span>
+                    </span>
+                </label>
+
+                <div>
+                    <label for="email-export-units" class="block text-sm font-semibold text-slate-700 dark:text-slate-200">Unidades específicas</label>
+                    <select id="email-export-units" name="units[]" multiple size="8" class="mt-2 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800">
+                        @foreach (($unitOptions ?? []) as $unit)
+                            <option value="{{ $unit }}" @selected(in_array($unit, $units ?? [], true))>{{ $unit }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Use Ctrl ou Command para selecionar mais de uma unidade.</p>
+                </div>
+
+                <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+                    <button type="button" onclick="closeEmailExportModal()" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Cancelar</button>
+                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800">Exportar CSV</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        function openEmailExportModal() {
+            const modal = document.getElementById('email-export-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            toggleEmailExportUnits();
+        }
+
+        function closeEmailExportModal() {
+            const modal = document.getElementById('email-export-modal');
+            if (!modal) return;
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        function toggleEmailExportUnits() {
+            const all = document.getElementById('email-export-all');
+            const select = document.getElementById('email-export-units');
+            if (!all || !select) return;
+
+            select.disabled = all.checked;
+            if (all.checked) {
+                Array.from(select.options).forEach((option) => {
+                    option.selected = false;
+                });
+            }
+        }
+
+        function prepareEmailExportForm() {
+            const all = document.getElementById('email-export-all');
+            const select = document.getElementById('email-export-units');
+            if (all?.checked && select) {
+                Array.from(select.options).forEach((option) => {
+                    option.selected = false;
+                });
+            }
+            return true;
+        }
+
         function openEmailCreateModal() {
             const modal = document.getElementById('email-create-modal');
             if (!modal) return;
@@ -538,6 +679,16 @@
             }
             modal.classList.remove('flex');
             modal.classList.add('hidden');
+        }
+
+        function applyCoretiRateio(select, id) {
+            const option = select?.options?.[select.selectedIndex];
+            if (!option || !option.dataset.unicoop || !option.dataset.area) return;
+
+            document.getElementById(`coreti-centro-custo-${id}`).value = `${option.dataset.unicoop}.${option.dataset.area}`;
+            document.getElementById(`coreti-centro-nome-${id}`).value = option.dataset.name || '';
+            document.getElementById(`coreti-unicoop-${id}`).value = option.dataset.unicoop;
+            document.getElementById(`coreti-area-${id}`).value = option.dataset.area;
         }
 
         function resetModalForm(modal) {

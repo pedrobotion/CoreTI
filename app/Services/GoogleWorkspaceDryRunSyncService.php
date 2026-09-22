@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ServiceDeskEmail;
 use App\Models\ServiceDeskEmailCostCenter;
+use App\Models\CoretiGoogleEmail;
 use App\Services\CoretiGoogleEmailImportService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -73,14 +74,53 @@ class GoogleWorkspaceDryRunSyncService
      */
     public function refreshIntranetDataForExistingEmails(): array
     {
+        $adRateioUpdates = $this->refreshLegacyEmailsFromAd();
+
+        // The AD is authoritative for organizational allocation. Keep the
+        // previous intranet fallback below unreachable for compatibility with
+        // older deployments, but never let it overwrite an AD result.
+        return [
+            'updated' => $adRateioUpdates,
+            'ad_rateio_updates' => $adRateioUpdates,
+            'center_cost_changes' => 0,
+        ];
+
         $updated = 0;
         $centerCostChanges = 0;
+        $adRateioUpdates = $this->refreshLegacyEmailsFromCoreti();
 
         ServiceDeskEmail::query()
             ->whereNotNull('email')
             ->orderBy('id')
             ->chunkById(200, function ($emails) use (&$updated, &$centerCostChanges): void {
+                $normalizedEmails = $emails
+                    ->map(fn (ServiceDeskEmail $email): string => mb_strtolower(trim((string) $email->email)))
+                    ->filter()
+                    ->values();
+
+                $officialRows = CoretiGoogleEmail::query()
+                    ->whereIn(DB::raw('LOWER(TRIM(email))'), $normalizedEmails->all())
+                    ->get([
+                        'email', 'ad_user_id', 'unicoop', 'area', 'centro_custo',
+                        'centro_custo_nome', 'nome_local', 'centro_custo_manual',
+                    ])
+                    ->keyBy(fn (CoretiGoogleEmail $row): string => mb_strtolower(trim((string) $row->email)));
+
                 foreach ($emails as $email) {
+                    $official = $officialRows->get(mb_strtolower(trim((string) $email->email)));
+
+                    // The legacy fallback by matrícula must not overwrite an
+                    // official AD rateio already resolved in coreti_google_emails.
+                    if ($official
+                        && ! (bool) $official->centro_custo_manual
+                        && filled($official->ad_user_id)
+                        && filled($official->unicoop)
+                        && filled($official->area)
+                        && filled($official->centro_custo)
+                        && filled($official->centro_custo_nome ?: $official->nome_local)) {
+                        continue;
+                    }
+
                     $matricula = trim((string) ($email->matricula ?? ''));
                     $domainPayload = $this->resolveDataByEmailDomain((string) $email->email);
                     if ($domainPayload !== null) {
@@ -187,9 +227,158 @@ class GoogleWorkspaceDryRunSyncService
             });
 
         return [
-            'updated' => $updated,
+            'updated' => $updated + $adRateioUpdates,
+            'ad_rateio_updates' => $adRateioUpdates,
             'center_cost_changes' => $centerCostChanges,
         ];
+    }
+
+    /**
+     * Align legacy ServiceDesk e-mails directly from AD. Manual assignments
+     * remain untouched, and unresolved AD users are left for manual review.
+     */
+    private function refreshLegacyEmailsFromAd(): int
+    {
+        $updated = 0;
+
+        ServiceDeskEmail::query()
+            ->whereNotNull('email')
+            ->orderBy('id')
+            ->chunkById(200, function ($emails) use (&$updated): void {
+                foreach ($emails as $email) {
+                    if ((bool) $email->centro_custo_manual) {
+                        continue;
+                    }
+
+                    $resolved = $this->importService->resolveAdRateioByEmail((string) $email->email);
+                    if ($resolved === null) {
+                        continue;
+                    }
+
+                    $payload = $resolved['payload'] ?? [];
+                    $unicoop = trim((string) ($payload['unicoop'] ?? ''));
+                    $area = trim((string) ($payload['area'] ?? ''));
+                    $centerName = trim((string) ($payload['centro_custo_nome'] ?? $payload['nome_local'] ?? ''));
+                    $centerCode = trim((string) ($payload['centro_custo'] ?? ''));
+
+                    if ($unicoop === '' || $area === '' || $centerCode === '' || $centerName === '') {
+                        continue;
+                    }
+
+                    $scope = $this->resolveScopeByUnicoop($unicoop) ?? 'genericos';
+                    $costCenterId = $this->syncEmailCostCenter($scope, $centerName, $unicoop, $area);
+                    $changes = [
+                        'colaborador_nome' => filled($resolved['ad_user_name'] ?? null)
+                            ? $resolved['ad_user_name']
+                            : $email->colaborador_nome,
+                        'centro_custo' => $centerName,
+                        'unicoop_sede' => $unicoop,
+                        'area_sede' => $area,
+                        'service_desk_email_cost_center_id' => $costCenterId,
+                        'scope' => $scope,
+                    ];
+
+                    $dirty = [];
+                    foreach ($changes as $field => $value) {
+                        if ((string) ($email->{$field} ?? '') !== (string) ($value ?? '')) {
+                            $dirty[$field] = $value;
+                        }
+                    }
+
+                    if ($dirty === []) {
+                        continue;
+                    }
+
+                    $email->update($dirty);
+                    $updated++;
+                }
+            });
+
+        return $updated;
+    }
+
+    /**
+     * Keeps the legacy ServiceDesk email view aligned with the official
+     * organizational data already resolved from AD into coreti_google_emails.
+     * Manual assignments remain untouched on either side.
+     */
+    private function refreshLegacyEmailsFromCoreti(): int
+    {
+        $updated = 0;
+
+        ServiceDeskEmail::query()
+            ->whereNotNull('email')
+            ->orderBy('id')
+            ->chunkById(200, function ($emails) use (&$updated): void {
+                $normalizedEmails = $emails
+                    ->map(fn (ServiceDeskEmail $email): string => mb_strtolower(trim((string) $email->email)))
+                    ->filter()
+                    ->values();
+
+                if ($normalizedEmails->isEmpty()) {
+                    return;
+                }
+
+                $coretiRows = CoretiGoogleEmail::query()
+                    ->whereIn(DB::raw('LOWER(TRIM(email))'), $normalizedEmails->all())
+                    ->get([
+                        'email', 'nome', 'matricula', 'ad_user_id', 'unicoop', 'area',
+                        'centro_custo', 'centro_custo_nome', 'nome_local',
+                        'centro_custo_manual', 'mapeamento_status',
+                    ])
+                    ->keyBy(fn (CoretiGoogleEmail $row): string => mb_strtolower(trim((string) $row->email)));
+
+                foreach ($emails as $email) {
+                    if ((bool) $email->centro_custo_manual) {
+                        continue;
+                    }
+
+                    $coreti = $coretiRows->get(mb_strtolower(trim((string) $email->email)));
+                    if (! $coreti || (bool) $coreti->centro_custo_manual || blank($coreti->ad_user_id)) {
+                        continue;
+                    }
+
+                    $unicoop = trim((string) ($coreti->unicoop ?? ''));
+                    $area = trim((string) ($coreti->area ?? ''));
+                    $centroNome = trim((string) ($coreti->centro_custo_nome ?? $coreti->nome_local ?? ''));
+                    $centroCodigo = trim((string) ($coreti->centro_custo ?? ''));
+
+                    if ($unicoop === '' || $area === '' || $centroCodigo === '' || $centroNome === '') {
+                        continue;
+                    }
+
+                    $changes = [
+                        'matricula' => filled($coreti->matricula) ? (string) $coreti->matricula : $email->matricula,
+                        'colaborador_nome' => filled($coreti->nome) ? (string) $coreti->nome : $email->colaborador_nome,
+                        'centro_custo' => $centroNome,
+                        'unicoop_sede' => $unicoop,
+                        'area_sede' => $area,
+                        'centro_custo_manual' => false,
+                        'centro_custo_manual_at' => null,
+                    ];
+
+                    $targetScope = $this->resolveScopeByUnicoop($unicoop);
+                    if ($targetScope !== null && $targetScope !== $email->scope) {
+                        $changes['scope'] = $targetScope;
+                    }
+
+                    $dirty = [];
+                    foreach ($changes as $field => $value) {
+                        if ((string) ($email->{$field} ?? '') !== (string) ($value ?? '')) {
+                            $dirty[$field] = $value;
+                        }
+                    }
+
+                    if ($dirty === []) {
+                        continue;
+                    }
+
+                    $email->update($dirty);
+                    $updated++;
+                }
+            });
+
+        return $updated;
     }
 
     public function resolveServiceDeskIntranetDataByMatricula(string $matricula): ?array
@@ -276,30 +465,21 @@ class GoogleWorkspaceDryRunSyncService
             return null;
         }
 
-        try {
-            $row = DB::connection('intranet_cocari')
-                ->table('cadColaborador as c')
-                ->select([
-                    DB::raw('c.IdPessoa as matricula'),
-                    DB::raw('c.Nome as nome'),
-                    DB::raw('c.IdPessoa as id_pessoa'),
-                ])
-                ->whereRaw('LOWER(c.Email) = ?', [$normalized])
-                ->orderByDesc('c.Ativo')
-                ->first();
+        $row = CoretiGoogleEmail::query()
+            ->whereRaw('LOWER(email) = ?', [$normalized])
+            ->whereNotNull('matricula')
+            ->orderByDesc('updated_at')
+            ->first();
 
-            if (! $row) {
-                return null;
-            }
-
-            return [
-                'matricula' => trim((string) ($row->matricula ?? '')),
-                'nome' => trim((string) ($row->nome ?? '')),
-                'id_pessoa' => $row->id_pessoa ?? null,
-            ];
-        } catch (\Throwable) {
+        if (! $row) {
             return null;
         }
+
+        return [
+            'matricula' => trim((string) ($row->matricula ?? '')),
+            'nome' => trim((string) ($row->nome ?? '')),
+            'id_pessoa' => $row->matricula ?? null,
+        ];
     }
 
     private function syncEmailCostCenter(string $scope, ?string $name, ?string $unicoop, ?string $area): ?int
@@ -327,79 +507,36 @@ class GoogleWorkspaceDryRunSyncService
 
     private function resolveIntranetDataByMatricula(string $matricula): ?array
     {
-        for ($attempt = 1; $attempt <= 2; $attempt++) {
-            try {
-                $row = DB::connection('intranet_cocari')
-                    ->table('cadColaborador as c')
-                    ->select([
-                        DB::raw('c.IdPessoa as matricula'),
-                        DB::raw('c.IdPessoa as id_pessoa'),
-                        DB::raw('c.Nome as nome'),
-                        DB::raw('c.Email as email'),
-                        DB::raw('c.CentroCusto as centro_custo_codigo'),
-                        DB::raw('c.Ativo as ativo'),
-                    ])
-                    ->where('c.IdPessoa', $matricula)
-                    ->orderByDesc('c.Ativo')
-                    ->first();
-
-                if (! $row) {
-                    return null;
-                }
-
-                $parsedCostCenter = $this->parseIntranetCentroCusto($row->centro_custo_codigo ?? null);
-                if ($parsedCostCenter === null) {
-                    return [
-                        'matricula' => (string) ($row->matricula ?? $matricula),
-                        'id_pessoa' => $row->id_pessoa ?? null,
-                        'colaborador_nome' => trim((string) ($row->nome ?? '')) ?: null,
-                        'centro_custo' => null,
-                        'unicoop_sede' => null,
-                        'area_sede' => null,
-                    ];
-                }
-
-                $parsedCostCenter = $this->normalizeServiceDeskRateioCostCenter($parsedCostCenter);
-                $localName = $this->resolveLocalNameFromCoreti(
-                    $parsedCostCenter['unicoop'],
-                    $parsedCostCenter['area']
-                );
-
-                return [
-                    'matricula' => (string) ($row->matricula ?? $matricula),
-                    'id_pessoa' => $row->id_pessoa ?? null,
-                    'colaborador_nome' => trim((string) ($row->nome ?? '')) ?: null,
-                    'centro_custo' => $localName ?? $parsedCostCenter['centro_custo'],
-                    'unicoop_sede' => $parsedCostCenter['unicoop'],
-                    'area_sede' => $parsedCostCenter['area'],
-                ];
-            } catch (\Throwable) {
-                try {
-                    DB::connection('intranet_cocari')->disconnect();
-                } catch (\Throwable) {
-                }
-
-                if ($attempt === 2) {
-                    return null;
-                }
-            }
+        $matricula = trim($matricula);
+        if ($matricula === '') {
+            return null;
         }
 
-        return null;
+        $row = CoretiGoogleEmail::query()
+            ->where('matricula', $matricula)
+            ->whereNotNull('centro_custo')
+            ->orderByRaw("CASE WHEN mapeamento_status = 'mapeado' THEN 0 ELSE 1 END")
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if (! $row) {
+            return app(OrganizationLookupService::class)->resolveRateioByEmployeeNumber($matricula);
+        }
+
+        return [
+            'matricula' => (string) ($row->matricula ?? $matricula),
+            'id_pessoa' => $row->matricula ?? null,
+            'colaborador_nome' => trim((string) ($row->nome ?? '')) ?: null,
+            'centro_custo' => $row->nome_local ?? $row->centro_custo_nome ?? $row->centro_custo,
+            'unicoop_sede' => $row->unicoop,
+            'area_sede' => $row->area,
+        ];
     }
 
     private function normalizeServiceDeskRateioCostCenter(array $costCenter): array
     {
         $unicoop = str_pad(preg_replace('/\D+/', '', (string) ($costCenter['unicoop'] ?? '')), 2, '0', STR_PAD_LEFT);
         $area = str_pad(preg_replace('/\D+/', '', (string) ($costCenter['area'] ?? '')), 3, '0', STR_PAD_LEFT);
-
-        if ($unicoop === '86') {
-            $area = '201';
-        } elseif ($unicoop === '64') {
-            $area = '200';
-        } elseif (! in_array($unicoop, ['01', '59'], true)) {
-            $area = '154';
-        }
 
         return [
             'unicoop' => $unicoop,
@@ -451,50 +588,9 @@ class GoogleWorkspaceDryRunSyncService
         $unicoop = str_pad(preg_replace('/\D+/', '', $unicoop), 2, '0', STR_PAD_LEFT);
         $area = str_pad(preg_replace('/\D+/', '', $area), 3, '0', STR_PAD_LEFT);
 
-        if ($unicoop === '01') {
-            $department = DB::table('departamentos')
-                ->where('ativo', true)
-                ->where('unicoop', $unicoop)
-                ->where('area', $area)
-                ->value('nome');
+        $record = app(\App\Services\OrganizationLookupService::class)->findByUnicoopArea($unicoop, $area);
 
-            if (filled($department)) {
-                return (string) $department;
-            }
-
-            $sedeDepartment = DB::table('sede_departamentos')
-                ->where('ativo', true)
-                ->where('unicoop', $unicoop)
-                ->where('area', $area)
-                ->value('nome_departamento');
-
-            if (filled($sedeDepartment)) {
-                return (string) $sedeDepartment;
-            }
-        }
-
-        $unit = DB::table('unidades')
-            ->where('unicoop', $unicoop)
-            ->where('area', $area)
-            ->value('unidade');
-
-        if (filled($unit)) {
-            return (string) $unit;
-        }
-
-        if ($unicoop !== '01') {
-            $department = DB::table('departamentos')
-                ->where('ativo', true)
-                ->where('unicoop', $unicoop)
-                ->where('area', $area)
-                ->value('nome');
-
-            if (filled($department)) {
-                return (string) $department;
-            }
-        }
-
-        return null;
+        return $record ? (string) $record->name : null;
     }
 
     private function buildDiff(): array
@@ -603,6 +699,33 @@ class GoogleWorkspaceDryRunSyncService
 
     private function extractEmployeeId(object $user): ?string
     {
+        if (method_exists($user, 'getEmployeeId')) {
+            $employeeId = trim((string) $user->getEmployeeId());
+            if ($employeeId !== '') {
+                return $employeeId;
+            }
+        }
+
+        $customSchemas = method_exists($user, 'getCustomSchemas')
+            ? (array) ($user->getCustomSchemas() ?? [])
+            : [];
+
+        foreach ($customSchemas as $schemaValues) {
+            $schemaValues = is_object($schemaValues) ? (array) $schemaValues : (array) $schemaValues;
+            foreach (['matricula', 'employeeid', 'employee_id', 'idpessoa', 'id_pessoa', 'codigo_colaborador', 'codcolaborador'] as $key) {
+                foreach ($schemaValues as $schemaKey => $schemaValue) {
+                    if (mb_strtolower(trim((string) $schemaKey)) !== $key) {
+                        continue;
+                    }
+
+                    $value = trim((string) $schemaValue);
+                    if ($value !== '' && ! in_array(mb_strtolower($value), ['?', '-', '--', 'null', 'n/a', 'na'], true)) {
+                        return $value;
+                    }
+                }
+            }
+        }
+
         $externalIds = method_exists($user, 'getExternalIds')
             ? (array) ($user->getExternalIds() ?? [])
             : [];

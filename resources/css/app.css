@@ -984,9 +984,72 @@ html.dark .filter-control:focus {
 }
 
 .coreti-sidebar-link span:not(.coreti-sidebar-chevron) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    line-height: 1.2;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* The CMDB uses full labels instead of the compact legacy sidebar width. */
+.cmdb-desktop-sidebar {
+    width: 18rem !important;
+    min-width: 18rem !important;
+    max-width: 18rem !important;
+    flex: 0 0 18rem !important;
+}
+
+.cmdb-content-shell {
+    margin-left: 18rem !important;
+}
+
+.cmdb-sidebar-link {
+    display: flex !important;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    align-items: center !important;
+    gap: .75rem;
+}
+
+.cmdb-sidebar-link .cmdb-sidebar-label {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none;
+}
+
+.cmdb-sidebar-link .cmdb-sidebar-label-wrap {
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+}
+
+.cmdb-sidebar-link .cmdb-sidebar-arrow {
+    flex: 0 0 auto;
+    margin-left: auto;
+    justify-self: auto;
+}
+
+.cmdb-action { display:inline-flex; min-height:2.5rem; align-items:center; justify-content:center; border:1px solid #cbd5e1; border-radius:.375rem; background:#fff; padding:.5rem .75rem; font-size:.875rem; font-weight:600; color:#334155; }
+.cmdb-action:hover { background:#f8fafc; }
+.cmdb-action-primary { border-color:#033151; background:#033151; color:#fff; }
+
+.coreti-sidebar-link-wrap {
+    min-height: 48px;
+}
+
+.coreti-sidebar-link-wrap span:not(.coreti-sidebar-chevron) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.15;
 }
 
 .coreti-sidebar-link:hover {
@@ -999,6 +1062,13 @@ html.dark .filter-control:focus {
     background: #111827;
     color: #ffffff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.coreti-sidebar-link-sub {
+    min-height: 34px;
+    padding-left: 24px;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .coreti-sidebar-chevron {

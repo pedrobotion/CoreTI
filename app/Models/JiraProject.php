@@ -15,6 +15,7 @@ class JiraProject extends Model
         'unicoop',
         'area',
         'projeto_grupo',
+        'jira_project_group_id',
         'status',
         'obs',
         'data_inclusao',
@@ -30,5 +31,9 @@ class JiraProject extends Model
             'excluido' => 'boolean',
         ];
     }
-}
 
+    public function projectGroup()
+    {
+        return $this->belongsTo(JiraProjectGroup::class, 'jira_project_group_id');
+    }
+}

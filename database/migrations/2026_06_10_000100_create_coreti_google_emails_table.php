@@ -25,6 +25,8 @@ return new class extends Migration
                 $table->string('area', 10)->nullable()->index();
                 $table->string('centro_custo', 50)->nullable()->index();
                 $table->string('centro_custo_nome')->nullable();
+                $table->boolean('centro_custo_manual')->default(false)->index();
+                $table->timestamp('centro_custo_manual_at')->nullable();
                 $table->string('mapeamento_status')->default('pendente')->index();
                 $table->text('mapeamento_motivo')->nullable();
                 $table->timestamp('importado_em')->nullable();

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BancadaEquipment;
+use Illuminate\Support\Str;
 
 class BancadaStatusFlowService
 {
@@ -35,6 +36,14 @@ class BancadaStatusFlowService
         'Entrada Realizada' => self::ENTRY_DONE,
     ];
 
+    private const FISCAL_EXEMPT_UNITS = [
+        'e commerce',
+        'cd centro de distribuicao de insumos',
+        'transcocari',
+        'mandaguari',
+        'ubc unidade de beneficiamento de cafe',
+    ];
+
     public function normalizeStatus(?string $status): ?string
     {
         if ($status === null) {
@@ -61,19 +70,45 @@ class BancadaStatusFlowService
 
     public function initialStatusForOrigin(string $origin): string
     {
-        return $origin === 'sede'
+        return $this->initialStatusFor($origin);
+    }
+
+    public function initialStatusFor(string $origin, ?string $unitName = null): string
+    {
+        return $origin === 'sede' || $this->isFiscalExemptUnit($unitName)
             ? self::STATUS_EM_BANCADA
             : self::STATUS_AGUARDANDO_ENTRADA_FISCAL;
     }
 
     public function initialEntryStatusForOrigin(string $origin): string
     {
-        return $origin === 'sede' ? self::ENTRY_DONE : self::ENTRY_PENDING;
+        return $this->initialEntryStatusFor($origin);
+    }
+
+    public function initialEntryStatusFor(string $origin, ?string $unitName = null): string
+    {
+        return $origin === 'sede' || $this->isFiscalExemptUnit($unitName) ? self::ENTRY_DONE : self::ENTRY_PENDING;
+    }
+
+    public function requiresFiscalFlow(BancadaEquipment $equipment): bool
+    {
+        return ($equipment->origem_tipo ?? 'unidade') === 'unidade'
+            && ! $this->isFiscalExemptUnit($equipment->unidade_setor);
+    }
+
+    public function isFiscalExemptUnit(?string $unitName): bool
+    {
+        $normalized = $this->normalizeFiscalUnitName($unitName);
+        if ($normalized === '') {
+            return false;
+        }
+
+        return in_array($normalized, self::FISCAL_EXEMPT_UNITS, true);
     }
 
     public function isOperationalLocked(BancadaEquipment $equipment): bool
     {
-        if (($equipment->origem_tipo ?? 'unidade') !== 'unidade') {
+        if (! $this->requiresFiscalFlow($equipment)) {
             return false;
         }
 
@@ -115,7 +150,7 @@ class BancadaStatusFlowService
             self::STATUS_SEM_CONSERTO => [
                 self::STATUS_DESCARTE,
             ],
-            self::STATUS_PRONTO_ENTREGA => (($equipment->origem_tipo ?? 'unidade') === 'sede')
+            self::STATUS_PRONTO_ENTREGA => ! $this->requiresFiscalFlow($equipment)
                 ? [self::STATUS_ENTREGUE]
                 : [self::STATUS_NOTA_FISCAL_EMITIDA],
             self::STATUS_NOTA_FISCAL_EMITIDA => [self::STATUS_ENTREGUE],
@@ -148,7 +183,7 @@ class BancadaStatusFlowService
             }
         }
 
-        if ($from === self::STATUS_PRONTO_ENTREGA && ($equipment->origem_tipo ?? 'unidade') === 'unidade' && $to === self::STATUS_ENTREGUE) {
+        if ($from === self::STATUS_PRONTO_ENTREGA && $this->requiresFiscalFlow($equipment) && $to === self::STATUS_ENTREGUE) {
             throw new \DomainException('Equipamentos de unidade precisam de nota de saída antes da entrega.');
         }
 
@@ -200,7 +235,7 @@ class BancadaStatusFlowService
             return [];
         }
 
-        if ($from === self::STATUS_PRONTO_ENTREGA && ($equipment->origem_tipo ?? 'unidade') === 'unidade') {
+        if ($from === self::STATUS_PRONTO_ENTREGA && $this->requiresFiscalFlow($equipment)) {
             return [];
         }
 
@@ -243,5 +278,13 @@ class BancadaStatusFlowService
     {
         return in_array((string) ($equipment->terceiros_resultado ?? ''), ['sem_conserto', 'negada', 'reprovada', 'reprovado'], true)
             || (string) ($equipment->terceiros_orcamento_status ?? '') === 'reprovado';
+    }
+
+    private function normalizeFiscalUnitName(?string $unitName): string
+    {
+        $value = Str::ascii(mb_strtolower(trim((string) $unitName)));
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?: '';
+
+        return trim(preg_replace('/\s+/', ' ', $value) ?: '');
     }
 }

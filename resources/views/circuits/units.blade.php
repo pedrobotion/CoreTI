@@ -71,7 +71,7 @@
                                         <td class="px-4 py-3 text-gray-700">{{ $unit->operadora }}</td>
                                         <td class="px-4 py-3 text-gray-900 font-medium">
                                             <button type="button" onclick="openCircuitModal('circuit-modal-{{ $unit->id_circuitos }}')" class="text-left text-slate-900 hover:text-blue-700">
-                                                {{ $unit->unidade->unidade ?? $unit->unidades_circuitos }}
+                                                {{ $unit->organizationUnit?->name ?? $unit->unidades_circuitos }}
                                             </button>
                                         </td>
                                         <td class="px-4 py-3 text-gray-700">{{ $unit->servico }}</td>
@@ -142,7 +142,7 @@
                         const enderecoInput = this.$refs.enderecoInput;
                         if (!unitSelect || !unitSelect.value) return;
                         try {
-                            const response = await fetch(`${this.lookupUfUrl}?id_unidades=${encodeURIComponent(unitSelect.value)}`, { headers: { Accept: 'application/json' } });
+                            const response = await fetch(`${this.lookupUfUrl}?organization_unit_id=${encodeURIComponent(unitSelect.value)}`, { headers: { Accept: 'application/json' } });
                             const payload = await response.json();
                             if (response.ok && payload.found && enderecoInput && payload.endereco) {
                                 enderecoInput.value = payload.endereco;
@@ -167,11 +167,11 @@
 
                     <div>
                         <label class="text-sm font-medium text-slate-700">Unidade</label>
-                        <select name="id_unidades" x-ref="unitSelect" @change="fillAddressFromUnit" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900" required>
+                        <select name="organization_unit_id" x-ref="unitSelect" @change="fillAddressFromUnit" class="mt-1 w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900" required>
                             <option value="">Selecione uma unidade</option>
                             @foreach ($unidades as $unidade)
-                                <option value="{{ $unidade->id_unidades }}" @selected(old('id_unidades') == $unidade->id_unidades)>
-                                    {{ $unidade->unidade }}
+                                <option value="{{ $unidade->id }}" @selected(old('organization_unit_id') == $unidade->id)>
+                                    {{ $unidade->name }}
                                 </option>
                             @endforeach
                         </select>
@@ -258,7 +258,7 @@
 
         @if ($errors->any() && old('nome'))
             openCircuitModal('create-operator-modal');
-        @elseif ($errors->any() && (old('operadora') || old('id_unidades') || old('servico') || old('endereco') || old('contato') || old('informacoes_adicionais')))
+        @elseif ($errors->any() && (old('operadora') || old('organization_unit_id') || old('servico') || old('endereco') || old('contato') || old('informacoes_adicionais')))
             openCircuitModal('create-circuit-modal');
         @endif
     </script>

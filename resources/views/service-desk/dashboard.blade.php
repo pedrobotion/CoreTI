@@ -11,16 +11,26 @@
 
             <div class="flex flex-wrap gap-2">
                 @if ($isAdmin)
-                    <form method="POST" action="{{ route('service-desk.workspace-sync.now') }}">
+                    <form method="POST" action="{{ route('service-desk.workspace-sync.now') }}" x-data="{ loading: false }" @submit="loading = true">
                         @csrf
-                        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                            Sincronizar Google Agora
+                        <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" :disabled="loading">
+                            <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.25"></circle>
+                                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                            </svg>
+                            <span x-show="!loading">Sincronizar Google Agora</span>
+                            <span x-show="loading" x-cloak>Sincronizando...</span>
                         </button>
                     </form>
-                    <form method="POST" action="{{ route('service-desk.workspace-sync.preview') }}">
+                    <form method="POST" action="{{ route('service-desk.workspace-sync.preview') }}" x-data="{ loading: false }" @submit="loading = true">
                         @csrf
-                        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                            Atualizar Prévia
+                        <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" :disabled="loading">
+                            <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.25"></circle>
+                                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                            </svg>
+                            <span x-show="!loading">Atualizar Prévia</span>
+                            <span x-show="loading" x-cloak>Atualizando...</span>
                         </button>
                     </form>
                 @endif
@@ -30,7 +40,7 @@
             </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-3">
+        <div class="grid gap-4 lg:grid-cols-4">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">E-mail</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ $emailStats['total_ativos'] }}</p>
@@ -60,6 +70,22 @@
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200 col-span-2">SLA em atenção<br><span class="font-semibold text-amber-700 dark:text-amber-300">{{ $jiraGeneralStats['sla_atencao'] }}</span></div>
                 </div>
             </div>
+            <a href="{{ route('service-desk.ad') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Active Directory</p>
+                        <p class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ $adStats['total'] }}</p>
+                    </div>
+                    <span class="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Consultar</span>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Ativos<br><span class="font-semibold">{{ $adStats['ativos'] }}</span></div>
+                    <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Sede<br><span class="font-semibold">{{ $adStats['sede'] }}</span></div>
+                    <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">PR<br><span class="font-semibold">{{ $adStats['pr'] }}</span></div>
+                    <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">GO<br><span class="font-semibold">{{ $adStats['go'] }}</span></div>
+                    <div class="col-span-2 rounded-md bg-cyan-50 px-2 py-2 text-center text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">Indústrias<br><span class="font-semibold">{{ $adStats['industrias'] }}</span></div>
+                </div>
+            </a>
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -135,12 +161,11 @@
         $syncSummary = $workspacePreview['summary'] ?? [];
         $workspacePendingSyncCount =
             ($syncSummary['new_emails'] ?? 0)
-            + ($syncSummary['pending'] ?? 0)
-            + ($syncSummary['center_cost_changes'] ?? 0)
-            + ($syncSummary['sem_centro_custo'] ?? 0);
+            + ($syncSummary['updated_emails'] ?? 0)
+            + ($syncSummary['center_cost_changes'] ?? 0);
     @endphp
 
-    @if ($isAdmin && !empty($workspacePreview) && $workspacePendingSyncCount > 0)
+    @if ($isAdmin && $workspacePreviewOpen && !empty($workspacePreview) && $workspacePendingSyncCount > 0)
             <div id="workspace-sync-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-3 py-4 sm:px-6">
                 <div class="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:p-5">
                     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -223,10 +248,15 @@
 
                     <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
                         <button type="button" onclick="closeWorkspaceSyncModal()" class="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto">Depois</button>
-                        <form method="POST" action="{{ route('service-desk.workspace-sync.apply') }}" class="w-full sm:w-auto">
+                        <form method="POST" action="{{ route('service-desk.workspace-sync.apply') }}" class="w-full sm:w-auto" x-data="{ loading: false }" @submit="loading = true">
                             @csrf
-                            <button type="submit" class="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto">
-                                Aplicar alterações
+                            <button type="submit" class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto" :disabled="loading">
+                                <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.25"></circle>
+                                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                                </svg>
+                                <span x-show="!loading">Aplicar alterações</span>
+                                <span x-show="loading" x-cloak>Aplicando...</span>
                             </button>
                         </form>
                     </div>
@@ -248,7 +278,11 @@
                     modal.classList.add('hidden');
                 }
 
-                document.addEventListener('DOMContentLoaded', openWorkspaceSyncModal);
+                document.addEventListener('DOMContentLoaded', () => {
+                    @if ($workspacePreviewOpen && !empty($workspacePreview) && $workspacePendingSyncCount > 0)
+                        openWorkspaceSyncModal();
+                    @endif
+                });
             </script>
     @endif
 </x-app-layout>

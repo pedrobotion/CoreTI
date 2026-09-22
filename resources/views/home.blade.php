@@ -72,71 +72,56 @@
             </div>
         </div>
 
-        <div class="dashboard-main-grid grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">Circuitos recentes</h2>
+        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-col gap-1 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">Status das sincronizações</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Situação das integrações que alimentam o CoreTI.</p>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[720px] text-sm">
-                        <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
-                            <tr>
-                                <th class="px-5 py-3">Unidade</th>
-                                <th class="px-5 py-3">Operadora</th>
-                                <th class="px-5 py-3">Serviço</th>
-                                <th class="px-5 py-3">Contato</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @forelse ($recentCircuits as $circuit)
-                                <tr>
-                                    <td class="px-5 py-4 font-medium text-slate-900 dark:text-slate-100">{{ $circuit->unidade->unidade ?? $circuit->unidades_circuitos }}</td>
-                                    <td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ $circuit->operadora }}</td>
-                                    <td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ $circuit->servico }}</td>
-                                    <td class="px-5 py-4 text-slate-600 dark:text-slate-300">
-                                        @if ($circuit->contato_whatsapp && $circuit->whatsappUrl())
-                                            <a href="{{ $circuit->whatsappUrl() }}" target="_blank" rel="noopener noreferrer" class="underline hover:no-underline">
-                                                {{ $circuit->contato }}
-                                            </a>
-                                        @else
-                                            {{ $circuit->contato }}
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="px-5 py-8 text-center text-slate-500 dark:text-slate-400">Nenhum circuito cadastrado ainda.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <div class="grid gap-6">
-                <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <h2 class="text-base font-semibold text-slate-950 dark:text-white">Operadoras com mais circuitos</h2>
-                    <div class="mt-4 space-y-3">
-                        @forelse ($operatorBreakdown as $operator)
-                            @php
-                                $percent = $stats['circuits_total'] > 0 ? max(4, round(($operator->total / $stats['circuits_total']) * 100)) : 0;
-                            @endphp
-                            <div>
-                                <div class="mb-1 flex items-center justify-between gap-3 text-sm">
-                                    <span class="truncate font-medium text-slate-700 dark:text-slate-200">{{ $operator->operadora }}</span>
-                                    <span class="text-slate-500 dark:text-slate-400">{{ number_format($operator->total, 0, ',', '.') }}</span>
-                                </div>
-                                <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
-                                    <div class="h-2 rounded-full bg-sky-500" style="width: {{ $percent }}%"></div>
-                                </div>
-                            </div>
-                        @empty
-                            <p class="text-sm text-slate-500 dark:text-slate-400">Sem dados de operadoras.</p>
-                        @endforelse
-                    </div>
-                </section>
+                <p class="text-xs text-slate-400">Consultado em {{ now()->format('d/m/Y H:i') }}</p>
             </div>
-        </div>
+
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @forelse ($syncStatus as $fonte)
+                    @php $cores = \App\Services\SyncStatusService::classes($fonte['status']); @endphp
+                    <li class="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
+                        <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $cores['ponto'] }}"></span>
+
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $fonte['rotulo'] }}</p>
+                            @if ($fonte['detalhe'])
+                                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ $fonte['detalhe'] }}</p>
+                            @elseif ($fonte['numeros'])
+                                <p class="mt-0.5 text-xs text-slate-400">{{ $fonte['numeros'] }}</p>
+                            @endif
+                        </div>
+
+                        <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $cores['selo'] }}">{{ $fonte['rotulo_status'] }}</span>
+
+                        <div class="text-right">
+                            <p class="text-sm text-slate-700 dark:text-slate-300">{{ $fonte['executado_em']?->format('d/m/Y H:i') ?? 'nunca' }}</p>
+                            @if ($fonte['ha_quanto_tempo'])
+                                <p class="text-xs text-slate-400">{{ $fonte['ha_quanto_tempo'] }}</p>
+                            @endif
+                        </div>
+
+                        @if ($fonte['rota'])
+                            <a href="{{ $fonte['rota'] }}" class="text-xs font-semibold text-slate-600 underline-offset-2 hover:underline dark:text-slate-300">Detalhes</a>
+                        @endif
+
+                        @unless ($fonte['status_proprio'])
+                            {{-- A origem só carimba a data; o status vem da idade do dado. --}}
+                            <span class="text-[11px] text-slate-400" title="Esta origem não reporta status próprio. A situação é inferida pela data da última atualização.">inferido</span>
+                        @endunless
+                    </li>
+                @empty
+                    {{-- Sem módulo que dê direito a alguma sincronização. --}}
+                    <li class="px-5 py-8 text-center text-sm text-slate-500">
+                        Nenhuma sincronização disponível para os seus acessos.
+                    </li>
+                @endforelse
+            </ul>
+        </section>
 
         @if ($isAdmin)
             <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -158,6 +143,7 @@
                     @endforelse
                 </div>
             </section>
+
         @endif
         @endif
     </div>

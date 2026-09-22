@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class NetworkLocationResolverService
@@ -14,58 +13,33 @@ class NetworkLocationResolverService
         return Cache::remember('network-datacenter.locations', now()->addHours(6), function (): Collection {
             $locations = collect();
 
-            DB::table('unidades')
-                ->select(['id_unidades', 'unidade', 'endereco'])
-                ->orderBy('unidade')
-                ->get()
+            app(OrganizationLookupService::class)->unitOptions()
                 ->each(function ($row) use ($locations): void {
-                    $label = trim((string) $row->unidade);
+                    $label = trim((string) $row->name);
                     $locations->push([
                         'label' => $label,
                         'type' => 'unidade',
                         'name' => $label,
-                        'id_unidade' => $row->id_unidades,
+                        'id_unidade' => $row->organization_unit_id,
                         'id_departamento' => null,
-                        'endereco' => trim((string) ($row->endereco ?? '')) ?: null,
+                        'endereco' => trim((string) ($row->address ?? '')) ?: null,
                         'search' => $this->normalize($label),
                     ]);
                 });
 
-            DB::table('departamentos')
-                ->select(['id', 'nome'])
-                ->orderBy('nome')
-                ->get()
+            app(OrganizationLookupService::class)->departmentOptions()
                 ->each(function ($row) use ($locations): void {
-                    $label = trim((string) $row->nome);
+                    $label = trim((string) $row->name);
                     $locations->push([
                         'label' => 'Departamento - ' . $label,
                         'type' => 'departamento',
                         'name' => $label,
                         'id_unidade' => null,
-                        'id_departamento' => $row->id,
+                        'id_departamento' => $row->organization_department_id,
                         'endereco' => null,
                         'search' => $this->normalize($label),
                     ]);
                 });
-
-            if (DB::getSchemaBuilder()->hasTable('sede_departamentos')) {
-                DB::table('sede_departamentos')
-                    ->select(['id', 'nome_departamento'])
-                    ->orderBy('nome_departamento')
-                    ->get()
-                    ->each(function ($row) use ($locations): void {
-                        $label = trim((string) $row->nome_departamento);
-                        $locations->push([
-                            'label' => 'Sede - ' . $label,
-                            'type' => 'departamento',
-                            'name' => $label,
-                            'id_unidade' => null,
-                            'id_departamento' => $row->id,
-                            'endereco' => null,
-                            'search' => $this->normalize($label),
-                        ]);
-                    });
-            }
 
             return $locations
                 ->unique(fn (array $item): string => $item['type'] . '|' . $item['name'])

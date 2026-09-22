@@ -23,6 +23,8 @@ class CircuitUnit extends Model
         'contato_whatsapp',
         'informacoes_adicionais',
         'id_unidades',
+        'organization_unit_id',
+        'organization_department_id',
         'chamado_numero',
         'massiva_regiao',
         'unidade_operacional',
@@ -34,9 +36,14 @@ class CircuitUnit extends Model
         'massiva_regiao' => 'boolean',
     ];
 
+    public function organizationUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnit::class, 'organization_unit_id');
+    }
+
     public function unidade(): BelongsTo
     {
-        return $this->belongsTo(Unidade::class, 'id_unidades', 'id_unidades');
+        return $this->belongsTo(OrganizationUnit::class, 'organization_unit_id');
     }
 
     public function getRouteKeyName(): string

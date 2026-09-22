@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\UserModulePermission;
 use App\Models\User;
+use App\Services\ModuleAccessService;
+use App\Support\LegacyModulePermissions;
+use App\Support\ModuleRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class AdminController extends Controller
 {
@@ -15,17 +18,26 @@ class AdminController extends Controller
     {
         $this->authorize('viewAdminDashboard', User::class);
 
-        $users = User::with('modulePermissions')->orderBy('created_at', 'desc')->get();
+        $users = User::query()
+            ->when(LegacyModulePermissions::novaTabelaDisponivel(), fn ($q) => $q->with('moduleAccesses'))
+            ->orderBy('created_at', 'desc')
+            ->get();
         $currentUser = $users->firstWhere('id', auth()->id());
         if ($currentUser) {
             $users = $users->reject(fn ($user) => $user->id === $currentUser->id)
                 ->prepend($currentUser);
         }
 
-        return view('admin.dashboard', compact('users'));
+        $moduleGroups = ModuleRegistry::grouped();
+
+        // Sem a tabela normalizada, a tela ainda lista os acessos (via modelo
+        // legado) mas não pode gravar — o formulário é exibido bloqueado.
+        $permissionsReady = LegacyModulePermissions::novaTabelaDisponivel();
+
+        return view('admin.dashboard', compact('users', 'moduleGroups', 'permissionsReady'));
     }
 
-    public function updateModuleAccess(Request $request, User $user)
+    public function updateModuleAccess(Request $request, User $user, ModuleAccessService $moduleAccess)
     {
         $this->authorize('updateRole', $user);
         if ($user->isMasterAccount()) {
@@ -33,38 +45,30 @@ class AdminController extends Controller
                 ->with('error', 'Conta master protegida: operação não permitida.');
         }
 
-        $data = $request->validate([
-            'servicedesk' => ['nullable', 'boolean'],
-            'unidades' => ['nullable', 'boolean'],
-            'aplicativos' => ['nullable', 'boolean'],
-            'bancada' => ['nullable', 'boolean'],
-            'administrativo' => ['nullable', 'boolean'],
-            'network_datacenter' => ['nullable', 'boolean'],
-        ]);
+        // O formulário envia modules[<modulo>][] = <ability>; o registry decide
+        // o que é válido, então nenhum módulo novo exige mudar este método.
+        $submitted = (array) $request->input('modules', []);
+        $desired = [];
 
-        $permissions = UserModulePermission::firstOrCreate(
-            ['user_id' => $user->id],
-            [
-                'servicedesk' => false,
-                'unidades' => false,
-                'aplicativos' => false,
-                'bancada' => false,
-                'administrativo' => false,
-                'network_datacenter' => false,
-            ]
-        );
+        foreach (ModuleRegistry::keys() as $module) {
+            $abilities = array_values(array_filter(
+                array_map('strval', (array) ($submitted[$module] ?? [])),
+                fn (string $ability) => ModuleRegistry::supportsAbility($module, $ability)
+            ));
 
-        $permissions->update([
-            'servicedesk' => (bool) ($data['servicedesk'] ?? false),
-            'unidades' => (bool) ($data['unidades'] ?? false),
-            'aplicativos' => (bool) ($data['aplicativos'] ?? false),
-            'bancada' => (bool) ($data['bancada'] ?? false),
-            'administrativo' => (bool) ($data['administrativo'] ?? false),
-            'network_datacenter' => (bool) ($data['network_datacenter'] ?? false),
-        ]);
+            if ($abilities !== []) {
+                $desired[$module] = $abilities;
+            }
+        }
+
+        try {
+            $moduleAccess->sync($user, $desired, $request->user());
+        } catch (RuntimeException $e) {
+            return redirect()->route('admin.dashboard')->with('error', $e->getMessage());
+        }
 
         return redirect()->route('admin.dashboard')
-            ->with('success', 'Acessos por módulo atualizados com sucesso.');
+            ->with('success', "Acessos de {$user->name} atualizados com sucesso.");
     }
 
     public function approveUser(User $user)
