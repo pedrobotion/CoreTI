@@ -1,0 +1,11 @@
+# Contas que NUNCA devem ser excluidas do Active Directory.
+#
+# Uma por linha. Aceita curinga (*). Linhas vazias e iniciadas por # sao
+# ignoradas. Vale tanto para a previa quanto para a exclusao.
+#
+# Os padroes krbtgt* e MSOL_* ja estao no modulo e nao precisam ser repetidos.
+# Este arquivo e para as contas especificas de voces.
+
+# Comunicacao entre a sede e a unidade (krbtgt do RODC) - ja coberta por
+# krbtgt*, mantida aqui como registro explicito da decisao.
+krbtgt_31402
