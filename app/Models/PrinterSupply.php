@@ -15,6 +15,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PrinterSupply extends Model
 {
+    /**
+     * Tipos que o portal usa, com o nome que a equipe fala.
+     *
+     * Toner não é o único que acaba: fusor, cilindro e rolete têm vida útil e
+     * param a impressora do mesmo jeito. Todos vêm como percentual de vida
+     * restante, então a mesma faixa de alerta serve para qualquer um.
+     */
+    public const TIPOS = [
+        'TONER' => 'Toner',
+        'FUSER' => 'Fusor',
+        'DRUM' => 'Cilindro',
+        'ROLLER' => 'Rolete',
+        'BELT' => 'Correia',
+        'WASTE' => 'Reservatório de resíduo',
+        'CLEANING' => 'Limpeza',
+    ];
+
     protected $table = 'printer_supplies';
 
     protected $fillable = [
@@ -43,6 +60,12 @@ class PrinterSupply extends Model
     public function scopeAcabando(Builder $query, int $limite = Printer::NIVEL_ALERTA): Builder
     {
         return $query->whereNotNull('percent_left')->where('percent_left', '<=', $limite);
+    }
+
+    /** Nome do tipo em português; o código cru quando for tipo novo. */
+    public function getTipoLabelAttribute(): string
+    {
+        return self::TIPOS[$this->tipo] ?? ($this->tipo ?: '—');
     }
 
     public function getSituacaoAttribute(): string

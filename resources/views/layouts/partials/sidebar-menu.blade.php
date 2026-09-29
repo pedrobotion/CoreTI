@@ -17,6 +17,7 @@
     // Administrativo e do ServiceDesk, mas não dependem da permissão deles.
     $canTelefonia = $user->hasModuleAccess('telefonia');
     $canEquipamentos = $user->hasModuleAccess('equipamentos');
+    $canImpressoras = $user->hasModuleAccess('impressoras');
     $isAdminRole = $user->role === 'admin';
     // Administrativo pede apenas o módulo para consultar; a escrita é que
     // exige 'manage'. Antes o menu exigia também role=admin, espelhando um
@@ -30,7 +31,7 @@
     $canGovernanca = $isAdminRole;
     $temAlgumModulo = $canServiceDesk || $canAplicativos || $isAdminRole
         || $canCoordenacao || $canAdmissao || $canUnidades || $canBancada
-        || $canPainelAdministrativo;
+        || $canPainelAdministrativo || $canImpressoras;
 @endphp
 
 <div class="{{ $containerClass ?? 'coreti-sidebar-shell' }} {{ $isNetworkDatacenter ? 'cmdb-sidebar-container' : '' }}">
@@ -522,6 +523,18 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v5l3 2" />
                 </svg>
                 <span style="white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15;">Coordenação</span>
+                <span class="coreti-sidebar-chevron">‹</span>
+            </a>
+            @endif
+
+            @if ($canImpressoras)
+            <a href="{{ route('impressoras.index') }}" class="coreti-sidebar-link {{ request()->routeIs('impressoras.*') ? 'coreti-sidebar-link-active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 8V4h10v4" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 8h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 14h10v6H7z" />
+                </svg>
+                <span style="white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15;">Impressoras</span>
                 <span class="coreti-sidebar-chevron">‹</span>
             </a>
             @endif
