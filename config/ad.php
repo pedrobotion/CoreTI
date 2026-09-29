@@ -158,6 +158,34 @@ return [
             'Tratorcase',
             'Tratornew',
             'Terceiros',
+            // Representantes não são contratados: não têm matrícula, cargo
+            // nem centro de custo nossos.
+            'Representantes',
+        ],
+
+        /*
+         | Prefixos de login que não pertencem a uma pessoa.
+         |
+         | Qualidade cadastral mede o cadastro de COLABORADOR. Um scanner, um
+         | GED de unidade ou uma conta modelo nunca vão ter matrícula e cargo:
+         | contá-los como pendência cria um número que não baixa nunca e
+         | esconde quem de fato precisa ser preenchido. Só as contas modelo
+         | (user.*) já são 340.
+         |
+         | Vale tanto para o painel quanto para o relatório detalhado — os dois
+         | leem daqui para não divergirem.
+         |
+         | Comparação por início do login, sem diferenciar maiúsculas.
+         */
+        'prefixos_nao_pessoa' => [
+            'scanner.',   // multifuncionais das unidades
+            'ged.',       // digitalização por unidade
+            'user.',      // contas modelo ("User Modelo ... Padrão/Restrito/Liberado")
+            'svc',        // conta de serviço
+            'srv',
+            'ftp',
+            'ctx',
+            'dnadmin',
         ],
 
         /*
@@ -173,6 +201,17 @@ return [
          */
         'campos_dispensados' => [
             'Rodocoop' => ['matricula'],
+
+            /*
+             | Colari é a outra empresa sob Afiliados, no mesmo caso da
+             | Rodocoop: os colaboradores não têm matrícula nossa.
+             |
+             | Só matrícula. O cargo continua cobrado de propósito: em 24/09
+             | havia 42 contas sem cargo ali, e isso é informação que ainda
+             | não foi levantada, não uma dispensa — tirá-la do relatório
+             | esconderia trabalho que ainda vai acontecer.
+             */
+            'Colari' => ['matricula'],
         ],
     ],
 

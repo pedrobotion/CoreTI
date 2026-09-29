@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AdUser;
 use App\Models\CoretiCostCenter;
+use App\Services\Ad\AdCadastroIncompletoService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -118,14 +119,50 @@ class ServiceDeskAdDirectoryService
             ->all();
     }
 
+    /**
+     * Pendências de cadastro, contando só quem deveria ter esses campos.
+     *
+     * O recorte vem inteiro de AdCadastroIncompletoService: prefixo de conta
+     * que não é pessoa, lista de "não é colaborador" mantida na tela, e as
+     * estruturas que seguem outro modelo de cadastro. Perguntar ao serviço em
+     * vez de repetir as regras aqui é o que garante que este painel e o
+     * relatório detalhado respondam o mesmo número — eles já divergiram
+     * porque cada um tinha sua própria lista.
+     *
+     * Essas contas continuam no restante do painel: elas existem no domínio e
+     * ocupam lugar na base. O que muda é só a contagem de pendência, que
+     * senão vira um número que nunca baixa.
+     */
     public function dataQuality(Collection $users): array
     {
+        $relatorio = app(AdCadastroIncompletoService::class);
+        $noEscopo = array_flip($relatorio->loginsNoEscopo());
+
+        $pessoas = $users->filter(
+            fn (AdUser $user): bool => isset($noEscopo[mb_strtolower(trim((string) $user->nome_usuario))])
+        );
+
+        /*
+         | Campo em branco não é sempre pendência: faltaCampo() desconta as
+         | dispensas por estrutura (a Rodocoop não tem matrícula nossa). Sem
+         | isso o painel cobrava 14 contas que o relatório não cobra.
+         |
+         | "Sem unidade" olha unidade_principal, o mesmo campo do relatório —
+         | antes olhava unidade_setor, que está sempre preenchido e por isso
+         | o indicador vivia zerado.
+         */
+        $faltando = fn (string $campo): int => $pessoas
+            ->filter(fn (AdUser $user): bool => $relatorio->faltaCampo($user, $campo))
+            ->count();
+
         return [
-            'sem_email' => $users->filter(fn (AdUser $user): bool => blank($user->email))->count(),
-            'sem_matricula' => $users->filter(fn (AdUser $user): bool => blank($user->matricula))->count(),
-            'sem_unidade' => $users->filter(fn (AdUser $user): bool => blank($user->unidade_setor))->count(),
-            'sem_cargo' => $users->filter(fn (AdUser $user): bool => blank($user->Cargo))->count(),
-            'sem_centro_custo' => $users->filter(fn (AdUser $user): bool => blank($user->centro_custo))->count(),
+            'sem_email' => $pessoas->filter(fn (AdUser $user): bool => blank($user->email))->count(),
+            'sem_matricula' => $faltando('matricula'),
+            'sem_unidade' => $faltando('unidade_principal'),
+            'sem_cargo' => $faltando('Cargo'),
+            'sem_centro_custo' => $faltando('centro_custo'),
+            // Quantas contas ficaram de fora da conta, para a tela poder dizer.
+            'fora_da_contagem' => $users->count() - $pessoas->count(),
         ];
     }
 

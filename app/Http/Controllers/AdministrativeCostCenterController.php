@@ -73,12 +73,21 @@ class AdministrativeCostCenterController extends Controller
     {
         /*
          | O código é a chave que liga este catálogo ao resto do sistema:
-         | e-mails, licenças e o AD procuram o centro de custo por "unicoop.área".
+         | e-mails, licenças e o AD procuram o centro de custo por ele.
          |
-         | Fora desse formato o registro não dá erro em lugar nenhum — ele
-         | simplesmente some das seleções, porque quem consome filtra o que não
-         | consegue separar em unicoop e área. Já aconteceu de código e nome
-         | entrarem trocados e o cadastro ficar invisível. Melhor recusar aqui.
+         | Um código sem forma reconhecível não dá erro em lugar nenhum — ele
+         | simplesmente some das seleções, porque quem consome descarta o que
+         | não consegue interpretar. Já aconteceu de código e nome entrarem
+         | trocados e o cadastro ficar invisível. Melhor recusar aqui.
+         |
+         | São DOIS formatos válidos, não um:
+         |
+         |   01.226              unicoop.área, o caso comum
+         |   07.881.528/0001-66  CNPJ, usado pelas empresas afiliadas
+         |
+         | A Rodocoop é afiliada: o "Escritório" no AD guarda o CNPJ dela em
+         | vez de um centro de custo nosso. Exigir só unicoop.área impedia
+         | cadastrar o nome dela no catálogo.
          */
         $request->merge(['code' => $this->normalizeCode($request->input('code'))]);
 
@@ -87,20 +96,38 @@ class AdministrativeCostCenterController extends Controller
                 'required',
                 'string',
                 'max:50',
-                'regex:/^\d{2}\.\d{3}$/',
+                'regex:'.self::FORMATOS_DE_CODIGO,
                 Rule::unique('coreti_cost_centers', 'code')->ignore($center?->id)->whereNull('deleted_at'),
             ],
             'name' => ['required', 'string', 'max:255'],
             'active' => ['nullable', 'boolean'],
         ], [
-            'code.regex' => 'O código deve ser a unicoop e a área, no formato 01.226. Confira se o código e o nome não entraram trocados.',
+            'code.regex' => 'O código deve ser a unicoop e a área (formato 01.226) ou um CNPJ (formato 07.881.528/0001-66). Confira se o código e o nome não entraram trocados.',
         ], ['code' => 'código', 'name' => 'nome']);
     }
 
-    /** Aceita "1.226", "01/226" e "01 . 226" como o mesmo "01.226". */
+    /** unicoop.área ou CNPJ — ver a nota em {@see validated()}. */
+    private const FORMATOS_DE_CODIGO = '/^(\d{2}\.\d{3}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})$/';
+
+    /**
+     * Aceita "1.226", "01/226" e "01 . 226" como o mesmo "01.226".
+     *
+     * CNPJ passa direto: ele já tem pontuação própria e normalizá-lo como
+     * unicoop.área o estragaria.
+     */
     private function normalizeCode(mixed $code): mixed
     {
-        if (! is_string($code) || ! preg_match('/^\s*(\d{1,2})\s*[.\/-]\s*(\d{1,3})\s*$/', $code, $m)) {
+        if (! is_string($code)) {
+            return $code;
+        }
+
+        $limpo = trim($code);
+
+        if (preg_match('/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/', $limpo)) {
+            return $limpo;
+        }
+
+        if (! preg_match('/^\s*(\d{1,2})\s*[.\/-]\s*(\d{1,3})\s*$/', $code, $m)) {
             return $code;
         }
 

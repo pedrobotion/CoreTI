@@ -28,53 +28,79 @@ class AdCadastroIncompletoService
         'centro_custo' => 'Centro de custo',
     ];
 
-    /**
-     * Contas que não são de colaborador.
-     *
-     * Este relatório existe para achar PESSOA com cadastro incompleto. Um
-     * scanner não tem matrícula nem cargo e nunca terá: as 100 contas
-     * scanner.* entrariam como pendência permanente e afogariam o que
-     * realmente precisa ser preenchido.
-     *
-     * Isso não as dispensa de centro de custo — elas consomem custo do setor
-     * onde ficam. Quem resolve isso é a regra por OU, em AdOfficeRuleService,
-     * que trata scanner.* como conta válida de propósito.
+    /*
+     | Os prefixos de conta que não são de pessoa saíram daqui para
+     | config/ad.php ('relatorio.prefixos_nao_pessoa').
+     |
+     | O painel do AD precisava da mesma regra e as duas listas começaram a
+     | divergir: o relatório já ignorava scanner.* e ged.*, o painel contava
+     | tudo. Com a lista em config e o critério no próprio AdUser, incluir um
+     | prefixo novo passa a valer nas duas telas de uma vez.
+     |
+     | Isso não dispensa essas contas de centro de custo — elas consomem custo
+     | do setor onde ficam. Quem trata disso é AdOfficeRuleService, que aceita
+     | scanner.* de propósito.
      */
-    private const PREFIXOS_NAO_PESSOA = ['scanner.', 'svc', 'srv', 'ftp', 'ged.', 'ctx', 'dnadmin'];
+
+    /**
+     * Contas que entram no cadastro de colaborador, sem olhar pendência.
+     *
+     * É o recorte "quem deveria ter esses campos preenchidos". O painel do AD
+     * usa o mesmo recorte para a Qualidade cadastral: antes ele aplicava só a
+     * regra de prefixo e chegava a números bem maiores que os desta tela, o
+     * que fazia o painel e o relatório discordarem sobre a mesma pergunta.
+     */
+    public function contasNoEscopo(): Builder
+    {
+        $query = AdUser::query()->where('e_ativo', true)->vigentes();
+
+        // Lista mantida na tela: balança, barraca, impressora, guarita,
+        // conta de serviço e conta de máquina não são pessoas.
+        $naoColaboradores = AdNonCollaboratorAccount::nomes();
+
+        if ($naoColaboradores !== []) {
+            $query->whereNotIn(DB::raw('LOWER(nome_usuario)'), $naoColaboradores);
+        }
+
+        $query->dePessoa();
+
+        /*
+         | Concessionárias e Terceiros seguem outro modelo de cadastro.
+         | O DN traz cada nível como "OU=Nome,", então a comparação inclui
+         | a vírgula: sem ela, "Terceiros" casaria com "Terceirizados".
+         */
+        foreach ((array) config('ad.relatorio.ous_fora_de_escopo', []) as $ou) {
+            /*
+             | COALESCE porque NULL NOT LIKE '...' devolve NULL em SQL, e
+             | NULL não passa no WHERE: conta sem DistinguishedName seria
+             | descartada em silêncio, que é o oposto do pretendido.
+             */
+            $query->whereRaw('COALESCE(`distinguished_name`, "") NOT LIKE ?', ['%OU='.$ou.',%']);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Logins que entram no cadastro de colaborador, em minúsculo.
+     *
+     * @return array<int, string>
+     */
+    public function loginsNoEscopo(): array
+    {
+        return $this->contasNoEscopo()
+            ->pluck('nome_usuario')
+            ->map(fn ($login): string => mb_strtolower(trim((string) $login)))
+            ->all();
+    }
 
     public function consulta(array $camposExigidos = [], bool $incluirForaDeEscopo = false): Builder
     {
         $campos = $camposExigidos === [] ? array_keys(self::CAMPOS) : $camposExigidos;
 
-        $query = AdUser::query()->where('e_ativo', true)->vigentes();
-
-        if (! $incluirForaDeEscopo) {
-            // Lista mantida na tela: balança, barraca, impressora, guarita,
-            // conta de serviço e conta de máquina não são pessoas.
-            $naoColaboradores = AdNonCollaboratorAccount::nomes();
-
-            if ($naoColaboradores !== []) {
-                $query->whereNotIn(DB::raw('LOWER(nome_usuario)'), $naoColaboradores);
-            }
-
-            foreach (self::PREFIXOS_NAO_PESSOA as $prefixo) {
-                $query->where('nome_usuario', 'not like', $prefixo.'%');
-            }
-
-            /*
-             | Concessionárias e Terceiros seguem outro modelo de cadastro.
-             | O DN traz cada nível como "OU=Nome,", então a comparação inclui
-             | a vírgula: sem ela, "Terceiros" casaria com "Terceirizados".
-             */
-            foreach ((array) config('ad.relatorio.ous_fora_de_escopo', []) as $ou) {
-                /*
-                 | COALESCE porque NULL NOT LIKE '...' devolve NULL em SQL, e
-                 | NULL não passa no WHERE: conta sem DistinguishedName seria
-                 | descartada em silêncio, que é o oposto do pretendido.
-                 */
-                $query->whereRaw('COALESCE(`distinguished_name`, "") NOT LIKE ?', ['%OU='.$ou.',%']);
-            }
-        }
+        $query = $incluirForaDeEscopo
+            ? AdUser::query()->where('e_ativo', true)->vigentes()
+            : $this->contasNoEscopo();
 
         // Falta QUALQUER um dos campos pedidos.
         $query->where(function ($q) use ($campos): void {
@@ -142,12 +168,23 @@ class AdCadastroIncompletoService
         return false;
     }
 
+    /**
+     * O campo está em branco E é cobrado desta conta?
+     *
+     * Em branco não basta: a Rodocoop não tem matrícula nossa, e cobrá-la
+     * geraria pendência que ninguém pode resolver.
+     */
+    public function faltaCampo(AdUser $conta, string $campo): bool
+    {
+        return trim((string) ($conta->{$campo} ?? '')) === ''
+            && ! $this->dispensado($conta, $campo);
+    }
+
     /** Quais campos faltam nesta conta, já descontando os dispensados. */
     public function faltando(AdUser $conta): Collection
     {
         return collect(self::CAMPOS)
-            ->filter(fn ($rotulo, $campo) => trim((string) ($conta->{$campo} ?? '')) === ''
-                && ! $this->dispensado($conta, $campo))
+            ->filter(fn ($rotulo, $campo) => $this->faltaCampo($conta, $campo))
             ->values();
     }
 }
