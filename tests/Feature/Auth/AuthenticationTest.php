@@ -27,7 +27,11 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+
+        // 'home' e não 'dashboard': o scaffold do Breeze aponta para
+        // /dashboard, mas o CoreTI leva para a visão geral em /home. O
+        // destino real está em AuthenticatedSessionController::store().
+        $response->assertRedirect(route('home', absolute: false));
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
