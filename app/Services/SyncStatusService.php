@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\PrintCollectorStatus;
+use App\Models\User;
+use App\Services\Insight\InsightApiClient;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -38,6 +40,21 @@ class SyncStatusService
     private const MODULOS_CMDB = ['cmdb', 'network_datacenter'];
 
     private const MODULOS_ORGANIZACAO = ['coordenacao', 'admissao', 'administrativo'];
+
+    private const MODULOS_IMPRESSORAS = ['impressoras'];
+
+    /** Maior intervalo entre execuções (5h30) mais folga. */
+    private const HORAS_ESPERADAS_IMPRESSORAS = 8;
+
+    /**
+     * Silêncio tolerado de um coletor de impressão.
+     *
+     * A tarefa roda de hora em hora. Seis horas cobrem reinício de servidor e
+     * janela de manutenção sem alarme falso, e ainda deixam muita margem
+     * antes do prazo que importa: o log do Windows retém cerca de seis DIAS,
+     * e coleta parada além disso vira perda definitiva.
+     */
+    private const HORAS_ESPERADAS_COLETOR = 6;
 
     /**
      * Fontes visíveis para o usuário.
@@ -73,6 +90,8 @@ class SyncStatusService
             $this->googleWorkspace(),
             $this->office365(),
             $this->auditoriaBackups(),
+            $this->impressoras(),
+            $this->logDeImpressao(),
         ])->filter()->values();
     }
 
@@ -258,6 +277,122 @@ class SyncStatusService
     /**
      * Status derivado da idade do dado mais recente.
      */
+    /**
+     * Impressoras: frescura do dado mais o teto da API de origem.
+     *
+     * A EKM Insight é de terceiro e tem teto diário nosso. Se o teto estourar,
+     * as execuções agendadas passam a falhar sem que nada mude na base — o
+     * dado simplesmente envelhece. Olhar só a data levaria horas para acusar
+     * isso, e a causa não apareceria. Por isso o teto entra aqui.
+     */
+    private function impressoras(): ?array
+    {
+        if (! Schema::hasTable('printers')) {
+            return null;
+        }
+
+        $ultimo = DB::table('printers')->max('last_synced_at');
+
+        $numeros = $this->numeros([
+            'impressoras' => DB::table('printers')->count() ?: null,
+            'consumíveis' => Schema::hasTable('printer_supplies')
+                ? (DB::table('printer_supplies')->count() ?: null)
+                : null,
+        ]);
+
+        if (! $ultimo) {
+            return $this->fonte('impressoras', 'Sincronização Impressoras', null, self::DESCONHECIDO,
+                'Nenhuma sincronização executada ainda.', 'impressoras.index', $numeros,
+                modulos: self::MODULOS_IMPRESSORAS);
+        }
+
+        $consumo = app(InsightApiClient::class)->consumoDeHoje();
+
+        if ($consumo['restantes'] <= 0) {
+            return $this->fonte('impressoras', 'Sincronização Impressoras', $ultimo, self::ERRO,
+                sprintf('Teto diário de %d chamadas à Insight API atingido: as próximas execuções não vão rodar hoje.',
+                    $consumo['teto']),
+                'impressoras.index', $numeros, modulos: self::MODULOS_IMPRESSORAS);
+        }
+
+        $quando = Carbon::parse($ultimo);
+
+        /*
+         | São 4 execuções por dia e o maior intervalo entre elas é de 5h30
+         | (07:00 → 12:30). A folga até 8h evita alarme falso logo depois do
+         | intervalo normal, e ainda acusa uma execução perdida.
+         */
+        if ($quando->lessThan(now()->subHours(self::HORAS_ESPERADAS_IMPRESSORAS))) {
+            return $this->fonte('impressoras', 'Sincronização Impressoras', $quando, self::ATRASADO,
+                sprintf('Sem atualização há mais de %dh — alguma execução agendada pode ter falhado.',
+                    self::HORAS_ESPERADAS_IMPRESSORAS),
+                'impressoras.index', $numeros, modulos: self::MODULOS_IMPRESSORAS);
+        }
+
+        return $this->fonte('impressoras', 'Sincronização Impressoras', $quando, self::OK,
+            sprintf('%d de %d chamadas à Insight API usadas hoje.', $consumo['usadas'], $consumo['teto']),
+            'impressoras.index', $numeros, modulos: self::MODULOS_IMPRESSORAS);
+    }
+
+    /**
+     * Coletores de log de impressão dos servidores Windows.
+     *
+     * Olha o último CONTATO, não o último trabalho impresso: domingo sem
+     * impressão nenhuma é normal, coletor parado não é, e só o contato
+     * separa os dois.
+     */
+    private function logDeImpressao(): ?array
+    {
+        if (! Schema::hasTable('print_collector_status')) {
+            return null;
+        }
+
+        $esperados = collect(config('impressao.servidores', []))
+            ->map(fn ($s): string => mb_strtoupper(trim((string) $s)))
+            ->filter();
+
+        if ($esperados->isEmpty()) {
+            return null;
+        }
+
+        $contatos = PrintCollectorStatus::query()->get()->keyBy('servidor');
+        $limite = now()->subHours(self::HORAS_ESPERADAS_COLETOR);
+
+        $mudos = $esperados->filter(function (string $nome) use ($contatos, $limite): bool {
+            $contato = $contatos->get($nome);
+
+            return $contato === null || $contato->ultimo_contato_em->lessThan($limite);
+        })->values();
+
+        $ultimo = $contatos->max('ultimo_contato_em');
+
+        $numeros = $this->numeros([
+            'servidores reportando' => $esperados->count() - $mudos->count(),
+            'trabalhos' => Schema::hasTable('print_jobs')
+                ? (DB::table('print_jobs')->count() ?: null)
+                : null,
+        ]);
+
+        if ($contatos->isEmpty()) {
+            return $this->fonte('impressao_log', 'Coleta de Impressões', null, self::DESCONHECIDO,
+                'Nenhum servidor enviou ainda. Configure a tarefa agendada em '.$esperados->implode(', ').'.',
+                'dashboards.impressoes', $numeros, modulos: self::MODULOS_IMPRESSORAS);
+        }
+
+        if ($mudos->isNotEmpty()) {
+            return $this->fonte('impressao_log', 'Coleta de Impressões', $ultimo, self::ERRO,
+                sprintf(
+                    'Sem contato de %s há mais de %dh. O log do Windows retém poucos dias: coleta parada vira histórico perdido.',
+                    $mudos->implode(', '),
+                    self::HORAS_ESPERADAS_COLETOR
+                ),
+                'dashboards.impressoes', $numeros, modulos: self::MODULOS_IMPRESSORAS);
+        }
+
+        return $this->fonte('impressao_log', 'Coleta de Impressões', $ultimo, self::OK,
+            null, 'dashboards.impressoes', $numeros, modulos: self::MODULOS_IMPRESSORAS);
+    }
+
     private function porFrescura(
         string $chave,
         string $rotulo,
@@ -333,7 +468,8 @@ class SyncStatusService
 
         foreach ($valores as $rotulo => $valor) {
             if ($valor !== null) {
-                $partes[] = $valor.' '.$rotulo;
+                // Separador de milhar: "2.265 consumíveis" se lê, "2265" não.
+                $partes[] = (is_int($valor) ? number_format($valor, 0, ',', '.') : $valor).' '.$rotulo;
             }
         }
 

@@ -91,6 +91,19 @@ Route::post('/webhooks/backup', [BackupWebhookController::class, 'store'])
  | não guarda credencial capaz de apagar contas: responde apenas o que uma
  | pessoa aprovou na tela.
  */
+/*
+ | Log de impressão — endpoints consumidos pelos servidores IMP01/02/03.
+ |
+ | O sentido é sempre servidor → CoreTI, como no AD: o CoreTI não abre conexão
+ | com os servidores nem guarda credencial de domínio.
+ */
+Route::prefix('api/impressao')
+    ->middleware(['impressao_token', 'throttle:120,1,api-impressao:'])
+    ->name('api.impressao.')->group(function () {
+        Route::post('/lote', [\App\Http\Controllers\Impressao\PrintLogApiController::class, 'lote'])->name('lote');
+        Route::get('/ultimo-evento', [\App\Http\Controllers\Impressao\PrintLogApiController::class, 'ultimoEvento'])->name('ultimo-evento');
+    });
+
 Route::prefix('api/ad/exclusao')
     // O token tem 64 caracteres e a comparação é hash_equals, então adivinhar
     // é inviável — mas endpoint sem limite ainda serve de canal de carga e
@@ -778,6 +791,26 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::patch('/admin/role/{user}', [AdminController::class, 'updateRole'])->name('admin.update-role')->middleware('module_access:administrativo.manage');
         Route::patch('/admin/module-access/{user}', [AdminController::class, 'updateModuleAccess'])->name('admin.update-module-access')->middleware('module_access:administrativo.manage');
         Route::delete('/admin/delete/{user}', [AdminController::class, 'deleteUser'])->name('admin.delete')->middleware('module_access:administrativo.manage');
+    });
+
+    /*
+     | Impressoras. Só leitura: o cadastro é do portal da Simpress, e a
+     | sincronização de 4x ao dia sobrescreveria qualquer edição nossa.
+     | Por isso nada aqui pede 'manage' ainda — quando abrirmos pedido de
+     | toner pelo CoreTI, essa ação é que vai exigir.
+     */
+    /*
+     | Dashboards analíticos. Cada um é protegido pelo módulo do assunto que
+     | analisa — ver estatística de impressão é ver dado de impressão.
+     */
+    Route::prefix('dashboards')->name('dashboards.')->group(function () {
+        Route::get('/impressoes', [\App\Http\Controllers\Impressao\PrintDashboardController::class, 'impressoes'])
+            ->middleware('module_access:impressoras')->name('impressoes');
+    });
+
+    Route::prefix('impressoras')->name('impressoras.')->middleware('module_access:impressoras')->group(function () {
+        Route::get('/', [\App\Http\Controllers\PrinterController::class, 'index'])->name('index');
+        Route::get('/{printer}', [\App\Http\Controllers\PrinterController::class, 'show'])->name('show');
     });
 });
 

@@ -8,6 +8,7 @@ use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\VerifyBackupWebhookToken;
 use App\Http\Middleware\VerifyAdPurgeToken;
+use App\Http\Middleware\VerifyImpressaoToken;
 use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'module_access' => EnsureModuleAccess::class,
             'backup_webhook' => VerifyBackupWebhookToken::class,
             'ad_purge_token' => VerifyAdPurgeToken::class,
+            'impressao_token' => VerifyImpressaoToken::class,
         ]);
 
         // Webhook chamado por curl a partir dos servidores: não há sessão nem
@@ -33,6 +35,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // Chamado pelo servidor do AD via Invoke-RestMethod: não há sessão
             // nem token CSRF. A autenticação é feita pelo ad_purge_token.
             'api/ad/exclusao/*',
+            // Chamado pelas tarefas agendadas dos servidores de impressão,
+            // também sem sessão. Autenticado pelo impressao_token.
+            'api/impressao/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

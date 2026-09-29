@@ -100,7 +100,14 @@ class StatusSincronizacoesPermissaoTest extends TestCase
 
     public function test_todas_as_fontes_existem_independente_de_permissao(): void
     {
-        $this->assertCount(7, app(SyncStatusService::class)->todasAsFontes());
+        /*
+         | Compara as chaves, não a quantidade: quando alguém acrescentar uma
+         | origem, a falha diz QUAL apareceu em vez de "7 virou 8".
+         */
+        $this->assertSame(
+            ['ad', 'backups', 'colaboradores', 'google', 'impressao_log', 'impressoras', 'office', 'organizacao', 'vcenter'],
+            app(SyncStatusService::class)->todasAsFontes()->pluck('chave')->sort()->values()->all()
+        );
     }
 
     public function test_service_desk_ve_apenas_ad_emails_e_office(): void
@@ -159,7 +166,9 @@ class StatusSincronizacoesPermissaoTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->assertCount(7, app(SyncStatusService::class)->fontes($master));
+        // "Todas" sai do próprio registro: o número não fica congelado aqui.
+        $servico = app(SyncStatusService::class);
+        $this->assertCount($servico->todasAsFontes()->count(), $servico->fontes($master));
     }
 
     public function test_tela_do_service_desk_nao_mostra_vcenter(): void
