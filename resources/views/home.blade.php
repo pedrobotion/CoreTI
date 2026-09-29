@@ -72,6 +72,28 @@
             </div>
         </div>
 
+        @if (!empty($dashboards))
+            <section>
+                <h2 class="text-base font-semibold text-slate-950 dark:text-white">Dashboards</h2>
+                <p class="mt-1 text-sm text-slate-500">Painéis analíticos montados sobre os dados que o CoreTI coleta.</p>
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($dashboards as $painel)
+                        <a href="{{ route($painel['rota']) }}"
+                           class="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-base font-bold text-slate-950 dark:text-white">{{ $painel['titulo'] }}</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ $painel['descricao'] }}</p>
+                                </div>
+                                <span class="mt-1 h-3 w-3 shrink-0 rounded-full" style="background: {{ $painel['cor'] ?? '#0f172a' }}"></span>
+                            </div>
+                            <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400 transition group-hover:text-slate-600">Abrir painel →</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex flex-col gap-1 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
                 <div>
