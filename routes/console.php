@@ -3382,3 +3382,28 @@ Schedule::command('ad:expirar-lotes')
     ->dailyAt('06:30')
     ->onOneServer()
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Impressoras — EKM Insight API
+|--------------------------------------------------------------------------
+|
+| Quatro execuções por dia, nos horários definidos pela TI. O fuso vai
+| declarado porque o app roda em UTC: sem ele, 00:00 cairia às 21:00 de
+| Brasília, e os horários combinados não seriam os horários reais.
+|
+| Custo por execução: 4 chamadas (devices, consumíveis, contadores, pedidos).
+| A autenticação é uma só por dia, porque o token vive 24h. Dá 17 chamadas
+| diárias — o teto em config/insight.php existe para o caso de algo fugir
+| desse desenho, não para o uso normal.
+|
+| withoutOverlapping evita que uma execução lenta se sobreponha à seguinte e
+| dobre o consumo.
+*/
+foreach (['00:00', '07:00', '12:30', '19:00'] as $horario) {
+    Schedule::command('impressoras:sincronizar')
+        ->dailyAt($horario)
+        ->timezone('America/Sao_Paulo')
+        ->onOneServer()
+        ->withoutOverlapping();
+}

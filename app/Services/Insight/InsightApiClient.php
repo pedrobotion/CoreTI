@@ -7,6 +7,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Cliente da EKM Insight API (portal HP Smart Device Services / Simpress).
@@ -203,8 +204,13 @@ class InsightApiClient
      */
     private function chamar(string $metodo, string $caminho, array $dados, bool $jaRepetiu = false): array
     {
+        // O token tem de sair antes do contador: autenticar também é chamada.
+        $token = $this->token();
+
+        $this->respeitarLimites($caminho);
+
         $resposta = $this->requisicao()
-            ->withToken($this->token())
+            ->withToken($token)
             ->{$metodo}($this->url($caminho), $dados);
 
         if ($resposta->status() === 401 && ! $jaRepetiu) {
@@ -239,6 +245,11 @@ class InsightApiClient
             throw InsightApiException::semCredencial();
         }
 
+        // O login conta no teto como qualquer outra chamada. Credencial
+        // recusada devolve 401 e o cliente pede token de novo: sem isso, um
+        // segredo errado viraria martelada em /login.
+        $this->respeitarLimites('/login');
+
         $basic = base64_encode(config('insight.key').':'.config('insight.secret'));
 
         $resposta = $this->requisicao()
@@ -268,6 +279,127 @@ class InsightApiClient
     public function esquecerToken(): void
     {
         Cache::forget(self::CHAVE_CACHE);
+    }
+
+    // ------------------------------------------------------------------
+    // Teto de requisições
+    // ------------------------------------------------------------------
+
+    private const CHAVE_ULTIMA = 'insight:ultima-chamada';
+
+    private const CHAVE_DIA = 'insight:chamadas-do-dia';
+
+    /**
+     * Segura a chamada antes de ela sair.
+     *
+     * Três camadas, da mais branda para a mais dura: um intervalo mínimo que
+     * desmancha rajada, um teto por minuto que espera a janela abrir, e um
+     * teto diário que simplesmente interrompe.
+     *
+     * Os contadores vivem no cache de propósito. Em memória do processo, dois
+     * comandos simultâneos teriam cada um o seu teto e o volume dobraria —
+     * que é exatamente o que não pode acontecer com API de terceiro.
+     */
+    private function respeitarLimites(string $caminho): void
+    {
+        $limites = (array) config('insight.limites', []);
+
+        $this->cobrarTetoDiario((int) ($limites['por_dia'] ?? 300), $caminho);
+        $this->esperarJanelaDoMinuto(
+            (int) ($limites['por_minuto'] ?? 20),
+            (int) ($limites['espera_maxima_segundos'] ?? 90)
+        );
+        $this->aguardarIntervalo((int) ($limites['intervalo_ms'] ?? 400));
+
+        Cache::put(self::CHAVE_ULTIMA, microtime(true), now()->addMinutes(10));
+    }
+
+    /** Disjuntor: estourou o dia, não sai mais nada. */
+    private function cobrarTetoDiario(int $teto, string $caminho): void
+    {
+        if ($teto <= 0) {
+            return;
+        }
+
+        $chave = self::CHAVE_DIA.':'.now()->toDateString();
+        $usadas = (int) Cache::get($chave, 0);
+
+        if ($usadas >= $teto) {
+            Log::warning('Insight API: teto diário atingido, chamada recusada.', [
+                'caminho' => $caminho,
+                'usadas' => $usadas,
+                'teto' => $teto,
+            ]);
+
+            throw InsightApiException::tetoDiario($teto);
+        }
+
+        // add() cria a chave com validade; increment() sozinho criaria uma
+        // chave sem expiração e o contador nunca zeraria.
+        Cache::add($chave, 0, now()->endOfDay()->addMinutes(5));
+        Cache::increment($chave);
+    }
+
+    private function esperarJanelaDoMinuto(int $teto, int $esperaMaxima): void
+    {
+        if ($teto <= 0) {
+            return;
+        }
+
+        $chave = 'insight:por-minuto';
+
+        if (RateLimiter::remaining($chave, $teto) > 0) {
+            RateLimiter::hit($chave, 60);
+
+            return;
+        }
+
+        $faltam = RateLimiter::availableIn($chave);
+
+        if ($faltam > $esperaMaxima) {
+            throw InsightApiException::esperaLonga($faltam, $esperaMaxima);
+        }
+
+        Log::info('Insight API: janela do minuto cheia, aguardando.', ['segundos' => $faltam]);
+        sleep(max($faltam, 1));
+        RateLimiter::hit($chave, 60);
+    }
+
+    /** Desmancha rajada: nunca duas chamadas coladas. */
+    private function aguardarIntervalo(int $intervaloMs): void
+    {
+        if ($intervaloMs <= 0) {
+            return;
+        }
+
+        $ultima = Cache::get(self::CHAVE_ULTIMA);
+
+        if (! is_float($ultima) && ! is_int($ultima)) {
+            return;
+        }
+
+        $decorridoMs = (microtime(true) - (float) $ultima) * 1000;
+
+        if ($decorridoMs < $intervaloMs) {
+            usleep((int) (($intervaloMs - $decorridoMs) * 1000));
+        }
+    }
+
+    /**
+     * Quantas chamadas já saíram hoje e quanto resta do teto.
+     *
+     * @return array{usadas:int, teto:int, restantes:int}
+     */
+    public function consumoDeHoje(): array
+    {
+        $teto = (int) config('insight.limites.por_dia', 300);
+        $usadas = (int) Cache::get(self::CHAVE_DIA.':'.now()->toDateString(), 0);
+
+        return [
+            'usadas' => $usadas,
+            'teto' => $teto,
+            'restantes' => max($teto - $usadas, 0),
+        ];
     }
 
     private function requisicao(): PendingRequest

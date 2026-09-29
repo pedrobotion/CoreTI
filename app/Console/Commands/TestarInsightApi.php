@@ -15,12 +15,21 @@ use Illuminate\Console\Command;
  */
 class TestarInsightApi extends Command
 {
-    protected $signature = 'insight:testar {--devices : Também lista os equipamentos de cada cliente visível}';
+    protected $signature = 'insight:testar
+        {--devices : Também lista os equipamentos de cada cliente visível}
+        {--uso : Só mostra o consumo do dia, sem chamar a API}';
 
     protected $description = 'Testa a conexão com a EKM Insight API (somente leitura)';
 
     public function handle(InsightApiClient $insight): int
     {
+        // Consultar o quanto já gastamos não pode custar mais uma chamada.
+        if ($this->option('uso')) {
+            $this->mostrarConsumo($insight);
+
+            return self::SUCCESS;
+        }
+
         $this->components->twoColumnDetail('Endereço', (string) config('insight.base_url'));
         $this->components->twoColumnDetail('Credencial', $insight->configurado()
             ? '<fg=green>configurada</>'
@@ -54,6 +63,9 @@ class TestarInsightApi extends Command
         $this->components->info('Coloque os ids acima em INSIGHT_CUSTOMER_IDS no .env (separados por vírgula).');
 
         if (! $this->option('devices')) {
+            $this->newLine();
+            $this->mostrarConsumo($insight);
+
             return self::SUCCESS;
         }
 
@@ -97,4 +109,21 @@ class TestarInsightApi extends Command
 
         return self::SUCCESS;
     }
+
+    private function mostrarConsumo(InsightApiClient $insight): void
+    {
+        $consumo = $insight->consumoDeHoje();
+        $limites = (array) config('insight.limites', []);
+
+        $this->components->twoColumnDetail(
+            'Chamadas hoje',
+            sprintf('%d de %d (restam %d)', $consumo['usadas'], $consumo['teto'], $consumo['restantes'])
+        );
+        $this->components->twoColumnDetail(
+            'Tetos',
+            sprintf('%d/min · %d/dia · %dms entre chamadas',
+                $limites['por_minuto'] ?? 0, $limites['por_dia'] ?? 0, $limites['intervalo_ms'] ?? 0)
+        );
+    }
+
 }

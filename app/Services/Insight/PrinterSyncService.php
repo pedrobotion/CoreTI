@@ -343,7 +343,20 @@ class PrinterSyncService
         }
     }
 
-    private function inteiro(mixed $valor, ?int $min = null, ?int $max = null): ?int
+    /**
+     * Número da API, ou null quando não é número de verdade.
+     *
+     * O portal usa -1 e -2 como "desconhecido" — aparece em daysLeft e
+     * pagesLeft de consumível recém-instalado, que ainda não tem histórico
+     * para projetar. Não é quantidade negativa, é ausência de leitura.
+     *
+     * Por isso o mínimo é ZERO por padrão, e não "sem mínimo". Tudo que
+     * mapeamos aqui é quantidade — dias, páginas, ciclos, níveis, scans — e
+     * as 38 colunas correspondentes são unsigned. Deixar o -1 passar rendia
+     * "Out of range value for column 'days_left'" e derrubava a
+     * sincronização inteira por causa de um toner novo.
+     */
+    private function inteiro(mixed $valor, ?int $min = 0, ?int $max = null): ?int
     {
         if ($valor === null || $valor === '') {
             return null;
@@ -351,8 +364,6 @@ class PrinterSyncService
 
         $inteiro = (int) $valor;
 
-        // O portal às vezes devolve -1 ou -2 para "desconhecido" em nível de
-        // consumível; gravar isso como percentual produziria alerta falso.
         if ($min !== null && $inteiro < $min) {
             return null;
         }

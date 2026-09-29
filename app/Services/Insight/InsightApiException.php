@@ -21,6 +21,34 @@ class InsightApiException extends RuntimeException
         );
     }
 
+    /**
+     * Teto diário estourado.
+     *
+     * Não é erro da API: é o nosso disjuntor. Chegar aqui quase sempre
+     * significa laço indevido, não uso legítimo — uma sincronização completa
+     * custa 4 chamadas por cliente.
+     */
+    public static function tetoDiario(int $teto): self
+    {
+        return new self(sprintf(
+            'Teto diário de %d chamadas à Insight API atingido. Nenhuma nova requisição será feita hoje. '
+            .'Se o uso for legítimo, ajuste INSIGHT_POR_DIA no .env; se não for, procure o laço antes de aumentar.',
+            $teto
+        ));
+    }
+
+    /** Janela do minuto cheia e a espera passaria do aceitável. */
+    public static function esperaLonga(int $segundos, int $maximo): self
+    {
+        return new self(sprintf(
+            'Limite de %d chamadas por minuto à Insight API atingido; a próxima janela abre em %ds, '
+            .'acima do máximo de %ds que aceitamos esperar. Rode de novo daqui a pouco.',
+            (int) config('insight.limites.por_minuto', 20),
+            $segundos,
+            $maximo
+        ));
+    }
+
     /** Traduz os códigos do gateway para algo acionável. */
     public static function doHttp(int $status, string $corpo, string $caminho): self
     {
