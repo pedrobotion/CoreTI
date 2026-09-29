@@ -121,6 +121,10 @@ class AprovacaoAutomaticaTest extends TestCase
     /** Carência evita cadastrar VM criada e destruída no mesmo dia. */
     public function test_descoberta_recente_aguarda_carencia(): void
     {
+        // Fixa o valor em vez de herdar o do ambiente: é a carência que está
+        // sob teste aqui, e ela é ajustável por .env em cada instalação.
+        config(['cmdb.auto_aprovar.horas_de_carencia' => 24]);
+
         $d = $this->descoberta('recemcriada.cocari.com.br', [
             'discovered_at' => now()->subHours(2),
         ]);
@@ -138,6 +142,69 @@ class AprovacaoAutomaticaTest extends TestCase
         $this->aprovar();
 
         $this->assertNotNull($d->fresh()->asset_id);
+    }
+
+    /*
+     | Os testes de adiamento acima têm UMA descoberta na fila, e é por isso
+     | que deixavam passar o defeito: com a fila inteira adiada o comando
+     | encerra antes de mandar criar qualquer coisa. O problema só aparece
+     | quando uma aprovável divide o ciclo com uma adiada — era o momento em
+     | que a adiada entrava de carona e virava ativo.
+     */
+
+    public function test_adiada_nao_entra_junto_com_uma_aprovavel(): void
+    {
+        $adiada = $this->descoberta('fantasma.cocari.com.br', [
+            'last_seen_at' => now()->subDays(5),
+        ]);
+        $aprovavel = $this->descoberta('servidor02.cocari.com.br');
+
+        $this->aprovar();
+
+        $this->assertNotNull($aprovavel->fresh()->asset_id, 'a aprovável deveria virar ativo');
+        $this->assertNull($adiada->fresh()->asset_id, 'a adiada não pode entrar de carona');
+        $this->assertSame('pending', $adiada->fresh()->status);
+    }
+
+    public function test_em_carencia_nao_entra_junto_com_uma_aprovavel(): void
+    {
+        config(['cmdb.auto_aprovar.horas_de_carencia' => 24]);
+
+        $emCarencia = $this->descoberta('recemcriada.cocari.com.br', [
+            'discovered_at' => now()->subHours(2),
+        ]);
+        $aprovavel = $this->descoberta('servidor03.cocari.com.br');
+
+        $this->aprovar();
+
+        $this->assertNotNull($aprovavel->fresh()->asset_id);
+        $this->assertNull($emCarencia->fresh()->asset_id, 'a carência precisa valer mesmo com outra aprovável na fila');
+    }
+
+    public function test_ignorada_por_nome_nao_entra_junto_com_uma_aprovavel(): void
+    {
+        $template = $this->descoberta('template-ubuntu-22');
+        $aprovavel = $this->descoberta('servidor04.cocari.com.br');
+
+        $this->aprovar();
+
+        $this->assertNotNull($aprovavel->fresh()->asset_id);
+        $this->assertNull($template->fresh()->asset_id, 'template não vira ativo em hipótese alguma');
+        $this->assertSame('ignored', $template->fresh()->status);
+    }
+
+    public function test_carencia_zero_aprova_a_recem_descoberta(): void
+    {
+        // Como o ambiente está configurado hoje: servidor novo entra direto.
+        config(['cmdb.auto_aprovar.horas_de_carencia' => 0]);
+
+        $d = $this->descoberta('novissima.cocari.com.br', [
+            'discovered_at' => now()->subMinutes(5),
+        ]);
+
+        $this->aprovar();
+
+        $this->assertNotNull($d->fresh()->asset_id, 'sem carência, a descoberta recente entra no mesmo ciclo');
     }
 
     public function test_dry_run_nao_altera_nada(): void

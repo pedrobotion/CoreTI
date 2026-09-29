@@ -18,12 +18,26 @@ class CmdbVCenterAssetCreationService
     ) {
     }
 
-    public function createPendingServers(?int $connectorId = null, ?int $limit = null): array
+    /**
+     * @param  array<int,int>|null  $onlyIds  Restringe às descobertas informadas.
+     *                                        Quem decidiu o que entra é o chamador; sem
+     *                                        isso este método criaria ativo para toda a
+     *                                        fila, inclusive o que o chamador adiou.
+     */
+    public function createPendingServers(?int $connectorId = null, ?int $limit = null, ?array $onlyIds = null): array
     {
+        if ($onlyIds !== null && $onlyIds === []) {
+            return ['found' => 0, 'created' => 0, 'already_linked' => 0, 'failed' => 0, 'issues' => []];
+        }
+
         $query = CmdbDiscoveredAsset::query()
             ->whereIn('source_type', ['vcenter_virtual_machine', 'vcenter_host'])
             ->whereNull('asset_id')
             ->whereIn('status', ['pending', 'linked', 'created']);
+
+        if ($onlyIds !== null) {
+            $query->whereIn('id', $onlyIds);
+        }
 
         if ($connectorId !== null) {
             $query->where('connector_id', $connectorId);

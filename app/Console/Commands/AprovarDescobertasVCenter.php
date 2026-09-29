@@ -127,9 +127,18 @@ class AprovarDescobertasVCenter extends Command
             return self::SUCCESS;
         }
 
-        // Delega a criação: as excluídas já saíram da fila como ignoradas.
+        /*
+         | Delega a criação apenas do que passou pelas regras.
+         |
+         | A lista precisa ir junto. Sem ela o serviço cria ativo para toda a
+         | fila pendente, e as adiadas entravam de carona sempre que alguma
+         | outra descoberta fosse aprovável no mesmo ciclo — o adiamento só
+         | se sustentava quando a fila inteira estava adiada.
+         */
         $resumo = $criacao->createPendingServers(
-            $this->option('connector') !== null ? (int) $this->option('connector') : null
+            $this->option('connector') !== null ? (int) $this->option('connector') : null,
+            null,
+            array_map(fn (CmdbDiscoveredAsset $d): int => (int) $d->id, $aprovar),
         );
 
         $this->newLine();
