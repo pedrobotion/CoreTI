@@ -46,3 +46,13 @@ Thumbs.db
 # Documentos de apoio recebidos de terceiros.
 /Termo de Responsabilidade.docm
 /Insight API Developer Guide*.pdf
+
+# Relatorios de impressao exportados dos servidores: trazem o nome de
+# cada colaborador e o que ele imprimiu. Ficam fora do repositorio.
+/Relatorio_Impressoes*.xlsx
+/relatorio_impressoes*.xlsx
+
+# Configuracao real dos coletores de impressao: carrega o token de producao.
+# O modelo (.exemplo) fica versionado; o arquivo preenchido, nunca.
+/scripts/impressao/coreti.impressao.json
+/scripts/ad/coreti.config.json
