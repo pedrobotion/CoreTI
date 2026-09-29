@@ -44,6 +44,24 @@ return [
         'issue_type' => env('JIRA_ISSUE_TYPE'),
         'ticket_base_url' => env('JIRA_TICKET_BASE_URL'),
         'bancada_ticket_base_url' => env('JIRA_BANCADA_TICKET_BASE_URL'),
+
+        /*
+         | Conta que figura como relator dos chamados abertos pelo CoreTI.
+         |
+         | Quem autentica é uma conta pessoal, e sem isto o chamado apareceria
+         | como aberto por ela — o que confunde quem lê a fila e quebra a
+         | automação no dia em que essa pessoa sair. Definindo o relator, o
+         | chamado nasce em nome do sistema.
+         |
+         | Exige que a conta autenticada tenha "Modificar relator" no projeto.
+         | Sem a permissão, o Jira recusa a criação — e é melhor recusar do
+         | que abrir em nome errado sem avisar.
+         |
+         | Se um dia houver token da própria conta de suporte, ela passa a
+         | autenticar e este campo vira redundante (inofensivo).
+         */
+        'reporter_account_id' => env('JIRA_REPORTER_ACCOUNT_ID'),
+        'reporter_email' => env('JIRA_REPORTER_EMAIL'),
     ],
 
     'google_workspace' => [

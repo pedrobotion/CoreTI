@@ -97,6 +97,8 @@ class DatabaseBackupJiraService
             $campos[(string) config('backups.jira.fields.request_type')] = $requestType;
         }
 
+        $campos = $this->comRelator($campos);
+
         $resposta = $this->client()->post($this->url('/rest/api/3/issue'), ['fields' => $campos]);
 
         if (! $resposta->successful()) {
@@ -183,6 +185,8 @@ class DatabaseBackupJiraService
         if ($requestType = $this->resolverTipoDeSolicitacao()) {
             $campos[(string) config('backups.jira.fields.request_type')] = $requestType;
         }
+
+        $campos = $this->comRelator($campos);
 
         try {
             $resposta = $this->client()->post($this->url('/rest/api/3/issue'), ['fields' => $campos]);
@@ -517,6 +521,27 @@ class DatabaseBackupJiraService
             (string) config('services.jira.email'),
             (string) config('services.jira.api_token')
         )->acceptJson()->timeout(15);
+    }
+
+    /**
+     * Define quem assina o chamado.
+     *
+     * Sem isto o relator é a conta que autentica — uma pessoa. O chamado
+     * apareceria em nome dela na fila, e a automação morreria junto com a
+     * conta no dia em que ela saísse da empresa.
+     *
+     * @param  array<string, mixed>  $campos
+     * @return array<string, mixed>
+     */
+    private function comRelator(array $campos): array
+    {
+        $accountId = trim((string) config('services.jira.reporter_account_id'));
+
+        if ($accountId !== '') {
+            $campos['reporter'] = ['id' => $accountId];
+        }
+
+        return $campos;
     }
 
     private function url(string $caminho): string
