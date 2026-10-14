@@ -1862,7 +1862,7 @@ Artisan::command('office:diagnose-collaborators {--limit=20}', function () {
 })->purpose('Diagnostica a estrutura e amostras do snapshot local de colaboradores.');
 
 Artisan::command('office:sync-microsoft {--deactivate-missing} {--force-deactivate-missing} {--dry-run} {--limit=0}', function (CoreTiSyncNotificationService $notificationService) {
-    $enabled = filter_var(env('MS_OFFICE_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL);
+    $enabled = (bool) config('ms_office.sync_enabled');
     if (! $enabled) {
         $this->warn('Sincronização Microsoft Office desativada (MS_OFFICE_SYNC_ENABLED=false).');
         return 0;
@@ -1871,9 +1871,9 @@ Artisan::command('office:sync-microsoft {--deactivate-missing} {--force-deactiva
     $dryRun = (bool) $this->option('dry-run');
     $limit = max((int) $this->option('limit'), 0);
 
-    $tenantId = trim((string) env('MS_TENANT_ID', ''));
-    $clientId = trim((string) env('MS_CLIENT_ID', ''));
-    $clientSecret = trim((string) env('MS_CLIENT_SECRET', ''));
+    $tenantId = trim((string) config('ms_office.tenant_id'));
+    $clientId = trim((string) config('ms_office.client_id'));
+    $clientSecret = trim((string) config('ms_office.client_secret'));
 
     if ($tenantId === '' || $clientId === '' || $clientSecret === '') {
         $this->error('Credenciais Microsoft ausentes no .env (MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET).');
@@ -2417,7 +2417,7 @@ Artisan::command('office:sync-microsoft {--deactivate-missing} {--force-deactiva
     }
 
     // Opcional: envia para Microsoft (admin.cloud) matrícula e unidade/departamento corrigidos manualmente no CoreTI.
-    $pushEnabled = filter_var(env('MS_OFFICE_PUSH_ENABLED', false), FILTER_VALIDATE_BOOL);
+    $pushEnabled = (bool) config('ms_office.push_enabled');
     if (! $dryRun && $pushEnabled) {
         $pushed = 0;
         $skipped = 0;
@@ -2498,7 +2498,7 @@ Artisan::command('office:sync-microsoft {--deactivate-missing} {--force-deactiva
         if (! empty($emailsSet)) {
             $query->whereNotIn('email', $emailsSet);
         }
-        $deleteMissing = filter_var(env('MS_OFFICE_DELETE_MISSING', true), FILTER_VALIDATE_BOOL);
+        $deleteMissing = (bool) config('ms_office.delete_missing');
         if ($deleteMissing) {
             $deleted = $query->delete();
         } else {
