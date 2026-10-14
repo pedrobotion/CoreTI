@@ -56,3 +56,6 @@ Thumbs.db
 # O modelo (.exemplo) fica versionado; o arquivo preenchido, nunca.
 /scripts/impressao/coreti.impressao.json
 /scripts/ad/coreti.config.json
+
+# Configuração pessoal do Claude Code (permissões locais): não versionar.
+/.claude/settings.local.json
