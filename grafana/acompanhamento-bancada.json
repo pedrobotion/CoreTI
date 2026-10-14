@@ -171,7 +171,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) AS valor FROM bancada_equipments WHERE status NOT IN ('Entregue','Descarte')",
+          "rawSql": "SELECT COUNT(*) AS valor FROM bancada_equipments WHERE status NOT IN ('Entregue','Descarte','Backup')",
           "refId": "A"
         }
       ],
@@ -582,7 +582,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT status AS 'Status', ROUND(AVG(TIMESTAMPDIFF(MINUTE,start_time,end_time))/1440,1) AS 'Dias' FROM bancada_equipment_status_histories WHERE end_time IS NOT NULL AND end_time >= start_time GROUP BY status HAVING COUNT(*) >= 2 ORDER BY 2 DESC",
+          "rawSql": "SELECT status AS 'Status', ROUND(AVG(TIMESTAMPDIFF(MINUTE,start_time,end_time))/1440,1) AS 'Dias' FROM bancada_equipment_status_histories WHERE end_time IS NOT NULL AND end_time >= start_time AND status <> 'Backup' GROUP BY status HAVING COUNT(*) >= 2 ORDER BY 2 DESC",
           "refId": "A"
         }
       ],
@@ -763,7 +763,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT status AS 'Status', COUNT(*) AS 'Qtd' FROM bancada_equipments WHERE status NOT IN ('Entregue','Descarte') GROUP BY status ORDER BY 2 DESC",
+          "rawSql": "SELECT status AS 'Status', COUNT(*) AS 'Qtd' FROM bancada_equipments WHERE status NOT IN ('Entregue','Descarte','Backup') GROUP BY status ORDER BY 2 DESC",
           "refId": "A"
         }
       ],
@@ -913,7 +913,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(NULLIF(plaqueta,''), NULLIF(tic,''), CONCAT('#',id)) AS 'Plaqueta', tipo_equipamento AS 'Tipo', COALESCE(NULLIF(TRIM(unidade_setor),''),'—') AS 'Unidade', status AS 'Status', DATE_FORMAT(data_chegada,'%d/%m/%Y') AS 'Chegada', DATEDIFF(CURDATE(),data_chegada) AS 'Dias' FROM bancada_equipments WHERE status NOT IN ('Entregue','Descarte') AND data_chegada IS NOT NULL ORDER BY data_chegada ASC LIMIT 15",
+          "rawSql": "SELECT COALESCE(NULLIF(plaqueta,''), NULLIF(tic,''), CONCAT('#',id)) AS 'Plaqueta', tipo_equipamento AS 'Tipo', COALESCE(NULLIF(TRIM(unidade_setor),''),'—') AS 'Unidade', status AS 'Status', DATE_FORMAT(data_chegada,'%d/%m/%Y') AS 'Chegada', DATEDIFF(CURDATE(),data_chegada) AS 'Dias' FROM bancada_equipments WHERE status NOT IN ('Entregue','Descarte','Backup') AND data_chegada IS NOT NULL ORDER BY data_chegada ASC LIMIT 15",
           "refId": "A"
         }
       ],
