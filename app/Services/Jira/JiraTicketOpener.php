@@ -41,8 +41,10 @@ class JiraTicketOpener
      * @param  array<string, mixed>  $extra  campos adicionais do Jira
      * @param  string|null  $equipeNome  nome da "Equipe de atendimento" só para
      *                                    este chamado (sobrepõe o padrão global)
+     * @param  string|null  $requestTypeId  id do tipo de solicitação (catálogo)
+     *                                       só para este chamado (sobrepõe o padrão)
      */
-    public function abrir(string $titulo, string $descricao, string $contexto = 'coreti', array $extra = [], ?string $equipeNome = null): ?string
+    public function abrir(string $titulo, string $descricao, string $contexto = 'coreti', array $extra = [], ?string $equipeNome = null, ?string $requestTypeId = null): ?string
     {
         if (! $this->configurado()) {
             Log::warning('jira.ticket.nao_configurado', ['contexto' => $contexto, 'titulo' => $titulo]);
@@ -68,7 +70,7 @@ class JiraTicketOpener
             $campos[(string) config('backups.jira.fields.team')] = $equipe;
         }
 
-        if ($tipo = $this->resolverTipoDeSolicitacao()) {
+        if ($tipo = $this->resolverTipoDeSolicitacao($requestTypeId)) {
             $campos[(string) config('backups.jira.fields.request_type')] = $tipo;
         }
 
@@ -152,10 +154,13 @@ class JiraTicketOpener
         return isset($opcoes[$indice]['id']) ? ['id' => (string) $opcoes[$indice]['id']] : null;
     }
 
-    private function resolverTipoDeSolicitacao(): ?string
+    private function resolverTipoDeSolicitacao(?string $override = null): ?string
     {
         $serviceDesk = (string) config('backups.jira.service_desk_id');
-        $requestType = (string) config('backups.jira.request_type_id');
+        // Catálogo informado na chamada tem prioridade sobre o padrão global.
+        $requestType = $override !== null && trim($override) !== ''
+            ? trim($override)
+            : (string) config('backups.jira.request_type_id');
 
         if ($serviceDesk === '' || $requestType === '') {
             return null;

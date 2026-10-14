@@ -198,6 +198,14 @@ Schedule::command('bancada:verificar-pendencias')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
 
+// Chamado de nota de saída na manhã do dia de separação de cada rota (até ~15:00
+// o equipamento vai ao embarque), para os equipamentos não-Sede já prontos.
+Schedule::command('bancada:chamados-nota-saida')
+    ->weekdays()
+    ->at('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();
+
 Artisan::command('cmdb:vcenter-create-servers {--connector=} {--limit=}', function (CmdbVCenterAssetCreationService $service) {
     $connector = $this->option('connector') !== null ? (int) $this->option('connector') : null;
     $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;

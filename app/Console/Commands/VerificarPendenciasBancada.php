@@ -132,7 +132,14 @@ class VerificarPendenciasBancada extends Command
             ."Parado há: {$p['dias']} dias (limiar {$p['limiar']} dias)\n";
 
         try {
-            return $jira->abrir($titulo, $descricao, 'bancada-pendencia', [], (string) config('bancada.pendencias.jira_equipe'));
+            return $jira->abrir(
+                $titulo,
+                $descricao,
+                'bancada-pendencia',
+                [],
+                (string) config('bancada.pendencias.jira_equipe'),
+                (string) config('bancada.pendencias.jira_request_type'),
+            );
         } catch (Throwable $e) {
             $this->warn("Falha ao abrir chamado para {$id}: ".$e->getMessage());
 
