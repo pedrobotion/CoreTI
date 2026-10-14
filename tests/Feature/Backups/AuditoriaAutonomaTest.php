@@ -33,6 +33,13 @@ class AuditoriaAutonomaTest extends TestCase
     {
         parent::setUp();
 
+        config(['backups.abertura' => [
+            'tipos' => ['backup', 'auditoria'],
+            'minimo_ocorrencias' => 1,
+            'minimo_minutos' => 0,
+            'exigir_sucesso_anterior' => false,
+        ]]);
+
         config([
             'services.jira.enabled' => false,
             'backups.stale_after_hours' => 36,
@@ -355,6 +362,20 @@ class AuditoriaAutonomaTest extends TestCase
             'services.jira.base_url' => 'https://exemplo.atlassian.net',
             'services.jira.email' => 'bot@exemplo.com',
             'services.jira.api_token' => 'token',
+            // Fixa a chave em vez de herdar o .env: a abertura automática é
+            // desligável por ambiente, e é justamente ela que está sob teste.
+            'backups.jira.enabled' => true,
+            'backups.jira.project_id' => '10005',
+            'backups.jira.issue_type_id' => '10008',
+            // Critérios de confirmação neutralizados: este teste é sobre
+            // outra coisa, e herdar a regra de abertura faria ele falhar por
+            // um motivo que não é o dele.
+            'backups.abertura' => [
+                'tipos' => ['backup', 'auditoria'],
+                'minimo_ocorrencias' => 1,
+                'minimo_minutos' => 0,
+                'exigir_sucesso_anterior' => false,
+            ],
         ]);
 
         Http::fake([

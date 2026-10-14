@@ -112,6 +112,77 @@ return [
     'stale_after_hours' => (int) env('BACKUP_STALE_AFTER_HOURS', 36),
 
     /*
+     | Acima disto o par não está atrasado: está descontinuado.
+     |
+     | "Atrasado há 3 horas" é incidente; "atrasado há um ano" é registro que
+     | deveria ter sido aposentado. Tratar os dois igual enche a tela de
+     | alarme que ninguém vai resolver, e o alarme legítimo se perde no meio.
+     |
+     | O caso concreto: a nomenclatura dos bancos mudou de caminho completo
+     | (/banco/trr/base/trr) para nome curto (trr). Os identificadores antigos
+     | ficaram na base sem nunca mais receber evento, e apareciam como
+     | atrasados ao lado de backups que realmente falharam ontem.
+     */
+    'inactive_after_days' => (int) env('BACKUP_INACTIVE_AFTER_DAYS', 30),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Quando abrir chamado automaticamente
+    |--------------------------------------------------------------------------
+    |
+    | Chamado é interrupção do trabalho de alguém. Abrir na primeira suspeita
+    | gasta atenção com o que se resolve sozinho, e quem recebe alarme demais
+    | para de ler alarme — aí o problema real passa junto.
+    |
+    | Os quatro critérios abaixo se somam. Todos precisam ser satisfeitos.
+    |
+    */
+    'abertura' => [
+
+        /*
+         | 1. Que tipo de problema abre chamado.
+         |
+         | Falha de BACKUP é problema: o backup não saiu, saiu velho ou saiu
+         | pequeno demais. Falha de AUDITORIA é suspeita: o CoreTI não
+         | conseguiu verificar — servidor fora do ar, chave recusada, host mal
+         | cadastrado. Não afirma nada sobre o backup.
+         |
+         | Em 29/09 quatro chamados saíram numa rajada: três eram falha de
+         | auditoria sobre alvos de teste mal cadastrados, e só um era backup
+         | de verdade atrasado.
+         */
+        'tipos' => ['backup'],   // 'backup', 'auditoria', ou os dois
+
+        /*
+         | 2. Quantas verificações seguidas precisam falhar.
+         |
+         | Uma falha é suspeita: rede oscilou, o backup estava rodando na hora
+         | da checagem, o disco respondeu devagar. Três seguidas é padrão.
+         |
+         | Isto também protege contra perda de estado: se o incidente for
+         | apagado, a contagem volta a 1 e o chamado não reabre.
+         */
+        'minimo_ocorrencias' => (int) env('BACKUP_ABERTURA_MIN_OCORRENCIAS', 3),
+
+        /*
+         | 3. Por quanto tempo o problema precisa persistir, em minutos.
+         |
+         | Três verificações em dois minutos não são confirmação, são a mesma
+         | leitura repetida. O problema precisa atravessar o tempo.
+         */
+        'minimo_minutos' => (int) env('BACKUP_ABERTURA_MIN_MINUTOS', 120),
+
+        /*
+         | 4. O alvo precisa ter funcionado alguma vez.
+         |
+         | Alvo que nunca teve um backup verificado com sucesso não tem
+         | problema de backup: tem cadastro incompleto ou errado. Isso é
+         | tarefa de configuração, e aparece no painel — não vira chamado.
+         */
+        'exigir_sucesso_anterior' => (bool) env('BACKUP_ABERTURA_EXIGIR_SUCESSO', true),
+    ],
+
+    /*
      | Alvo com problema em aberto é reavaliado neste intervalo, independente
      | da periodicidade — é assim que a recuperação é detectada rápido.
      */

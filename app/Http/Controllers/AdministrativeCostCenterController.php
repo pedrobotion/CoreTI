@@ -40,6 +40,31 @@ class AdministrativeCostCenterController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
+
+        /*
+         | Soft delete não libera o índice único do banco: a linha removida
+         | continua ocupando o `code`. A validação ignora excluídos, então
+         | ela passa, mas o INSERT bate no índice e estoura. Quando já existe
+         | um centro removido com este código, reaproveitamos a mesma linha:
+         | restauramos e regravamos o nome. Assim o recadastro funciona e as
+         | ligações por código (e-mails, licenças, AD) seguem intactas.
+         */
+        $removido = CoretiCostCenter::onlyTrashed()
+            ->where('code', $data['code'])
+            ->where('name', $data['name'])
+            ->first();
+
+        if ($removido !== null) {
+            $removido->restore();
+            $removido->update([
+                'name' => $data['name'],
+                'active' => $data['active'] ?? true,
+                'updated_by' => $request->user()?->id,
+            ]);
+
+            return back()->with('success', 'Centro de custo cadastrado.');
+        }
+
         $data['created_by'] = $request->user()?->id;
         CoretiCostCenter::query()->create($data);
 
@@ -89,20 +114,34 @@ class AdministrativeCostCenterController extends Controller
          | vez de um centro de custo nosso. Exigir só unicoop.área impedia
          | cadastrar o nome dela no catálogo.
          */
-        $request->merge(['code' => $this->normalizeCode($request->input('code'))]);
+        $code = $this->normalizeCode($request->input('code'));
+        $request->merge(['code' => $code]);
 
+        /*
+         | Unicidade por (código + nome), não só por código: um mesmo centro de
+         | custo pode ter várias unidades (ex.: as lojas Colari, todas 01.316).
+         | O que não pode é repetir o mesmo nome sob o mesmo código.
+         */
         return $request->validate([
             'code' => [
                 'required',
                 'string',
                 'max:50',
                 'regex:'.self::FORMATOS_DE_CODIGO,
-                Rule::unique('coreti_cost_centers', 'code')->ignore($center?->id)->whereNull('deleted_at'),
             ],
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('coreti_cost_centers', 'name')
+                    ->where(fn ($query) => $query->where('code', $code))
+                    ->ignore($center?->id)
+                    ->whereNull('deleted_at'),
+            ],
             'active' => ['nullable', 'boolean'],
         ], [
             'code.regex' => 'O código deve ser a unicoop e a área (formato 01.226) ou um CNPJ (formato 07.881.528/0001-66). Confira se o código e o nome não entraram trocados.',
+            'name.unique' => 'Já existe uma unidade com esse nome nesse centro de custo.',
         ], ['code' => 'código', 'name' => 'nome']);
     }
 

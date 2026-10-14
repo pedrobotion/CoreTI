@@ -8,34 +8,9 @@
             'VISIO_PLAN' => 'Custo Visio Plan',
         ];
 
-        $legacyRows = collect($summaryRows ?? [])->map(function ($row) {
-            $costCenter = (string) ($row->cost_center_code ?? '');
-            $unicoop = '-';
-            $area = '-';
-
-            if (preg_match('/^\s*(\d{1,3})\.(\d{1,4})\s*$/', $costCenter, $matches)) {
-                $unicoop = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
-                $area = str_pad($matches[2], 3, '0', STR_PAD_LEFT);
-            }
-
-            return [
-                'unidade' => trim((string) ($row->department_name ?? '')) !== ''
-                    ? (string) $row->department_name
-                    : ((string) ($row->unit_name ?? '') ?: 'N/D'),
-                'unicoop' => $unicoop,
-                'area' => $area,
-                'quantidade' => (int) ($row->apps_count ?? 0)
-                    + (int) ($row->business_count ?? 0)
-                    + (int) ($row->powerbi_count ?? 0)
-                    + (int) ($row->visio_count ?? 0)
-                    + (int) ($row->other_count ?? 0),
-                'custo_total' => (float) ($row->total_amount ?? 0),
-            ];
-        })->sortBy([
-            ['unidade', 'asc'],
-            ['unicoop', 'asc'],
-            ['area', 'asc'],
-        ])->values();
+        // Consolidado por centro de custo (unicoop.área), nomes do catálogo
+        // atual, já pronto no serviço — tela e Excel compartilham a mesma fonte.
+        $legacyRows = collect($consolidado ?? []);
 
         $totalLicencas = $legacyRows->sum('quantidade');
         $totalCusto = $legacyRows->sum('custo_total');
@@ -290,8 +265,8 @@
                                     <td class="px-4 py-3 font-medium text-slate-900">{{ $detail->user_name }}</td>
                                     <td class="px-4 py-3">{{ $detail->user_email }}</td>
                                     <td class="px-4 py-3">{{ $detail->sku_name }}<div class="font-mono text-xs text-slate-500">{{ $detail->sku_id }}</div></td>
-                                    <td class="px-4 py-3">{{ $detail->unit_name_snapshot ?: 'N/D' }}</td>
-                                    <td class="px-4 py-3">{{ $detail->cost_center_code_snapshot ?: 'N/D' }}<div class="text-xs text-slate-500">{{ $detail->cost_center_name_snapshot }}</div></td>
+                                    <td class="px-4 py-3">{{ $detail->catalog_cost_center_name ?: ($detail->unit_name_snapshot ?: 'N/D') }}</td>
+                                    <td class="px-4 py-3">{{ $detail->cost_center_code_snapshot ?: 'N/D' }}<div class="text-xs text-slate-500">{{ $detail->catalog_cost_center_name ?: $detail->cost_center_name_snapshot }}</div></td>
                                     <td class="px-4 py-3 font-semibold">{{ $classificationLabels[$detail->classification_status] ?? $detail->classification_status }}</td>
                                     <td class="px-4 py-3 text-right">R$ {{ number_format((float) $detail->total_amount, 2, ',', '.') }}</td>
                                     <td class="max-w-md px-4 py-3 text-xs text-slate-600">{{ $detail->classification_message ?: '-' }}</td>

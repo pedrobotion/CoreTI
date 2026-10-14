@@ -49,20 +49,43 @@ class CmdbDatabaseBackupController extends Controller
 
         $limite = now()->subHours($horasParaAtraso);
 
-        $ultimos = $ultimos->map(function (CmdbDatabaseBackup $b) use ($limite) {
+        /*
+         | Atrasado e inativo são coisas diferentes.
+         |
+         | Um par que parou de reportar ontem é incidente: alguém precisa
+         | olhar hoje. Um que parou há um ano é registro que deveria ter sido
+         | aposentado — no nosso caso, identificadores antigos de bancos que
+         | hoje reportam com outro nome (/banco/trr/base/trr virou trr).
+         |
+         | Misturar os dois enche a tela de alarme que ninguém vai resolver, e
+         | o alarme legítimo se perde no meio.
+         */
+        $diasParaInativo = (int) config('backups.inactive_after_days', 30);
+        $limiteInativo = now()->subDays($diasParaInativo);
+
+        $ultimos = $ultimos->map(function (CmdbDatabaseBackup $b) use ($limite, $limiteInativo) {
             $referencia = $b->data_backup ?? $b->received_at;
-            $b->atrasado = $referencia === null || $referencia->lessThan($limite);
+
+            $b->inativo = $referencia !== null && $referencia->lessThan($limiteInativo);
+            $b->atrasado = ! $b->inativo
+                && ($referencia === null || $referencia->lessThan($limite));
 
             return $b;
         });
 
+        // Inativo sai da lista por padrão: continua consultável pelo filtro.
+        $ativos = $ultimos->where('inativo', false);
+
         $resumo = [
-            'pares' => $ultimos->count(),
-            'ok' => $ultimos->where('sucesso', true)->where('atrasado', false)->count(),
-            'falha' => $ultimos->where('sucesso', false)->count(),
-            'atrasados' => $ultimos->where('atrasado', true)->count(),
-            'sem_ativo' => $ultimos->whereNull('asset_id')->count(),
+            'pares' => $ativos->count(),
+            'ok' => $ativos->where('sucesso', true)->where('atrasado', false)->count(),
+            'falha' => $ativos->where('sucesso', false)->count(),
+            'atrasados' => $ativos->where('atrasado', true)->count(),
+            'sem_ativo' => $ativos->whereNull('asset_id')->count(),
+            'inativos' => $ultimos->where('inativo', true)->count(),
         ];
+
+        $ultimos = $situacao === 'inativos' ? $ultimos->where('inativo', true) : $ativos;
 
         if ($situacao === 'falha') {
             $ultimos = $ultimos->where('sucesso', false);
@@ -99,7 +122,10 @@ class CmdbDatabaseBackupController extends Controller
             'situacao' => $situacao,
             'busca' => $busca,
             'horasParaAtraso' => $horasParaAtraso,
+            'diasParaInativo' => $diasParaInativo,
             'jiraAtivo' => $this->jira->habilitado(),
+            'jiraConfigurado' => $this->jira->configurado(),
+            'jiraMotivo' => $this->jira->motivoDesligado(),
         ]);
     }
 

@@ -13,13 +13,25 @@
 
         @include('admissao.partials.flash')
 
-        @unless($jiraAtivo)
+        {{--
+            "Falta configurar" e "está desligado de propósito" são situações
+            diferentes, e a tela dizia a primeira nos dois casos — mandando
+            preencher variáveis que já estavam preenchidas.
+        --}}
+        @if($jiraMotivo === 'nao_configurado')
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 Jira não configurado no CoreTI — falhas são registradas, mas o chamado é apenas simulado.
                 Preencha <code class="rounded bg-amber-100 px-1">JIRA_ENABLED</code>, <code class="rounded bg-amber-100 px-1">JIRA_BASE_URL</code>,
                 <code class="rounded bg-amber-100 px-1">JIRA_EMAIL</code> e <code class="rounded bg-amber-100 px-1">JIRA_API_TOKEN</code> no .env.
             </div>
-        @endunless
+        @elseif($jiraMotivo === 'desligado')
+            <div class="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <strong>Abertura automática de chamado desligada.</strong>
+                A credencial do Jira está configurada e funcionando — o que está desativado é a abertura
+                automática pelo CoreTI (<code class="rounded bg-slate-200 px-1">BACKUP_JIRA_ENABLED</code>).
+                As falhas continuam sendo registradas aqui, e o chamado pode ser aberto manualmente.
+            </div>
+        @endif
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -34,10 +46,19 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-rose-700">Com falha</p>
                 <p class="mt-2 text-3xl font-bold text-rose-800">{{ $resumo['falha'] }}</p>
             </div>
-            <div class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm" title="Sem reportar há mais de {{ $horasParaAtraso }}h">
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm" title="Sem reportar há mais de {{ $horasParaAtraso }}h, mas há menos de {{ $diasParaInativo }} dias">
                 <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Em silêncio</p>
                 <p class="mt-2 text-3xl font-bold text-amber-800">{{ $resumo['atrasados'] }}</p>
             </div>
+            @if(($resumo['inativos'] ?? 0) > 0)
+                <a href="{{ route('cmdb.database-backups.index', ['situacao' => 'inativos']) }}"
+                   class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400"
+                   title="Sem reportar há mais de {{ $diasParaInativo }} dias — provavelmente identificador antigo, não backup falhando">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Descontinuados</p>
+                    <p class="mt-2 text-3xl font-bold text-slate-700">{{ $resumo['inativos'] }}</p>
+                    <p class="mt-1 text-xs text-slate-400">fora da contagem</p>
+                </a>
+            @endif
             <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" title="Host sem ativo correspondente no CMDB">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Sem ativo no CMDB</p>
                 <p class="mt-2 text-3xl font-bold text-slate-950">{{ $resumo['sem_ativo'] }}</p>
@@ -57,6 +78,7 @@
                     <option value="atrasados" @selected($situacao === 'atrasados')>Em silêncio</option>
                     <option value="ok" @selected($situacao === 'ok')>Saudáveis</option>
                     <option value="sem_ativo" @selected($situacao === 'sem_ativo')>Sem ativo no CMDB</option>
+                    <option value="inativos" @selected($situacao === 'inativos')>Descontinuados</option>
                 </select>
             </div>
             <div class="min-w-64 flex-1">

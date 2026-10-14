@@ -155,5 +155,47 @@ return [
             ],
         ],
 
+        /*
+         | Dashboards analíticos — acesso individual, uma permissão POR painel
+         | (decisão do usuário 2026-10-09). Ter o módulo de operação do domínio
+         | NÃO dá acesso ao painel: cada dashboard é liberado pessoa a pessoa na
+         | tela de acessos (grupo "Dashboards"). Admin vê tudo via
+         | legacy_admin_bypass.
+         */
+        'dashboard_impressoes' => [
+            'label' => 'Dashboard · Impressões',
+            'description' => 'Painel de volume e custo de impressão.',
+            'group' => 'Dashboards',
+            'abilities' => ['view'],
+        ],
+
+        'dashboard_auditoria_backups' => [
+            'label' => 'Dashboard · Auditoria de Backups',
+            'description' => 'Painel de taxa de sucesso, falhas e volume de backups.',
+            'group' => 'Dashboards',
+            'abilities' => ['view'],
+        ],
+
+        'dashboard_telefonia' => [
+            'label' => 'Dashboard · Telefonia',
+            'description' => 'Painel de custo mensal e inventário de telefonia.',
+            'group' => 'Dashboards',
+            'abilities' => ['view'],
+        ],
+
+        'dashboard_servicedesk' => [
+            'label' => 'Dashboard · ServiceDesk',
+            'description' => 'Painel analítico do Service Desk (chamados, e-mails, AD, Office).',
+            'group' => 'Dashboards',
+            'abilities' => ['view'],
+        ],
+
+        'dashboard_sd_apresentacao' => [
+            'label' => 'Dashboard · Service Desk (Apresentação)',
+            'description' => 'Apresentação por período do Service Desk, ao vivo.',
+            'group' => 'Dashboards',
+            'abilities' => ['view'],
+        ],
+
     ],
 ];

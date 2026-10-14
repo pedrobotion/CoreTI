@@ -6,6 +6,7 @@
                 <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Impressoras</h1>
                 <p class="mt-1 text-sm text-slate-500">Parque monitorado pelo portal da Simpress. Consulta apenas — o cadastro é de lá.</p>
             </div>
+            <a href="{{ route('impressoras.conciliacao') }}" class="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Conciliação com a Simpress</a>
         </div>
 
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

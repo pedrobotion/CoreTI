@@ -1,0 +1,1002 @@
+{
+    "id": null,
+    "uid": "coreti-visao-geral",
+    "title": "CoreTI — Visão Geral",
+    "description": "Painel único do CoreTI (Backups, ServiceDesk, Telefonia, Impressões). Horários já normalizados para America/Sao_Paulo por coluna.",
+    "tags": [
+        "coreti"
+    ],
+    "timezone": "America/Sao_Paulo",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "30m",
+    "time": {
+        "from": "now/M",
+        "to": "now"
+    },
+    "templating": {
+        "list": [
+            {
+                "name": "ds",
+                "label": "Banco CoreTI",
+                "type": "datasource",
+                "query": "mysql",
+                "hide": 0,
+                "current": [],
+                "refresh": 1
+            },
+            {
+                "name": "preco_pb",
+                "label": "Preço por página P&B (R$)",
+                "type": "textbox",
+                "query": "0.0316",
+                "current": {
+                    "text": "0.0316",
+                    "value": "0.0316"
+                },
+                "hide": 0
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 1,
+            "type": "row",
+            "title": "🗄️  Backups",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Taxa de sucesso",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 1
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "decimals": 1,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 90
+                            },
+                            {
+                                "color": "green",
+                                "value": 99
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "value",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT 100 * SUM(sucesso = 1) / COUNT(*) AS valor FROM cmdb_database_backups WHERE $__timeFilter(data_backup - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "Falhas",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 1
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "value",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT SUM(sucesso = 0) AS valor FROM cmdb_database_backups WHERE $__timeFilter(data_backup - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "stat",
+            "title": "Execuções",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 1
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM cmdb_database_backups WHERE $__timeFilter(data_backup - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "stat",
+            "title": "Volume",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 1
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "decgbytes",
+                    "decimals": 1
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT ROUND(SUM(tamanho), 1) AS valor FROM cmdb_database_backups WHERE $__timeFilter(data_backup - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Execuções × falhas por dia",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 5
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 60,
+                        "stacking": {
+                            "mode": "normal"
+                        }
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Falhas"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "red"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Execuções"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "fixed",
+                                    "fixedColor": "green"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(data_backup - INTERVAL 3 HOUR) + INTERVAL 3 HOUR AS `time`, COUNT(*) AS 'Execuções', SUM(sucesso = 0) AS 'Falhas' FROM cmdb_database_backups WHERE $__timeFilter(data_backup - INTERVAL 3 HOUR) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "type": "row",
+            "title": "🎫  ServiceDesk",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 13
+            }
+        },
+        {
+            "id": 11,
+            "type": "stat",
+            "title": "Chamados abertos",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 14
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM jiras WHERE data_hora_resolucao IS NULL AND (squad IS NULL OR squad <> 'Time Cerrado')"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "type": "stat",
+            "title": "Aguardando solicitante",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 14
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM jiras WHERE data_hora_resolucao IS NULL AND (squad IS NULL OR squad <> 'Time Cerrado') AND (status LIKE '%Aguardando%' OR currentstatus_status LIKE '%Aguardando%')"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "type": "stat",
+            "title": "SLA em atenção",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 14
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "value",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM jiras WHERE data_hora_resolucao IS NULL AND (squad IS NULL OR squad <> 'Time Cerrado') AND (tempo_sla_final_remainingTime <= 0 OR sla_remainingTime <= 0)"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "type": "stat",
+            "title": "Resolvidos no período",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 14
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM jiras WHERE (squad IS NULL OR squad <> 'Time Cerrado') AND $__timeFilter(data_hora_resolucao)"
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "type": "timeseries",
+            "title": "Criados × resolvidos por dia",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 18
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 60
+                    }
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(data_hora_criacao) + INTERVAL 3 HOUR AS `time`, COUNT(*) AS 'Criados' FROM jiras WHERE (squad IS NULL OR squad <> 'Time Cerrado') AND $__timeFilter(data_hora_criacao) GROUP BY 1 ORDER BY 1"
+                },
+                {
+                    "refId": "B",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(data_hora_resolucao) + INTERVAL 3 HOUR AS `time`, COUNT(*) AS 'Resolvidos' FROM jiras WHERE (squad IS NULL OR squad <> 'Time Cerrado') AND $__timeFilter(data_hora_resolucao) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "type": "table",
+            "title": "Abertos por status",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 26
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COALESCE(NULLIF(status, ''), '—') AS 'Status', COUNT(*) AS 'Qtd' FROM jiras WHERE data_hora_resolucao IS NULL AND (squad IS NULL OR squad <> 'Time Cerrado') GROUP BY 1 ORDER BY 2 DESC"
+                }
+            ]
+        },
+        {
+            "id": 17,
+            "type": "table",
+            "title": "Top catálogo (criados no período)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 26
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COALESCE(NULLIF(catalogo, ''), '—') AS 'Catálogo', COUNT(*) AS 'Qtd' FROM jiras WHERE (squad IS NULL OR squad <> 'Time Cerrado') AND $__timeFilter(data_hora_criacao) GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "type": "row",
+            "title": "📱  Telefonia (foto atual)",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 34
+            }
+        },
+        {
+            "id": 21,
+            "type": "stat",
+            "title": "Custo mensal",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 35
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "currencyBRL",
+                    "decimals": 2
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT SUM(valor_mensal) AS valor FROM corp_lines WHERE status <> 'Cancelada'"
+                }
+            ]
+        },
+        {
+            "id": 22,
+            "type": "stat",
+            "title": "Linhas em uso",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 35
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM corp_lines WHERE status = 'Em Uso'"
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "type": "stat",
+            "title": "Aparelhos",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 35
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM corp_devices"
+                }
+            ]
+        },
+        {
+            "id": 24,
+            "type": "stat",
+            "title": "Vínculos ativos",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 35
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM asset_assignments WHERE ativo = 1"
+                }
+            ]
+        },
+        {
+            "id": 25,
+            "type": "barchart",
+            "title": "Custo por operadora",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 10,
+                "x": 0,
+                "y": 39
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "currencyBRL"
+                },
+                "overrides": []
+            },
+            "options": {
+                "orientation": "horizontal",
+                "xField": "Operadora"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COALESCE(NULLIF(operadora, ''), 'Sem operadora') AS 'Operadora', SUM(valor_mensal) AS 'Custo' FROM corp_lines WHERE status <> 'Cancelada' GROUP BY 1 ORDER BY 2 DESC"
+                }
+            ]
+        },
+        {
+            "id": 26,
+            "type": "table",
+            "title": "Custo por unidade (vínculo ativo mais recente)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 14,
+                "x": 10,
+                "y": 39
+            },
+            "fieldConfig": {
+                "defaults": [],
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Custo"
+                        },
+                        "properties": [
+                            {
+                                "id": "unit",
+                                "value": "currencyBRL"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COALESCE(ou.name, 'Sem unidade informada') AS 'Unidade', COUNT(*) AS 'Linhas', ROUND(SUM(cl.valor_mensal), 2) AS 'Custo' FROM corp_lines cl JOIN (SELECT ai.corp_line_id, MAX(aa.id) AS assignment_id FROM asset_assignment_items ai JOIN asset_assignments aa ON aa.id = ai.asset_assignment_id AND aa.ativo = 1 WHERE ai.corp_line_id IS NOT NULL GROUP BY ai.corp_line_id) v ON v.corp_line_id = cl.id JOIN asset_assignments aa ON aa.id = v.assignment_id JOIN hr_collaborators hc ON hc.id = aa.hr_collaborator_id LEFT JOIN organization_units ou ON ou.source_id = hc.unit_source_id WHERE cl.status <> 'Cancelada' GROUP BY ou.name ORDER BY 3 DESC LIMIT 15"
+                }
+            ]
+        },
+        {
+            "id": 30,
+            "type": "row",
+            "title": "🖨️  Impressões",
+            "gridPos": {
+                "h": 1,
+                "w": 24,
+                "x": 0,
+                "y": 47
+            }
+        },
+        {
+            "id": 31,
+            "type": "timeseries",
+            "title": "Volume diário (servidores de impressão)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 52
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 70
+                    }
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(impresso_em - INTERVAL 3 HOUR) + INTERVAL 3 HOUR AS `time`, SUM(paginas) AS 'Páginas' FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        },
+        {
+            "id": 37,
+            "type": "timeseries",
+            "title": "Custo diário estimado (servidores de impressão)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 52
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "currencyBRL",
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 70
+                    }
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(impresso_em - INTERVAL 3 HOUR) + INTERVAL 3 HOUR AS `time`, ROUND(SUM(paginas) * ${preco_pb}, 2) AS 'Custo' FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        },
+        {
+            "id": 32,
+            "type": "stat",
+            "title": "Impressões no mês (páginas)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 12,
+                "x": 0,
+                "y": 48
+            },
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": true,
+                    "limit": 1,
+                    "fields": ""
+                },
+                "textMode": "value",
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT REPLACE(FORMAT(SUM(paginas),0),',','.') AS valor FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 36,
+            "type": "stat",
+            "title": "Custo estimado no mês",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 12,
+                "x": 12,
+                "y": 48
+            },
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": true,
+                    "limit": 1,
+                    "fields": ""
+                },
+                "textMode": "value",
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT('R$ ', REPLACE(REPLACE(REPLACE(FORMAT(ROUND(SUM(paginas)*${preco_pb},2),2),',','|'),'.',','),'|','.')) AS valor FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR)"
+                }
+            ]
+        }
+    ]
+}

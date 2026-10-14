@@ -7,7 +7,7 @@
             <p class="mt-2 text-sm text-slate-600">Equipamentos liberados para entrega (Sede em Pronto para entrega e Unidade com Nota Fiscal Emitida).</p>
         </div>
         <section class="rounded-lg border border-slate-200 bg-white p-5">
-            <form method="GET" class="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+            <form method="GET" class="bancada-filtros flex flex-wrap items-center gap-2 lg:flex-nowrap">
                 <input name="q" value="{{ $search ?? '' }}" placeholder="Buscar plaqueta, tipo, unidade, TIC..." class="h-10 w-full min-w-[240px] rounded-md border-slate-300 text-sm md:flex-1 md:w-auto">
                 <input name="tipo" value="{{ $tipo ?? '' }}" placeholder="Tipo" class="h-10 w-full min-w-[120px] rounded-md border-slate-300 text-sm md:w-32">
                 <input name="unidade" value="{{ $unidade ?? '' }}" placeholder="Unidade/Setor" class="h-10 w-full min-w-[170px] rounded-md border-slate-300 text-sm md:w-48">

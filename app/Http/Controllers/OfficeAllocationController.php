@@ -30,7 +30,7 @@ class OfficeAllocationController extends Controller
 
         $competence = (string) ($filters['competence'] ?? now()->format('Y-m'));
         $batch = $this->allocationService->latestOrGenerateCandidate($competence);
-        $summaryRows = $batch ? $this->allocationService->destinationSummary($batch) : collect();
+        $consolidado = $batch ? $this->allocationService->consolidado($batch) : collect();
         $skuSummary = $batch ? $this->allocationService->skuSummary($batch) : collect();
         $unitSummary = $batch ? $this->allocationService->unitSummary($batch) : collect();
         $departmentSummary = $batch ? $this->allocationService->departmentSummary($batch) : collect();
@@ -57,6 +57,12 @@ class OfficeAllocationController extends Controller
                 ->orderBy('user_name')
                 ->limit(200)
                 ->get();
+
+            // Nome atual do centro de custo (catálogo /centros-custo) pelo
+            // código, para o detalhamento não exibir o nome antigo obsoleto.
+            $detailRows->each(function ($row): void {
+                $row->catalog_cost_center_name = $this->allocationService->nomeCatalogoPorCodigo($row->cost_center_code_snapshot);
+            });
         }
 
         // Os custos são informados por categoria canônica, não por cada
@@ -66,7 +72,7 @@ class OfficeAllocationController extends Controller
         return view('service-desk.licensing.office-rateio', [
             'batch' => $batch,
             'competence' => $competence,
-            'summaryRows' => $summaryRows,
+            'consolidado' => $consolidado,
             'skuSummary' => $skuSummary,
             'unitSummary' => $unitSummary,
             'departmentSummary' => $departmentSummary,

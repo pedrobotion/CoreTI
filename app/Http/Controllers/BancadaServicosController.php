@@ -375,6 +375,21 @@ class BancadaServicosController extends Controller
         $route->save();
         return back()->with('success', $route->ativo ? 'Rota ativada.' : 'Rota desativada.');
     }
+    public function destroyRouteConfig(BancadaMaloteRoute $route)
+    {
+        // Só exclui rota inativa: uma rota ativa ainda roteia entregas e pode
+        // estar vinculada a equipamentos a caminho. Desativar primeiro é a
+        // trava para não apagar uma rota em uso por engano.
+        if ((bool) $route->ativo) {
+            return back()->with('error', 'Só é possível excluir rotas inativas. Desative a rota antes de excluir.');
+        }
+
+        // As unidades da rota caem em cascata e o vínculo em bancada_equipments
+        // vira NULL (ver as FKs: cascadeOnDelete/nullOnDelete nas migrations).
+        $route->delete();
+
+        return back()->with('success', 'Rota excluída.');
+    }
     public function markSentToCd(BancadaEquipment $equipment)
     {
         $status = $this->statusFlow->normalizeStatus($equipment->status) ?? $equipment->status;
@@ -509,6 +524,7 @@ class BancadaServicosController extends Controller
         if ($selectedUnit !== '' && $allowed->isNotEmpty() && ! $allowed->contains($selectedUnit)) {
             abort(422, 'Unidade/Setor inválido para a origem selecionada.');
         }
+        $data['cost_center_code'] = $this->resolveCostCenterCode($data['unidade_setor'] ?? null, $data['origem_tipo'] ?? null);
         $before = [
             'tipo_equipamento' => (string) $equipment->tipo_equipamento,
             'plaqueta' => (string) $equipment->plaqueta,
@@ -615,6 +631,14 @@ class BancadaServicosController extends Controller
                         'created_at' => now(),
                             'updated_at' => now(),
                     ]);
+                    // Liga o consumo ao estoque interno: se houver um produto por
+                    // quantidade com o mesmo nome e saldo, já registra a baixa.
+                    app(\App\Services\Estoque\InternalStockService::class)->registrarConsumoBancada(
+                        (string) $pecaNome,
+                        (int) $pecaQuantidade,
+                        'bancada#'.$equipment->id,
+                        auth()->id(),
+                    );
                     $this->recordEquipmentEvent(
                         equipment: $equipment,
                         action: 'peca_estoque_interno_utilizada',
@@ -1493,6 +1517,13 @@ class BancadaServicosController extends Controller
                     });
             });
         }
+        // Contagem por status (respeita os filtros atuais) para os cartões-resumo.
+        $statusCounts = (clone $query)
+            ->selectRaw('TRIM(status) AS status_label, COUNT(*) AS total')
+            ->groupByRaw('TRIM(status)')
+            ->orderByRaw('COUNT(*) DESC')
+            ->pluck('total', 'status_label');
+
         $assets = $query
             ->when($sortOrder === 'oldest',
                 fn ($q) => $q->orderBy('data_chegada', 'asc'),
@@ -1506,6 +1537,7 @@ class BancadaServicosController extends Controller
         }
         return view('bancada-servicos.assets-list', [
             'assets' => $assets,
+            'statusCounts' => $statusCounts,
             'jiraTicketBaseUrl' => $this->jiraBancadaTicketBaseUrl(),
             'search' => $search,
             'plaqueta' => $plaqueta,
@@ -1726,6 +1758,7 @@ class BancadaServicosController extends Controller
         if ($selectedUnit !== '' && $allowed->isNotEmpty() && ! $allowed->contains($selectedUnit)) {
             abort(422, 'Unidade/Setor inválido para a origem selecionada.');
         }
+        $data['cost_center_code'] = $this->resolveCostCenterCode($unitName, $origin);
         if (($data['status'] ?? '') === BancadaStatusFlowService::STATUS_AGUARDANDO_PECA) {
             $request->validate([
                 'peca_nome' => ['required', 'string', 'max:255'],
@@ -1828,35 +1861,57 @@ class BancadaServicosController extends Controller
         );
         return $attachment->storage_path;
     }
+    /**
+     * Unidades da bancada vindas do MESMO catálogo do ServiceDesk
+     * (coreti_cost_centers). O código 01.xxx é a sede (departamentos da
+     * matriz); os demais unicoops são "unidade". Exibimos só o nome.
+     *
+     * @return array{unidade: \Illuminate\Support\Collection<int, string>, sede: \Illuminate\Support\Collection<int, string>}
+     */
     private function equipmentUnitOptionsByOrigin(): array
     {
-        $organization = app(\App\Services\OrganizationLookupService::class);
+        $centros = \App\Models\CoretiCostCenter::query()
+            ->active()
+            ->orderBy('name')
+            ->get(['code', 'name']);
 
-        $units = $organization->unitOptions()
+        $nomes = fn ($colecao) => $colecao
             ->pluck('name')
-            ->filter(fn ($name) => trim((string) $name) !== '')
+            ->map(fn ($nome) => trim((string) $nome))
+            ->filter(fn ($nome) => $nome !== '')
             ->unique()
+            ->sort()
             ->values();
 
-        $departments = $organization->departmentOptions()
-            ->pluck('name')
-            ->filter(fn ($name) => trim((string) $name) !== '')
-            ->unique()
-            ->values();
-
-        // Este departamento existe no catalogo operacional legado como uma
-        // opcao valida de rateio (01.175), embora nao esteja no snapshot de
-        // departamentos ativos usado pelo seletor principal.
-        if ($organization->findCostCenterByName('Ambulatório/Medicina') !== null
-            && ! $departments->contains('Ambulatório/Medicina')) {
-            $departments->push('Ambulatório/Medicina');
-        }
-        $departments = $departments->sort()->values();
+        $ehSede = fn ($c) => str_starts_with(trim((string) $c->code), '01.');
 
         return [
-            'unidade' => $units,
-            'sede' => $departments,
+            'unidade' => $nomes($centros->reject($ehSede)),
+            'sede' => $nomes($centros->filter($ehSede)),
         ];
+    }
+
+    /**
+     * Código do centro de custo da unidade escolhida (para gravar, sem exibir).
+     * Resolve pelo nome dentro da origem (sede = 01.xxx; unidade = demais).
+     */
+    private function resolveCostCenterCode(?string $nome, ?string $origem): ?string
+    {
+        $nome = trim((string) $nome);
+
+        if ($nome === '') {
+            return null;
+        }
+
+        $query = \App\Models\CoretiCostCenter::query()
+            ->active()
+            ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($nome)]);
+
+        $origem === 'sede'
+            ? $query->where('code', 'like', '01.%')
+            : $query->where('code', 'not like', '01.%');
+
+        return $query->orderBy('code')->value('code');
     }
 
     private function maloteUnitOptions()

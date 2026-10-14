@@ -1182,3 +1182,28 @@ html.dark .filter-control:focus {
         flex: 1 1 100%;
     }
 }
+
+/* ----------------------------------------------------------------------
+ | Responsividade mobile — passo global
+ | overflow-x: clip impede a página de rolar de lado por causa de uma
+ | tabela larga, SEM criar scroll-container (position: sticky segue ok).
+ | As tabelas continuam rolando dentro do próprio wrapper .overflow-x-auto.
+ ---------------------------------------------------------------------- */
+@media (max-width: 767px) {
+    .content-shell {
+        overflow-x: clip;
+    }
+
+    /* Barra de filtros da Bancada: empilha e ocupa a largura toda. */
+    .bancada-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .bancada-filtros > *,
+    .bancada-filtros input,
+    .bancada-filtros select {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}

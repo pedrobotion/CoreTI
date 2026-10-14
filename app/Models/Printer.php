@@ -45,7 +45,7 @@ class Printer extends Model
     protected $fillable = [
         'insight_device_id', 'insight_customer_id', 'scope', 'organization_unit_id',
         'serial_number', 'asset_number', 'sticker_number',
-        'manufacturer', 'model', 'sku', 'mib_description', 'firmware',
+        'manufacturer', 'model', 'sku', 'rental_value', 'rental_value_updated_at', 'mib_description', 'firmware',
         'ip_address', 'mac_address', 'hostname',
         'monitor_status', 'monitor_name',
         'insight_location', 'insight_zone', 'insight_zone_id',
@@ -60,6 +60,8 @@ class Printer extends Model
             'last_contact' => 'datetime',
             'registered' => 'datetime',
             'last_synced_at' => 'datetime',
+            'rental_value' => 'decimal:2',
+            'rental_value_updated_at' => 'datetime',
             'raw_data' => 'array',
         ];
     }

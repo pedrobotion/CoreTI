@@ -66,12 +66,25 @@ class CostCenterCodeFormatTest extends TestCase
     {
         CoretiCostCenter::create(['code' => '01.226', 'name' => 'Ouvidoria', 'active' => true]);
 
-        // "1.226" é o mesmo centro de custo: não pode virar um segundo registro.
+        // "1.226" normaliza para "01.226"; mesmo código + mesmo nome é duplicado.
         $this->actingAs($this->gestor())
-            ->post(route('administrativo.cost-centers.store'), ['code' => '1.226', 'name' => 'Ouvidoria Nova'])
-            ->assertSessionHasErrors('code');
+            ->post(route('administrativo.cost-centers.store'), ['code' => '1.226', 'name' => 'Ouvidoria'])
+            ->assertSessionHasErrors('name');
 
-        $this->assertDatabaseCount('coreti_cost_centers', 1);
+        $this->assertSame(1, CoretiCostCenter::where('code', '01.226')->count());
+    }
+
+    public function test_permite_varias_unidades_com_o_mesmo_codigo(): void
+    {
+        // As lojas Colari compartilham o código 01.316 — todas precisam entrar.
+        $gestor = $this->gestor();
+        foreach (['Colari Loja 1', 'Colari Loja 2', 'Colari Loja 3'] as $nome) {
+            $this->actingAs($gestor)
+                ->post(route('administrativo.cost-centers.store'), ['code' => '01.316', 'name' => $nome])
+                ->assertSessionHasNoErrors();
+        }
+
+        $this->assertSame(3, CoretiCostCenter::where('code', '01.316')->count());
     }
 
     public function test_aceita_cnpj_como_codigo(): void
@@ -119,6 +132,29 @@ class CostCenterCodeFormatTest extends TestCase
             ->assertSessionHasErrors('code');
 
         $this->assertDatabaseCount('coreti_cost_centers', 0);
+    }
+
+    public function test_recadastra_par_codigo_nome_que_foi_excluido(): void
+    {
+        /*
+         | Soft delete não libera o índice único do banco. Recadastrar o mesmo
+         | par (código + nome) que foi removido reaproveita a linha em vez de
+         | estourar 500 no INSERT.
+         */
+        $center = CoretiCostCenter::create(['code' => '01.291', 'name' => 'Segurança do Trabalho', 'active' => true]);
+        $center->delete();
+
+        $this->actingAs($this->gestor())
+            ->post(route('administrativo.cost-centers.store'), ['code' => '01.291', 'name' => 'Segurança do Trabalho'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('coreti_cost_centers', [
+            'id' => $center->id,
+            'code' => '01.291',
+            'name' => 'Segurança do Trabalho',
+            'deleted_at' => null,
+        ]);
+        $this->assertSame(1, CoretiCostCenter::withTrashed()->where('code', '01.291')->where('name', 'Segurança do Trabalho')->count());
     }
 
     public function test_edicao_tambem_recusa_codigo_invalido(): void

@@ -7,6 +7,7 @@ use App\Models\Printer;
 use App\Models\PrinterConsumableRequest;
 use App\Models\PrinterMeter;
 use App\Models\PrinterSupply;
+use App\Support\Impressao\ClassificadorCerrado;
 use App\Support\ScopeRegistry;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -101,7 +102,7 @@ class PrinterSyncService
         }
 
         $estendidos = (array) ($device['extendedFields'] ?? []);
-        $unidadeId = $this->resolverUnidade($estendidos);
+        $unidadeId = $this->resolverUnidade($device, $estendidos);
 
         $atributos = [
             'insight_customer_id' => $customerId,
@@ -285,11 +286,14 @@ class PrinterSyncService
      * Casa a localização do portal com uma unidade da intranet.
      *
      * Comparação sem acento e sem caixa, como na importação do gestaoTI. Sem
-     * correspondência devolve null — pendência é melhor que palpite.
+     * correspondência no texto, tenta os sinais do Cerrado (sigla no hostname /
+     * sub-rede) — ver ClassificadorCerrado e config/insight.php. Sem nada,
+     * devolve null: pendência é melhor que palpite.
      *
+     * @param  array<string, mixed>  $device
      * @param  array<string, mixed>  $estendidos
      */
-    private function resolverUnidade(array $estendidos): ?int
+    private function resolverUnidade(array $device, array $estendidos): ?int
     {
         foreach ([$estendidos['location'] ?? null, $estendidos['zone'] ?? null] as $candidato) {
             $chave = $this->normalizar((string) $candidato);
@@ -297,6 +301,18 @@ class PrinterSyncService
             if ($chave !== '' && isset($this->unidades()[$chave])) {
                 return $this->unidades()[$chave];
             }
+        }
+
+        // Fallback: unidade do Cerrado pela sigla do hostname ou pela sub-rede.
+        $fonte = ClassificadorCerrado::fonte(
+            $estendidos['hostName'] ?? null,
+            $device['ipAddress'] ?? null,
+        );
+
+        if ($fonte !== null) {
+            $id = OrganizationUnit::query()->where('source_id', (string) $fonte['source_id'])->value('id');
+
+            return $id !== null ? (int) $id : null;
         }
 
         return null;

@@ -1,0 +1,783 @@
+{
+    "id": null,
+    "uid": "acomp-impressoras",
+    "title": "Indicadores de Infraestrutura - Impressões 02",
+    "tags": [
+        "coreti",
+        "impressoras",
+        "tv"
+    ],
+    "timezone": "America/Sao_Paulo",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "30s",
+    "editable": true,
+    "graphTooltip": 0,
+    "time": {
+        "from": "now/M",
+        "to": "now"
+    },
+    "templating": {
+        "list": []
+    },
+    "annotations": {
+        "list": []
+    },
+    "panels": [
+        {
+            "id": 2,
+            "type": "text",
+            "gridPos": {
+                "h": 3,
+                "w": 6,
+                "x": 0,
+                "y": 0
+            },
+            "options": {
+                "mode": "html",
+                "content": "<div style=\"width:100%;height:100%;display:flex;align-items:center;justify-content:center;\">\n  <img src=\"data:image/png;base64,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\" style=\"max-width:90%;max-height:85%;object-fit:contain;filter:grayscale(100%) brightness(0) invert(1);\" />\n</div>"
+            },
+            "transparent": true,
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 22,
+            "type": "text",
+            "gridPos": {
+                "h": 3,
+                "w": 13,
+                "x": 6,
+                "y": 0
+            },
+            "options": {
+                "mode": "html",
+                "content": "<font size=7 color=\"#ffff00\"><center><B>ACOMPANHAMENTO IMPRESSÕES</B></center></font>"
+            },
+            "transparent": true,
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 23,
+            "type": "grafana-clock-panel",
+            "gridPos": {
+                "h": 3,
+                "w": 5,
+                "x": 19,
+                "y": 0
+            },
+            "transparent": true,
+            "options": {
+                "mode": "time",
+                "clockType": "24 hour",
+                "refresh": "sec",
+                "timezone": "America/Sao_Paulo",
+                "dateSettings": {
+                    "showDate": true,
+                    "dateFormat": "YYYY-MM-DD",
+                    "fontSize": "20px",
+                    "fontWeight": "normal"
+                },
+                "timeSettings": {
+                    "fontSize": "38px",
+                    "fontWeight": "bold"
+                },
+                "timezoneSettings": {
+                    "showTimezone": false,
+                    "fontSize": "12px",
+                    "fontWeight": "normal",
+                    "zoneFormat": "offsetAbbv"
+                },
+                "bgColor": ""
+            },
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 101,
+            "type": "stat",
+            "title": "Impressões no mês (páginas)",
+            "gridPos": {
+                "h": 3,
+                "w": 4,
+                "x": 0,
+                "y": 3
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "yellow"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT FORMAT(COALESCE(SUM(paginas),0),0,'de_DE') AS valor FROM print_jobs WHERE MONTH(impresso_em - INTERVAL 3 HOUR)=MONTH(NOW()) AND YEAR(impresso_em - INTERVAL 3 HOUR)=YEAR(NOW())"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 102,
+            "type": "stat",
+            "title": "Custo total no mês",
+            "gridPos": {
+                "h": 3,
+                "w": 4,
+                "x": 12,
+                "y": 3
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT('R$ ', FORMAT((SELECT COALESCE(SUM(GREATEST(dm,0))*0.0316+SUM(GREATEST(dc,0))*0.3165,0) FROM (SELECT MAX(mono_pages)-MIN(mono_pages) AS dm, MAX(colour_pages)-MIN(colour_pages) AS dc FROM printer_meters WHERE MONTH(billing_date)=MONTH(NOW()) AND YEAR(billing_date)=YEAR(NOW()) GROUP BY printer_id) x) + (SELECT COALESCE(SUM(rental_value),0) FROM printers),2,'de_DE')) AS valor"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 103,
+            "type": "stat",
+            "title": "Valor impressão (mês)",
+            "gridPos": {
+                "h": 3,
+                "w": 4,
+                "x": 4,
+                "y": 3
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "super-light-blue"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT('R$ ', FORMAT(COALESCE(SUM(GREATEST(dm,0))*0.0316+SUM(GREATEST(dc,0))*0.3165,0),2,'de_DE')) AS valor FROM (SELECT MAX(mono_pages)-MIN(mono_pages) AS dm, MAX(colour_pages)-MIN(colour_pages) AS dc FROM printer_meters WHERE MONTH(billing_date)=MONTH(NOW()) AND YEAR(billing_date)=YEAR(NOW()) GROUP BY printer_id) x"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 104,
+            "type": "stat",
+            "title": "Valor locação (mês)",
+            "gridPos": {
+                "h": 3,
+                "w": 4,
+                "x": 8,
+                "y": 3
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "orange"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT('R$ ', FORMAT(COALESCE(SUM(rental_value),0),2,'de_DE')) AS valor FROM printers"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 105,
+            "type": "stat",
+            "title": "Cobertura locação",
+            "gridPos": {
+                "h": 3,
+                "w": 4,
+                "x": 20,
+                "y": 3
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "purple"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT(COUNT(rental_value),' / ',COUNT(*)) AS valor FROM printers"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 106,
+            "type": "stat",
+            "title": "Impressoras no parque",
+            "gridPos": {
+                "h": 3,
+                "w": 4,
+                "x": 16,
+                "y": 3
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "blue"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM printers"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 107,
+            "type": "stat",
+            "title": "Com contato (24h)",
+            "gridPos": {
+                "h": 3,
+                "w": 6,
+                "x": 0,
+                "y": 6
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT SUM(last_contact >= NOW() - INTERVAL 24 HOUR) AS valor FROM printers"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 108,
+            "type": "stat",
+            "title": "Sem contato > 24h",
+            "gridPos": {
+                "h": 3,
+                "w": 6,
+                "x": 6,
+                "y": 6
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT SUM(last_contact < NOW() - INTERVAL 24 HOUR OR last_contact IS NULL) AS valor FROM printers"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 109,
+            "type": "stat",
+            "title": "Suprimentos críticos (≤10%)",
+            "gridPos": {
+                "h": 3,
+                "w": 6,
+                "x": 12,
+                "y": 6
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM printer_supplies WHERE percent_left <= 10"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 110,
+            "type": "stat",
+            "title": "Pedidos de toner",
+            "gridPos": {
+                "h": 3,
+                "w": 6,
+                "x": 18,
+                "y": 6
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "super-light-blue"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": ""
+                },
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM printer_consumable_requests"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 122,
+            "type": "barchart",
+            "title": "Top impressoras (mês)",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 17
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "orientation": "horizontal",
+                "xField": "Impressora"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT impressora AS 'Impressora', SUM(paginas) AS 'Páginas' FROM print_jobs WHERE MONTH(impresso_em - INTERVAL 3 HOUR)=MONTH(NOW()) AND YEAR(impresso_em - INTERVAL 3 HOUR)=YEAR(NOW()) GROUP BY impressora ORDER BY 2 DESC LIMIT 12"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 123,
+            "type": "barchart",
+            "title": "Volume por dia (mês)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 9
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "green"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "orientation": "vertical",
+                "xField": "Dia"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE_FORMAT(impresso_em - INTERVAL 3 HOUR,'%d/%m') AS 'Dia', SUM(paginas) AS 'Páginas' FROM print_jobs WHERE MONTH(impresso_em - INTERVAL 3 HOUR)=MONTH(NOW()) AND YEAR(impresso_em - INTERVAL 3 HOUR)=YEAR(NOW()) GROUP BY 1 ORDER BY 1"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 124,
+            "type": "barchart",
+            "title": "Custo por dia (mês)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 9
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "currencyBRL",
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "blue"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "orientation": "vertical",
+                "xField": "Dia"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE_FORMAT(impresso_em - INTERVAL 3 HOUR,'%d/%m') AS 'Dia', ROUND(SUM(paginas)*0.0316,2) AS 'Custo' FROM print_jobs WHERE MONTH(impresso_em - INTERVAL 3 HOUR)=MONTH(NOW()) AND YEAR(impresso_em - INTERVAL 3 HOUR)=YEAR(NOW()) GROUP BY 1 ORDER BY 1"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 125,
+            "type": "barchart",
+            "title": "Impressoras por zona",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 8,
+                "y": 17
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "orientation": "horizontal",
+                "xField": "Zona"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COALESCE(NULLIF(insight_zone,''),'—') AS 'Zona', COUNT(*) AS 'Qtd' FROM printers GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        },
+        {
+            "id": 126,
+            "type": "barchart",
+            "title": "Impressoras por modelo",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 16,
+                "y": 17
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "options": {
+                "orientation": "horizontal",
+                "xField": "Modelo"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COALESCE(NULLIF(model,''),'—') AS 'Modelo', COUNT(*) AS 'Qtd' FROM printers GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
+                }
+            ],
+            "datasource": {
+                "type": "mysql",
+                "uid": "8TO3O9PVz"
+            }
+        }
+    ]
+}

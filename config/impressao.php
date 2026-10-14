@@ -54,4 +54,20 @@ return [
         'trim',
         explode(',', (string) env('IMPRESSAO_SERVIDORES', 'IMP01,IMP02,IMP03'))
     ))),
+
+    /*
+     | Drivers de fila que NÃO entram na conciliação com a Simpress.
+     |
+     | Impressora térmica de cupom (Bematech) e de etiqueta (Zebra) não são do
+     | contrato da Simpress e não falam o SNMP de impressora — apareciam
+     | eternamente como "sem resposta", virando ruído no painel. A filtragem é
+     | por DRIVER, não pelo nome da fila: o driver é o que identifica o
+     | equipamento de verdade (o nome TERM/BAL é convenção e escapa casos).
+     |
+     | Comparação por trecho, sem diferenciar maiúsculas.
+     */
+    'drivers_fora_da_conciliacao' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('IMPRESSAO_DRIVERS_IGNORADOS', 'bematech,mp-4200,zdesigner,zpl,tsc,elgin,epson tm,daruma'))
+    ))),
 ];

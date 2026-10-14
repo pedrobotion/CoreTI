@@ -1,0 +1,398 @@
+{
+    "id": null,
+    "uid": "coreti-impressoras-tv",
+    "title": "CoreTI — Impressoras (TV)",
+    "description": "Tela compacta para TV (Full HD, sem rolagem): KPIs do mês + volume e custo diário de impressão.",
+    "tags": [
+        "coreti",
+        "impressoras",
+        "tv"
+    ],
+    "timezone": "America/Sao_Paulo",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "5m",
+    "time": {
+        "from": "now/M",
+        "to": "now"
+    },
+    "templating": {
+        "list": [
+            {
+                "name": "ds",
+                "label": "Banco CoreTI",
+                "type": "datasource",
+                "query": "mysql",
+                "hide": 0,
+                "current": [],
+                "refresh": 1
+            },
+            {
+                "name": "preco_pb",
+                "label": "Preço P&B",
+                "type": "textbox",
+                "query": "0.0316",
+                "current": {
+                    "text": "0.0316",
+                    "value": "0.0316"
+                },
+                "hide": 2
+            },
+            {
+                "name": "preco_color",
+                "label": "Preço Color",
+                "type": "textbox",
+                "query": "0.3165",
+                "current": {
+                    "text": "0.3165",
+                    "value": "0.3165"
+                },
+                "hide": 2
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 32,
+            "type": "stat",
+            "title": "Impressões no mês (páginas)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 0,
+                "y": 0
+            },
+            "fieldConfig": {
+                "defaults": [],
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT FORMAT(COALESCE(SUM(paginas),0),0,'de_DE') AS valor FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 36,
+            "type": "stat",
+            "title": "Custo estimado no mês",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 8,
+                "y": 0
+            },
+            "fieldConfig": {
+                "defaults": [],
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT('R$ ', FORMAT(COALESCE(SUM(paginas),0)*${preco_pb},2,'de_DE')) AS valor FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR)"
+                }
+            ]
+        },
+        {
+            "id": 42,
+            "type": "stat",
+            "title": "Custo frota (mono+cor, mês)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 7,
+                "w": 8,
+                "x": 16,
+                "y": 0
+            },
+            "fieldConfig": {
+                "defaults": [],
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "values": false,
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "/^valor$/"
+                },
+                "textMode": "value",
+                "colorMode": "none",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "wideLayout": true
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT CONCAT('R$ ', FORMAT(SUM(GREATEST(dm,0))*${preco_pb}+SUM(GREATEST(dc,0))*${preco_color},2,'de_DE')) AS valor FROM (SELECT MAX(mono_pages)-MIN(mono_pages) AS dm, MAX(colour_pages)-MIN(colour_pages) AS dc FROM printer_meters WHERE $__timeFilter(billing_date) GROUP BY printer_id) x"
+                }
+            ]
+        },
+        {
+            "id": 40,
+            "type": "stat",
+            "title": "Páginas mono (frota)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 0,
+                "y": 7
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "decimals": 0,
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "text"
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT SUM(GREATEST(dm,0)) AS valor FROM (SELECT MAX(mono_pages)-MIN(mono_pages) AS dm, MAX(colour_pages)-MIN(colour_pages) AS dc FROM printer_meters WHERE $__timeFilter(billing_date) GROUP BY printer_id) x"
+                }
+            ]
+        },
+        {
+            "id": 41,
+            "type": "stat",
+            "title": "Páginas cor (frota)",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 8,
+                "y": 7
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "decimals": 0
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT SUM(GREATEST(dc,0)) AS valor FROM (SELECT MAX(mono_pages)-MIN(mono_pages) AS dm, MAX(colour_pages)-MIN(colour_pages) AS dc FROM printer_meters WHERE $__timeFilter(billing_date) GROUP BY printer_id) x"
+                }
+            ]
+        },
+        {
+            "id": 43,
+            "type": "stat",
+            "title": "Impressoras no parque",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 16,
+                "y": 7
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "decimals": 0
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "colorMode": "none",
+                "graphMode": "none"
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "table",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT COUNT(*) AS valor FROM printers"
+                }
+            ]
+        },
+        {
+            "id": 31,
+            "type": "timeseries",
+            "title": "Volume diário de impressão",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 20,
+                "w": 12,
+                "x": 0,
+                "y": 12
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short",
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 80,
+                        "lineWidth": 1
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "showLegend": false
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(impresso_em - INTERVAL 3 HOUR) + INTERVAL 3 HOUR AS `time`, SUM(paginas) AS 'Páginas' FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        },
+        {
+            "id": 37,
+            "type": "timeseries",
+            "title": "Custo diário estimado",
+            "datasource": {
+                "type": "mysql",
+                "uid": "${ds}"
+            },
+            "gridPos": {
+                "h": 20,
+                "w": 12,
+                "x": 12,
+                "y": 12
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "currencyBRL",
+                    "custom": {
+                        "drawStyle": "bars",
+                        "fillOpacity": 80,
+                        "lineWidth": 1
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "showLegend": false
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "format": "time_series",
+                    "rawQuery": true,
+                    "editorMode": "code",
+                    "rawSql": "SELECT DATE(impresso_em - INTERVAL 3 HOUR) + INTERVAL 3 HOUR AS `time`, ROUND(SUM(paginas)*${preco_pb},2) AS 'Custo' FROM print_jobs WHERE $__timeFilter(impresso_em - INTERVAL 3 HOUR) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        }
+    ]
+}

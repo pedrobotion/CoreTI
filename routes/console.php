@@ -191,6 +191,13 @@ Schedule::command('cmdb:sync-due-connectors --type=vcenter')
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
+// Cobrança diária das pendências administrativas da bancada (Jira + e-mail).
+Schedule::command('bancada:verificar-pendencias')
+    ->weekdays()
+    ->at('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();
+
 Artisan::command('cmdb:vcenter-create-servers {--connector=} {--limit=}', function (CmdbVCenterAssetCreationService $service) {
     $connector = $this->option('connector') !== null ? (int) $this->option('connector') : null;
     $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;
@@ -3407,3 +3414,57 @@ foreach (['00:00', '07:00', '12:30', '19:00'] as $horario) {
         ->onOneServer()
         ->withoutOverlapping();
 }
+
+// Varredura diária de alertas das impressoras (Insight) + e-mail dos críticos/avisos.
+// 06:00: antes do sync das 07:00; a varredura consome ~1 chamada por impressora online.
+Schedule::command('impressoras:alertas')
+    ->dailyAt('06:00')
+    ->timezone('America/Sao_Paulo')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Impressoras — conciliação com a Simpress pelo número de série
+|--------------------------------------------------------------------------
+|
+| Uma vez ao dia basta: IP de impressora não muda de hora em hora, e a leitura
+| SNMP do parque inteiro é a etapa cara (um timeout por equipamento que não
+| responde). Roda de madrugada, quando a rede está ociosa.
+|
+| Só a leitura é agendada. O envio das filas parte dos servidores Windows, no
+| agendador de tarefas deles.
+|
+| Diário, e não pontual, de propósito: um parque de 300 impressoras sempre tem
+| algumas desligadas na hora da consulta. A repetição diária é que separa
+| "offline hoje" de problema real — quem some vários dias seguidos é o que
+| merece atenção.
+*/
+Schedule::command('impressoras:consultar-seriais')
+    ->dailyAt('03:30')
+    ->timezone('America/Sao_Paulo')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Certificados TLS — aviso de renovação
+|--------------------------------------------------------------------------
+|
+| Verifica a validade pela conexão real e, chegando a janela de aviso (5 dias),
+| abre chamado no Jira em nome do CoreTI. O chamado sai uma vez por certificado
+| — o controle é por impressão digital, então a renovação reabre o ciclo.
+|
+| A cada 2 dias, não diário: o chamado precisa de uma verificação periódica
+| para saber que a data chegou, mas não todo dia. O intervalo de 2 é menor que
+| a janela de 5, então sempre cai ao menos uma vez dentro dela — o aviso sai 4
+| a 5 dias antes, nunca depois. Semanal (gap 7 > janela 5) poderia pular a
+| janela e avisar tarde.
+|
+| Cedo de manhã: se for dia de avisar, o chamado já está na fila na chegada.
+*/
+Schedule::command('certificados:verificar')
+    ->cron('0 7 */2 * *')
+    ->timezone('America/Sao_Paulo')
+    ->onOneServer()
+    ->withoutOverlapping();

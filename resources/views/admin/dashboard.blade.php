@@ -33,6 +33,7 @@
                     $granted = $user->moduleAccessMap();
                     $acessoTotal = $user->isMasterAccount() || $user->role === 'admin';
                     $totalConcedidos = collect($granted)->filter()->count();
+                    $userScopes = ($scopeOptions ?? []) !== [] ? $user->scopes->pluck('scope')->all() : [];
                 @endphp
 
                 <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm {{ $user->id === auth()->id() ? 'ring-1 ring-slate-300' : '' }}">
@@ -152,6 +153,33 @@
                                 @method('PATCH')
 
                                 <div class="space-y-5">
+                                    @if(! empty($scopeOptions))
+                                        <div>
+                                            <p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Operação — dados visíveis</p>
+                                            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                                <div class="rounded-lg border bg-white p-3 {{ $userScopes ? 'border-slate-300' : 'border-amber-200' }} sm:col-span-2">
+                                                    <p class="text-sm font-semibold leading-snug text-gray-800">Escopo de dados (Sede × Cerrado)</p>
+                                                    <p class="mt-0.5 text-[11px] leading-snug text-gray-400">Define quais operações o usuário enxerga nos dados (dashboards, telefonia, equipamentos…). Sem marcar nenhum, as telas abrem mas ficam <strong>sem dados</strong>.</p>
+                                                    <div class="mt-2.5 flex flex-wrap gap-x-6 gap-y-1.5 border-t border-gray-100 pt-2.5">
+                                                        @foreach($scopeOptions as $scopeKey => $scopeLabel)
+                                                            <label class="flex cursor-pointer items-start gap-2 text-xs leading-snug text-gray-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="scopes[]"
+                                                                    value="{{ $scopeKey }}"
+                                                                    class="mt-0.5 shrink-0 rounded border-gray-300"
+                                                                    @checked(in_array($scopeKey, $userScopes, true))
+                                                                    @disabled(! $permissionsReady)
+                                                                >
+                                                                <span>{{ $scopeLabel }}</span>
+                                                            </label>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+
                                     @foreach($moduleGroups as $groupName => $modules)
                                         <div>
                                             <p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{{ $groupName }}</p>

@@ -75,16 +75,19 @@ class OfficeAllocationExportService
             ->orderBy('user_name')
             ->orderBy('sku_name')
             ->get() as $row) {
+            // Nome pelo catálogo atual (chave = código); mantém o do snapshot
+            // só quando o código não existe/é ambíguo no catálogo novo.
+            $nomeCatalogo = $this->allocationService->nomeCatalogoPorCodigo($row->cost_center_code_snapshot);
             $sheet->fromArray([
                 $row->employee_number,
                 $row->user_name,
                 $row->user_email,
                 $row->sku_id,
                 $row->sku_name,
-                $row->unit_name_snapshot,
-                $this->allocationService->departmentNameForAllocationRow($row),
+                $nomeCatalogo ?: $row->unit_name_snapshot,
+                $nomeCatalogo ?: $this->allocationService->departmentNameForAllocationRow($row),
                 $row->cost_center_code_snapshot,
-                $row->cost_center_name_snapshot,
+                $nomeCatalogo ?: $row->cost_center_name_snapshot,
                 $row->classification_status,
                 $row->classification_message,
                 (float) $row->unit_price,
@@ -195,51 +198,6 @@ class OfficeAllocationExportService
 
     public function legacyRows(OfficeAllocationBatch $batch)
     {
-        return $this->allocationService->destinationSummary($batch)
-            ->map(function ($row): array {
-                [$unicoop, $area] = $this->costCenterParts((string) $row->cost_center_code);
-
-                return [
-                    'unidade' => $this->legacyDestinationName($row),
-                    'unicoop' => $unicoop,
-                    'area' => $area,
-                    'quantidade' => (int) $row->apps_count
-                        + (int) $row->business_count
-                        + (int) $row->powerbi_count
-                        + (int) $row->visio_count
-                        + (int) $row->other_count,
-                    'custo_total' => (float) $row->total_amount,
-                ];
-            })
-            ->sortBy([
-                ['unidade', 'asc'],
-                ['unicoop', 'asc'],
-                ['area', 'asc'],
-            ])
-            ->values();
-    }
-
-    private function legacyDestinationName(object $row): string
-    {
-        $department = trim((string) ($row->department_name ?? ''));
-        if ($department !== '') {
-            return $department;
-        }
-
-        $unit = trim((string) ($row->unit_name ?? ''));
-
-        return $unit !== '' ? $unit : 'N/D';
-    }
-
-    private function costCenterParts(string $costCenter): array
-    {
-        if (! preg_match('/^\s*(\d{1,3})\.(\d{1,4})\s*$/', $costCenter, $matches)) {
-            return ['-', '-'];
-        }
-
-        return [
-            str_pad($matches[1], 2, '0', STR_PAD_LEFT),
-            str_pad($matches[2], 3, '0', STR_PAD_LEFT),
-        ];
+        return $this->allocationService->consolidado($batch);
     }
 }

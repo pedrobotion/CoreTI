@@ -1,4 +1,9 @@
 <x-app-layout>
+    <datalist id="route-name-options">
+        @foreach($routeNameOptions as $routeNameOption)
+            <option value="{{ $routeNameOption }}"></option>
+        @endforeach
+    </datalist>
     <div class="mx-auto max-w-7xl space-y-6">
         <div>
             <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Bancada de Serviços</p>
@@ -9,12 +14,7 @@
             <h2 class="text-base font-bold text-slate-900">Nova rota</h2>
             <form method="POST" action="{{ route('bancada-servicos.routes.store') }}" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @csrf
-                <select name="nome" class="rounded-md border-slate-300 text-sm" required>
-                    <option value="">Nome da rota</option>
-                    @foreach($routeNameOptions as $routeNameOption)
-                        <option value="{{ $routeNameOption }}">{{ $routeNameOption }}</option>
-                    @endforeach
-                </select>
+                <input name="nome" list="route-name-options" value="{{ old('nome') }}" placeholder="Nome da rota" required maxlength="120" autocomplete="off" class="rounded-md border-slate-300 text-sm">
                 <select name="dia_separa" class="rounded-md border-slate-300 text-sm" required>
                     <option value="">Dia separação</option>
                     @foreach($weekdayOptions as $weekdayOption)
@@ -105,6 +105,13 @@
                                     </button>
                                 </form>
                                 <button type="button" onclick="document.getElementById('route-edit-{{ $route->id }}').classList.toggle('hidden')" class="rounded-md border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Editar</button>
+                                @unless($route->ativo)
+                                    <form method="POST" action="{{ route('bancada-servicos.routes.destroy', $route) }}" class="inline" onsubmit="return confirm('Excluir a rota “{{ $route->nome }}”? Esta ação não pode ser desfeita.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="rounded-md border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-700">Excluir</button>
+                                    </form>
+                                @endunless
                             </div>
                         </div>
                         <p class="text-xs text-slate-600">Separa: {{ $route->dia_separa ?: '-' }} | Carrega: {{ $route->dia_carrega ?: '-' }} | Entrega: {{ $route->dia_entrega ?: '-' }}</p>
@@ -117,11 +124,8 @@
                             <form method="POST" action="{{ route('bancada-servicos.routes.update', $route) }}" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 @csrf
                                 @method('PUT')
-                                <select name="nome" class="rounded-md border-slate-300 text-sm" required>
-                                    @foreach($routeNameOptions as $routeNameOption)
-                                        <option value="{{ $routeNameOption }}" @selected($route->nome === $routeNameOption)>{{ $routeNameOption }}</option>
-                                    @endforeach
-                                </select>
+                                <input name="nome" list="route-name-options" value="{{ $route->nome }}" placeholder="Nome da rota" required maxlength="120" autocomplete="off" class="rounded-md border-slate-300 text-sm">
+
                                 <select name="dia_separa" class="rounded-md border-slate-300 text-sm" required>
                                     @foreach($weekdayOptions as $weekdayOption)
                                         <option value="{{ $weekdayOption }}" @selected($route->dia_separa === $weekdayOption)>{{ $weekdayOption }}</option>

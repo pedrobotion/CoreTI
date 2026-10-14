@@ -14,6 +14,7 @@ class BancadaEquipment extends Model
         'tipo_equipamento',
         'plaqueta',
         'unidade_setor',
+        'cost_center_code',
         'origem_tipo',
         'delivery_route_id',
         'sent_to_cd_at',

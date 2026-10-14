@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\ModuleAccessService;
 use App\Support\LegacyModulePermissions;
 use App\Support\ModuleRegistry;
+use App\Support\ScopeRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -20,6 +21,7 @@ class AdminController extends Controller
 
         $users = User::query()
             ->when(LegacyModulePermissions::novaTabelaDisponivel(), fn ($q) => $q->with('moduleAccesses'))
+            ->when(ScopeRegistry::tabelasDisponiveis(), fn ($q) => $q->with('scopes'))
             ->orderBy('created_at', 'desc')
             ->get();
         $currentUser = $users->firstWhere('id', auth()->id());
@@ -30,11 +32,15 @@ class AdminController extends Controller
 
         $moduleGroups = ModuleRegistry::grouped();
 
+        // Escopo operacional (Sede/Cerrado): controla QUAIS dados o usuário vê
+        // (dashboards, telefonia, etc.), separado do módulo que abre a tela.
+        $scopeOptions = ScopeRegistry::tabelasDisponiveis() ? ScopeRegistry::options() : [];
+
         // Sem a tabela normalizada, a tela ainda lista os acessos (via modelo
         // legado) mas não pode gravar — o formulário é exibido bloqueado.
         $permissionsReady = LegacyModulePermissions::novaTabelaDisponivel();
 
-        return view('admin.dashboard', compact('users', 'moduleGroups', 'permissionsReady'));
+        return view('admin.dashboard', compact('users', 'moduleGroups', 'permissionsReady', 'scopeOptions'));
     }
 
     public function updateModuleAccess(Request $request, User $user, ModuleAccessService $moduleAccess)
@@ -63,12 +69,44 @@ class AdminController extends Controller
 
         try {
             $moduleAccess->sync($user, $desired, $request->user());
+
+            // Escopo operacional (Sede/Cerrado): quais dados o usuário enxerga.
+            if (ScopeRegistry::tabelasDisponiveis()) {
+                $this->syncScopes($user, (array) $request->input('scopes', []), $request->user());
+            }
         } catch (RuntimeException $e) {
             return redirect()->route('admin.dashboard')->with('error', $e->getMessage());
         }
 
         return redirect()->route('admin.dashboard')
             ->with('success', "Acessos de {$user->name} atualizados com sucesso.");
+    }
+
+    /**
+     * Sincroniza o escopo operacional (user_scopes) do usuário com o que veio
+     * do formulário, validando contra o ScopeRegistry.
+     *
+     * @param  array<int, mixed>  $submitted
+     */
+    private function syncScopes(User $user, array $submitted, ?User $actor): void
+    {
+        $desired = array_values(array_unique(array_filter(
+            array_map('strval', $submitted),
+            fn (string $scope) => ScopeRegistry::exists($scope)
+        )));
+
+        $current = $user->scopes()->pluck('scope')->all();
+
+        $remover = array_diff($current, $desired);
+        if ($remover !== []) {
+            $user->scopes()->whereIn('scope', $remover)->delete();
+        }
+
+        foreach (array_diff($desired, $current) as $scope) {
+            $user->scopes()->create(['scope' => $scope, 'granted_by' => $actor?->id]);
+        }
+
+        $user->load('scopes');
     }
 
     public function approveUser(User $user)

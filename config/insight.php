@@ -35,6 +35,91 @@ return [
 
     'timeout' => (int) env('INSIGHT_TIMEOUT', 30),
 
+    // Destinatário(s) do e-mail diário de alertas de impressoras (vírgula separa).
+    // Serve de fallback quando a região não tem destinatário próprio configurado.
+    'alertas_email' => (string) env('INSIGHT_ALERTAS_EMAIL', 'ti@cocari.com.br'),
+
+    /*
+     | Destinatários dos alertas por região (recorte Sede×Cerrado, ver
+     | config/scopes.php). Cada impressora cai na sua região pelo scope (ou,
+     | sem scope, pela unidade vinculada). Impressoras sem região definida
+     | entram no e-mail de TODAS as regiões (decisão do usuário 2026-10-09).
+     | Vírgula separa vários destinatários.
+     */
+    'alertas_emails' => [
+        'sede' => array_values(array_filter(array_map('trim', explode(
+            ',',
+            (string) env('INSIGHT_ALERTAS_EMAIL_SEDE', '')
+        )))),
+        'cerrado' => array_values(array_filter(array_map('trim', explode(
+            ',',
+            (string) env('INSIGHT_ALERTAS_EMAIL_CERRADO', '')
+        )))),
+    ],
+
+    /*
+     | Mapa das unidades do Cerrado (Goiás/Minas) por sinais do dispositivo.
+     |
+     | Muitas impressoras não têm unidade vinculada e o texto de localização da
+     | Insight é bagunçado ("COCARI", "New Device Zone"), então o sync e o
+     | roteamento reconhecem o Cerrado por dois sinais estáveis, levantados do
+     | Atlas (atlas.cocari.com.br, impressoras_monitor + const LOCAIS) em
+     | 2026-10-09:
+     |
+     |  - 'prefixos': a sigla no hostname (ex.: PIR-LASER-ADM-1 → Piracanjuba);
+     |  - 'subredes': o bloco de IP 172.20.78.x–172.20.92.x, uma cidade por
+     |    octeto — pega até quem não tem sigla (ex.: .90 = São João d'Aliança,
+     |    hostname genérico HP84790A).
+     |
+     | Cada entrada aponta [source_id da unidade, cidade]. O source_id é a chave
+     | de negócio da unidade (organization_units.source_id / unit_scopes), mais
+     | estável que o id local. Todas essas unidades já estão como 'cerrado' no
+     | unit_scopes. Nenhuma unidade do Paraná usa esse bloco de IP nem essas
+     | siglas — por isso "não-Cerrado = Paraná" é seguro. Unidade nova do
+     | Cerrado: some o prefixo e/ou o octeto aqui.
+     */
+    'cerrado' => [
+        'prefixos' => [
+            'CA1' => [19, 'Campo Alegre de Goiás'],
+            'CA2' => [19, 'Campo Alegre de Goiás'],
+            'CAT' => [77, 'Catalão'],
+            'COR' => [72, 'Coromandel'],
+            'CR1' => [16, 'Cristalina'],
+            'CR2' => [59, 'Cristalina II'],
+            'GMO' => [56, 'Guarda-Mor'],
+            'IPA' => [60, 'Ipameri'],
+            'ORI' => [70, 'Orizona'],
+            'PIR' => [78, 'Piracanjuba'],
+            'PTM' => [79, 'Patos de Minas'],
+            'PTU' => [63, 'Paracatu'],
+            'SARV' => [53, 'Santo Antônio do Rio Verde'],
+            'SIL' => [55, 'Silvânia'],
+        ],
+        'subredes' => [
+            '172.20.78.' => [79, 'Patos de Minas'],
+            '172.20.79.' => [78, 'Piracanjuba'],
+            '172.20.80.' => [77, 'Catalão'],
+            '172.20.81.' => [19, 'Campo Alegre de Goiás'],
+            '172.20.82.' => [19, 'Campo Alegre de Goiás'],
+            '172.20.83.' => [55, 'Silvânia'],
+            '172.20.84.' => [63, 'Paracatu'],
+            '172.20.85.' => [56, 'Guarda-Mor'],
+            '172.20.86.' => [72, 'Coromandel'],
+            '172.20.87.' => [60, 'Ipameri'],
+            '172.20.88.' => [53, 'Santo Antônio do Rio Verde'],
+            '172.20.89.' => [70, 'Orizona'],
+            '172.20.90.' => [58, "São João d'Aliança"],
+            '172.20.91.' => [16, 'Cristalina'],
+            '172.20.92.' => [59, 'Cristalina II'],
+        ],
+    ],
+
+    // Classes de alerta que entram no e-mail (hardware/mecânico; fora suprimentos/papel).
+    'alertas_classes' => array_values(array_filter(array_map('trim', explode(
+        ',',
+        (string) env('INSIGHT_ALERTAS_CLASSES', 'SYSTEM_FAIL,SYSTEM_WARNING,OPEN')
+    )))),
+
     /*
      | O token JWT vale 24h (expires_in = 86400). Guardamos com uma margem de
      | folga para não usar um token que expira no meio da sincronização.

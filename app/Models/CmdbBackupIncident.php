@@ -39,6 +39,15 @@ class CmdbBackupIncident extends Model
     public const JIRA_ERRO = 'erro';
     public const JIRA_EM_COOLDOWN = 'cooldown';
 
+    /*
+     | O problema existe, mas ainda não confirmou os critérios de abertura.
+     |
+     | Estado legítimo e frequente: o incidente está registrado e visível no
+     | painel, só não virou chamado ainda. Sem um estado próprio, isso ficaria
+     | indistinguível de "falhou ao abrir".
+     */
+    public const JIRA_AGUARDANDO_CONFIRMACAO = 'aguardando_confirmacao';
+
     protected $fillable = [
         'target_id', 'tipo_falha', 'status',
         'aberto_em', 'ultima_ocorrencia_em', 'recuperado_em', 'ocorrencias',
@@ -148,6 +157,7 @@ class CmdbBackupIncident extends Model
             self::JIRA_JA_EXISTENTE => 'Chamado já existente',
             self::JIRA_NAO_CONFIGURADO => 'Jira não configurado',
             self::JIRA_EM_COOLDOWN => 'Aguardando janela de reabertura',
+            self::JIRA_AGUARDANDO_CONFIRMACAO => 'Aguardando confirmação do problema',
             self::JIRA_ERRO => 'Erro ao criar chamado',
             default => 'Sem chamado',
         };

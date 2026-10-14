@@ -217,3 +217,39 @@ php artisan impressao:consolidar
 Ele remove da importação o que os servidores já entregaram e **mantém o que só
 existe na planilha** — o trecho que o log do Windows já girou e apagou, que é
 justamente o histórico que se perderia.
+
+## Conciliação com a Simpress (número de série)
+
+Cruza o que os servidores enxergam com a base do portal, usando o **número de
+série** como chave — ele não muda, então revela o erro da Simpress em vez de
+herdá-lo (hoje 112 impressoras lá com IP `127.0.0.1` ou trocado).
+
+O serial é lido pelo **CoreTI**, por SNMP direto na impressora — não pelo
+servidor. O componente SNMP do Windows não está funcional nos servidores, e
+não precisa estar: o servidor só lista as filas.
+
+### No servidor
+
+```powershell
+.\enviar_filas.ps1 -Simular   # confere
+.\enviar_filas.ps1            # envia nome, IP e driver de cada fila
+```
+
+Pode agendar como o coletor de log, de hora em hora — é barato, só lista o que
+o Windows já sabe.
+
+### No CoreTI
+
+```bash
+php artisan impressoras:consultar-seriais
+```
+
+Lê por SNMP as filas ainda não consultadas, casa pelo serial e marca as
+divergências de IP. É a etapa lenta (um timeout por impressora que não
+responde), então roda à parte do recebimento.
+
+O resultado aparece em **Impressoras → Conciliação com a Simpress**
+(`/impressoras/conciliacao`): divergências de IP, impressoras fora do portal e
+as que não respondem SNMP. É uma tela de correção, não de chamado — a base tem
+divergência acumulada, e a ideia é limpar no portal antes de ligar qualquer
+alerta automático.

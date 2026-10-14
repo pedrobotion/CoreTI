@@ -7,6 +7,7 @@ use App\Models\OfficeAllocationRow;
 use App\Models\OrganizationCostCenter;
 use App\Models\OfficeLicense;
 use App\Models\OfficeLicenseAssignment;
+use App\Support\Licensing\CatalogoCentrosCusto;
 use App\Support\OfficeLicenseSkuCatalog;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -23,10 +24,24 @@ class OfficeAllocationService
         'missing_cost_center',
     ];
 
+    private ?CatalogoCentrosCusto $catalogo = null;
+
     public function __construct(
         private readonly OfficeLicensePriceService $priceService,
         private readonly OfficeAllocationClassifierService $classifier,
     ) {
+    }
+
+    /** Catálogo atual de centros de custo (carregado uma vez por instância). */
+    private function catalogo(): CatalogoCentrosCusto
+    {
+        return $this->catalogo ??= new CatalogoCentrosCusto();
+    }
+
+    /** Nome atual do centro de custo pelo código (catálogo /centros-custo), ou null. */
+    public function nomeCatalogoPorCodigo(?string $codigo): ?string
+    {
+        return $this->catalogo()->nome($codigo);
     }
 
     public function generate(string $competence, ?int $userId = null): OfficeAllocationBatch
@@ -204,7 +219,74 @@ class OfficeAllocationService
             ->orderBy('unit_name')
             ->orderBy('department_name')
             ->orderBy('cost_center_code')
-            ->get();
+            ->get()
+            ->each(function ($row): void {
+                // Nome do destino pelo catálogo atual (chave = código). Só cai no
+                // nome antigo (departamento/unidade do snapshot) quando o código
+                // não existe ou é ambíguo no catálogo.
+                $antigo = trim((string) ($row->department_name ?? '')) !== ''
+                    ? (string) $row->department_name
+                    : (string) ($row->unit_name ?? '');
+                $row->destino_nome = $this->catalogo()->nomeOu($row->cost_center_code, $antigo) ?: 'N/D';
+            });
+    }
+
+    /**
+     * Consolidado no layout legado (Unidade, Unicoop, Área, Quantidade, Custo),
+     * uma linha por centro de custo (unicoop.área) — que é a chave de importação.
+     *
+     * A destinationSummary separa por unidade/departamento/centro; como agora o
+     * nome vem do catálogo pelo código, destinos do mesmo código têm o mesmo
+     * nome e precisam somar numa linha só, senão o arquivo sairia com códigos
+     * repetidos. Devolve arrays (mesma forma consumida pela tela e pelo Excel).
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    public function consolidado(OfficeAllocationBatch $batch)
+    {
+        return $this->destinationSummary($batch)
+            ->groupBy(function ($row): string {
+                $codigo = CatalogoCentrosCusto::normalizar((string) $row->cost_center_code);
+
+                // Sem código reconhecível não dá para somar com segurança:
+                // mantém a linha separada pelo próprio nome do destino.
+                return $codigo !== '' ? $codigo : '__' . mb_strtolower(trim((string) ($row->destino_nome ?? '')));
+            })
+            ->map(function ($grupo): array {
+                $primeiro = $grupo->first();
+                [$unicoop, $area] = $this->codigoPartes((string) $primeiro->cost_center_code);
+
+                return [
+                    'unidade' => trim((string) ($primeiro->destino_nome ?? '')) ?: 'N/D',
+                    'unicoop' => $unicoop,
+                    'area' => $area,
+                    'quantidade' => (int) $grupo->sum(fn ($row): int => (int) $row->apps_count
+                        + (int) $row->business_count
+                        + (int) $row->powerbi_count
+                        + (int) $row->visio_count
+                        + (int) $row->other_count),
+                    'custo_total' => (float) $grupo->sum('total_amount'),
+                ];
+            })
+            ->sortBy([
+                ['unidade', 'asc'],
+                ['unicoop', 'asc'],
+                ['area', 'asc'],
+            ])
+            ->values();
+    }
+
+    /** Quebra "01.180" em ["01", "180"]; devolve ["-", "-"] quando não casa. */
+    private function codigoPartes(string $codigo): array
+    {
+        if (! preg_match('/^\s*(\d{1,3})\.(\d{1,4})\s*$/', $codigo, $m)) {
+            return ['-', '-'];
+        }
+
+        return [
+            str_pad($m[1], 2, '0', STR_PAD_LEFT),
+            str_pad($m[2], 3, '0', STR_PAD_LEFT),
+        ];
     }
 
     public function skuSummary(OfficeAllocationBatch $batch)
@@ -225,6 +307,7 @@ class OfficeAllocationService
             ->selectRaw('
                 COALESCE(organization_unit_id, 0) as unit_key,
                 MAX(unit_name_snapshot) as unit_name,
+                GROUP_CONCAT(DISTINCT cost_center_code_snapshot) as cost_center_codes,
                 COUNT(DISTINCT user_email) as users_count,
                 SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.sku_group")) = "apps" THEN quantity ELSE 0 END) as apps_count,
                 SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.sku_group")) = "business" THEN quantity ELSE 0 END) as business_count,
@@ -235,7 +318,14 @@ class OfficeAllocationService
             ')
             ->groupBy('unit_key')
             ->orderBy('unit_name')
-            ->get();
+            ->get()
+            ->each(function ($row): void {
+                // Uma unidade pode reunir vários centros de custo. Só troca o
+                // nome quando todos apontam para o mesmo nome no catálogo; senão
+                // mantém o nome da unidade do snapshot (ex.: Sede, Cristalina II).
+                $codigos = array_filter(array_map('trim', explode(',', (string) ($row->cost_center_codes ?? ''))));
+                $row->unit_name = $this->catalogo()->nomeUnico($codigos) ?: $row->unit_name;
+            });
     }
 
     public function departmentSummary(OfficeAllocationBatch $batch)
@@ -249,7 +339,11 @@ class OfficeAllocationService
         $summary = [];
 
         foreach ($rows as $row) {
-            $departmentName = $this->departmentNameForAllocationRow($row);
+            $costCenter = trim((string) ($row->cost_center_code_snapshot ?: $row->officeLicense?->centro_custo));
+
+            // Nome pelo catálogo atual (chave = código); só cai no nome antigo
+            // do snapshot quando o código não existe/é ambíguo no catálogo.
+            $departmentName = $this->catalogo()->nome($costCenter) ?? $this->departmentNameForAllocationRow($row);
 
             // The department view is for headquarters. Rows without a stored
             // department can still be classified safely by a headquarters
@@ -258,8 +352,10 @@ class OfficeAllocationService
                 continue;
             }
 
-            $costCenter = trim((string) ($row->cost_center_code_snapshot ?: $row->officeLicense?->centro_custo));
-            $key = mb_strtolower($departmentName) . '|' . mb_strtolower($costCenter ?: '-');
+            // Agrupa pelo código (quando houver): o nome vem do catálogo e é o
+            // mesmo para o código, então linhas do mesmo centro de custo somam.
+            $codigoNorm = CatalogoCentrosCusto::normalizar($costCenter);
+            $key = $codigoNorm !== '' ? $codigoNorm : mb_strtolower($departmentName) . '|-';
             $group = $summary[$key] ?? [
                 'department_key' => $row->organization_department_id ?: $key,
                 'department_name' => $departmentName,

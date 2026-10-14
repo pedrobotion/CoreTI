@@ -25,9 +25,38 @@ class DatabaseBackupJiraService
 {
     public function habilitado(): bool
     {
-        return (bool) config('backups.jira.enabled', true)
-            && (bool) config('services.jira.enabled', false)
-            && $this->configuracaoCompleta();
+        return $this->configurado() && (bool) config('backups.jira.enabled', true);
+    }
+
+    /**
+     * Há credencial e projeto para abrir chamado?
+     *
+     * Separado de habilitado() porque "falta configurar" e "está desligado de
+     * propósito" são situações diferentes, e a tela dizia a primeira quando o
+     * caso era a segunda — mandando preencher variáveis que já estavam
+     * preenchidas.
+     */
+    public function configurado(): bool
+    {
+        return (bool) config('services.jira.enabled', false) && $this->configuracaoCompleta();
+    }
+
+    /**
+     * Por que a abertura automática não está valendo.
+     *
+     * Null quando está valendo.
+     */
+    public function motivoDesligado(): ?string
+    {
+        if (! $this->configurado()) {
+            return 'nao_configurado';
+        }
+
+        if (! (bool) config('backups.jira.enabled', true)) {
+            return 'desligado';
+        }
+
+        return null;
     }
 
     /**

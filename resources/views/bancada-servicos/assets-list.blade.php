@@ -15,6 +15,40 @@
                 <button type="button" @click="addModalOpen = true" style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Adicionar equipamento</button>
             </div>
         </div>
+        @if(isset($statusCounts) && $statusCounts->isNotEmpty())
+            @php
+                $statusCardClasses = [
+                    'Em bancada' => 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/40 dark:bg-sky-500/10 dark:text-sky-200',
+                    'Em manutenção' => 'border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-500/10 dark:text-indigo-200',
+                    'Aguardando peça' => 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/10 dark:text-amber-200',
+                    'Aguardando Entrada Fiscal' => 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/10 dark:text-amber-200',
+                    'Terceiros' => 'border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-900/40 dark:bg-violet-500/10 dark:text-violet-200',
+                    'Manutenção realizada' => 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-200',
+                    'Pronto para entrega' => 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-200',
+                    'Sem conserto' => 'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-500/10 dark:text-rose-200',
+                    'Descarte' => 'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-500/10 dark:text-rose-200',
+                    'Nota Fiscal Emitida' => 'border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-900/40 dark:bg-teal-500/10 dark:text-teal-200',
+                    'Entregue' => 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-200',
+                    'Backup' => 'border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200',
+                ];
+            @endphp
+            <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+                <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}"
+                   class="rounded-lg border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900 {{ ($statusFilter ?? '') === '' ? 'border-slate-900 ring-1 ring-slate-900 dark:border-white dark:ring-white' : 'border-slate-200 dark:border-slate-800' }}">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+                    <p class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ number_format($statusCounts->sum(), 0, ',', '.') }}</p>
+                </a>
+                @foreach($statusCounts as $statusLabel => $qtd)
+                    @php $classe = $statusCardClasses[$statusLabel] ?? 'border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900'; @endphp
+                    <a href="{{ request()->fullUrlWithQuery(['status' => $statusLabel]) }}"
+                       class="rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md {{ $classe }} {{ ($statusFilter ?? '') === $statusLabel ? 'ring-2 ring-current ring-offset-1' : '' }}">
+                        <p class="truncate text-xs font-semibold uppercase tracking-wide opacity-80" title="{{ $statusLabel }}">{{ $statusLabel }}</p>
+                        <p class="mt-1 text-2xl font-bold">{{ number_format($qtd, 0, ',', '.') }}</p>
+                    </a>
+                @endforeach
+            </section>
+        @endif
+
         <section x-data="bancadaLabelPrinter()" class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             @php
                 $resetRoute = match($scope) {
@@ -28,7 +62,7 @@
                 $showTicColumn = $scope === 'equipamentos';
             @endphp
             <div class="border-b border-slate-200 p-5 dark:border-slate-800">
-                <form method="GET" class="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+                <form method="GET" class="bancada-filtros flex flex-wrap items-center gap-2 lg:flex-nowrap">
                     <select name="origem_tipo" class="h-10 w-[150px] min-w-[150px] rounded-md border-slate-300 text-sm shrink-0">
                         <option value="">Todas as origens</option>
                         <option value="unidade" @selected(($origemTipo ?? '') === 'unidade')>Unidade</option>
@@ -69,8 +103,8 @@
                                 <th class="px-3 py-3">Emprestado para</th>
                                 <th class="px-3 py-3">Data backup</th>
                             @endif
-                            <th class="px-3 py-3 {{ $isBackup ? 'w-[230px]' : '' }}">Observação</th>
-                            <th class="sticky right-0 z-20 min-w-[350px] bg-[#033151] px-3 py-3">Ações</th>
+                            <th class="px-3 py-3 {{ $isBackup ? 'w-[230px]' : 'w-[200px]' }}">Observação</th>
+                            <th class="sticky right-0 z-20 min-w-[200px] bg-[#033151] px-3 py-3">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -352,10 +386,10 @@
                                     <td class="px-3 py-3 break-words">{{ $asset->backup_emprestado_para ?: '-' }}</td>
                                     <td class="px-3 py-3">{{ optional($asset->backup_data_formatado)->format('d/m/Y') ?: '-' }}</td>
                                 @endif
-                                <td class="{{ $isBackup ? 'max-w-[230px]' : '' }} px-3 py-3 break-words" title="{{ $asset->observacao ?: '' }}">
-                                    <div @if($isBackup) style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;" @endif>{{ $asset->observacao ?: '-' }}</div>
+                                <td class="{{ $isBackup ? 'max-w-[230px]' : 'max-w-[200px]' }} px-3 py-3 align-top break-words" title="{{ $asset->observacao ?: '' }}">
+                                    <div style="display:-webkit-box;-webkit-line-clamp:{{ $isBackup ? 3 : 2 }};-webkit-box-orient:vertical;overflow:hidden;">{{ $asset->observacao ?: '-' }}</div>
                                 </td>
-                                <td class="sticky right-0 z-10 min-w-[350px] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)] group-odd:bg-slate-50 group-even:bg-white" x-data="{ editModalOpen: false, editOrigem: @js($asset->origem_tipo ?: 'unidade'), backupModalOpen: false, loanModalOpen: false }">
+                                <td class="sticky right-0 z-10 min-w-[200px] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)] group-odd:bg-slate-50 group-even:bg-white" x-data="{ editModalOpen: false, editOrigem: @js($asset->origem_tipo ?: 'unidade'), backupModalOpen: false, loanModalOpen: false }">
                                     @if($scope === 'descartados')
                                         <form method="POST" action="{{ route('bancada-servicos.assets.discard.update', $asset) }}" class="mb-2 space-y-2 rounded-md border border-slate-200 p-2">
                                             @csrf

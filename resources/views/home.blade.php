@@ -76,7 +76,7 @@
             <section>
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Dashboards</h2>
                 <p class="mt-1 text-sm text-slate-500">Painéis analíticos montados sobre os dados que o CoreTI coleta.</p>
-                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboards as $painel)
                         <a href="{{ route($painel['rota']) }}"
                            class="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">

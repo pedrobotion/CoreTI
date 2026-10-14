@@ -24,6 +24,26 @@ class TamanhoCooldownIncidenteTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        /*
+         | Critérios de confirmação neutralizados para a classe inteira.
+         |
+         | Estes testes são sobre cooldown, recuperação e credencial ausente.
+         | Herdar a regra de abertura do ambiente os faria falhar por um
+         | motivo que não é o deles — e a regra tem teste próprio em
+         | ConfirmacaoAntesDoChamadoTest.
+         */
+        config(['backups.abertura' => [
+            'tipos' => ['backup', 'auditoria'],
+            'minimo_ocorrencias' => 1,
+            'minimo_minutos' => 0,
+            'exigir_sucesso_anterior' => false,
+        ]]);
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();
@@ -121,6 +141,20 @@ class TamanhoCooldownIncidenteTest extends TestCase
             'services.jira.email' => 'bot@exemplo.com',
             'services.jira.api_token' => 'token-fake-de-teste',
             'backups.jira_cooldown_minutes' => 360,
+            // Fixa a chave em vez de herdar o .env: é o comportamento sob
+            // teste, e ela é desligável por ambiente.
+            'backups.jira.enabled' => true,
+            'backups.jira.project_id' => '10005',
+            'backups.jira.issue_type_id' => '10008',
+            // Critérios de confirmação neutralizados: este teste é sobre
+            // outra coisa, e herdar a regra de abertura faria ele falhar por
+            // um motivo que não é o dele.
+            'backups.abertura' => [
+                'tipos' => ['backup', 'auditoria'],
+                'minimo_ocorrencias' => 1,
+                'minimo_minutos' => 0,
+                'exigir_sucesso_anterior' => false,
+            ],
         ]);
     }
 
@@ -499,6 +533,10 @@ class TamanhoCooldownIncidenteTest extends TestCase
     /** Sem duplo: exercita a validação real do SshRunner. */
     public function test_usuario_ssh_malicioso_e_recusado(): void
     {
+        // Chega à abertura de chamado: sem fake, com credencial real no
+        // .env, a requisição sai de verdade e abre chamado em produção.
+        Http::fake(['*' => Http::response(['key' => 'TIC-TESTE'], 201)]);
+
         $check = app(BackupVerificationService::class)
             ->verificar($this->alvo(['ssh_user' => 'root; cat /etc/shadow']));
 
@@ -508,6 +546,10 @@ class TamanhoCooldownIncidenteTest extends TestCase
 
     public function test_host_ssh_malicioso_e_recusado(): void
     {
+        // Chega à abertura de chamado: sem fake, com credencial real no
+        // .env, a requisição sai de verdade e abre chamado em produção.
+        Http::fake(['*' => Http::response(['key' => 'TIC-TESTE'], 201)]);
+
         $check = app(BackupVerificationService::class)
             ->verificar($this->alvo(['ssh_host' => 'sdb1 && curl evil.example']));
 

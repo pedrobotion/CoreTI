@@ -134,7 +134,6 @@
     <aside
         class="mobile-sidebar mobile-sidebar-position corp-sidebar fixed bottom-0 left-0 z-50 w-[88vw] max-w-xs border-r border-slate-200 shadow-xl"
         :style="mobileMenuOpen ? 'transform: translateX(0%); transition: transform .2s ease;' : 'transform: translateX(-100%); transition: transform .2s ease;'"
-        @click.outside="mobileMenuOpen = false"
     >
         @include('layouts.partials.sidebar-menu', ['containerClass' => 'coreti-sidebar-shell'])
     </aside>

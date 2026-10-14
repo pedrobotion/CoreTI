@@ -102,6 +102,8 @@ Route::prefix('api/impressao')
     ->name('api.impressao.')->group(function () {
         Route::post('/lote', [\App\Http\Controllers\Impressao\PrintLogApiController::class, 'lote'])->name('lote');
         Route::get('/ultimo-evento', [\App\Http\Controllers\Impressao\PrintLogApiController::class, 'ultimoEvento'])->name('ultimo-evento');
+        // Filas dos servidores para conciliar com a Simpress pelo serial.
+        Route::post('/filas', [\App\Http\Controllers\Impressao\PrinterQueueApiController::class, 'lote'])->name('filas');
     });
 
 Route::prefix('api/ad/exclusao')
@@ -674,7 +676,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::delete('/{jiraProject}', [JiraProjectController::class, 'destroy'])->name('destroy')->middleware('module_access:administrativo.manage');
     });
 
-    Route::prefix('bancada-servicos')->name('bancada-servicos.')->middleware(['admin', 'module_access:bancada'])->group(function () {
+    Route::prefix('bancada-servicos')->name('bancada-servicos.')->middleware('module_access:bancada')->group(function () {
         Route::get('/', [BancadaServicosController::class, 'dashboard'])->name('dashboard');
         Route::get('/chamados', [BancadaServicosController::class, 'tickets'])->name('tickets');
         Route::get('/equipamentos', [BancadaServicosController::class, 'assets'])->name('assets');
@@ -689,6 +691,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/rotas-malote', [BancadaServicosController::class, 'storeRouteConfig'])->name('routes.store');
         Route::put('/rotas-malote/{route}', [BancadaServicosController::class, 'updateRouteConfig'])->name('routes.update');
         Route::patch('/rotas-malote/{route}/toggle', [BancadaServicosController::class, 'toggleRouteConfig'])->name('routes.toggle');
+        Route::delete('/rotas-malote/{route}', [BancadaServicosController::class, 'destroyRouteConfig'])->name('routes.destroy');
         Route::get('/equipamentos/{equipment}/editar', [BancadaServicosController::class, 'editAsset'])->name('assets.edit');
         Route::put('/equipamentos/{equipment}', [BancadaServicosController::class, 'updateAsset'])->name('assets.update');
         Route::get('/equipamentos/{equipment}/historico', [BancadaServicosController::class, 'assetHistory'])->name('assets.history');
@@ -733,7 +736,16 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/administrativo/entrada-fiscal', [BancadaServicosController::class, 'administrativeEntryFiscal'])->name('administrativo.entrada-fiscal');
         Route::get('/administrativo/terceiros', [BancadaServicosController::class, 'administrativeThirdParties'])->name('administrativo.terceiros');
         Route::get('/administrativo/pecas', [BancadaServicosController::class, 'administrativeParts'])->name('administrativo.pecas');
-        Route::get('/administrativo/estoque-interno', [BancadaServicosController::class, 'administrativeInternalStock'])->name('administrativo.estoque-interno');
+        Route::get('/administrativo/estoque-interno', [\App\Http\Controllers\InternalStockController::class, 'index'])->name('administrativo.estoque-interno');
+        Route::get('/administrativo/estoque-interno/movimentos', [\App\Http\Controllers\InternalStockController::class, 'movimentos'])->name('administrativo.estoque-interno.movimentos');
+        Route::get('/administrativo/estoque-interno/exportar', [\App\Http\Controllers\InternalStockController::class, 'export'])->name('administrativo.estoque-interno.exportar');
+        Route::get('/administrativo/estoque-interno/produtos/{product}/entrada', [\App\Http\Controllers\InternalStockController::class, 'entradaForm'])->name('administrativo.estoque-interno.entrada');
+        Route::get('/administrativo/estoque-interno/produtos/{product}/baixa', [\App\Http\Controllers\InternalStockController::class, 'baixaForm'])->name('administrativo.estoque-interno.baixa');
+        Route::middleware('module_access:administrativo.manage')->group(function () {
+            Route::post('/administrativo/estoque-interno/produtos', [\App\Http\Controllers\InternalStockController::class, 'storeProduct'])->name('administrativo.estoque-interno.produtos.store');
+            Route::post('/administrativo/estoque-interno/produtos/{product}/entrada', [\App\Http\Controllers\InternalStockController::class, 'entrada'])->name('administrativo.estoque-interno.entrada.store');
+            Route::post('/administrativo/estoque-interno/produtos/{product}/baixa', [\App\Http\Controllers\InternalStockController::class, 'baixa'])->name('administrativo.estoque-interno.baixa.store');
+        });
         Route::get('/administrativo/nota-saida', [BancadaServicosController::class, 'administrativeOutboundNote'])->name('administrativo.nota-saida');
         Route::get('/administrativo/empresas-terceirizadas', [BancadaServicosController::class, 'administrativeThirdPartyCompanies'])->name('administrativo.empresas-terceirizadas');
         Route::get('/administrativo/historico', [BancadaServicosController::class, 'administrativeHistory'])->name('administrativo.historico');
@@ -805,11 +817,24 @@ Route::middleware(['auth', 'active'])->group(function () {
      */
     Route::prefix('dashboards')->name('dashboards.')->group(function () {
         Route::get('/impressoes', [\App\Http\Controllers\Impressao\PrintDashboardController::class, 'impressoes'])
-            ->middleware('module_access:impressoras')->name('impressoes');
+            ->middleware('module_access:dashboard_impressoes')->name('impressoes');
+
+        Route::get('/auditoria-backups', [\App\Http\Controllers\Dashboards\AnalyticsDashboardController::class, 'auditoriaBackups'])
+            ->middleware('module_access:dashboard_auditoria_backups')->name('auditoria-backups');
+
+        Route::get('/telefonia', [\App\Http\Controllers\Dashboards\AnalyticsDashboardController::class, 'telefonia'])
+            ->middleware('module_access:dashboard_telefonia')->name('telefonia');
+
+        Route::get('/servicedesk', [\App\Http\Controllers\Dashboards\AnalyticsDashboardController::class, 'servicedesk'])
+            ->middleware('module_access:dashboard_servicedesk')->name('servicedesk');
+
+        Route::get('/service-desk-apresentacao', [\App\Http\Controllers\Dashboards\AnalyticsDashboardController::class, 'servicedeskApresentacao'])
+            ->middleware('module_access:dashboard_sd_apresentacao')->name('service-desk-apresentacao');
     });
 
     Route::prefix('impressoras')->name('impressoras.')->middleware('module_access:impressoras')->group(function () {
         Route::get('/', [\App\Http\Controllers\PrinterController::class, 'index'])->name('index');
+        Route::get('/conciliacao', [\App\Http\Controllers\Impressao\PrinterReconciliationController::class, 'index'])->name('conciliacao');
         Route::get('/{printer}', [\App\Http\Controllers\PrinterController::class, 'show'])->name('show');
     });
 });
