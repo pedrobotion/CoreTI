@@ -55,4 +55,58 @@ return [
             explode(',', (string) env('BANCADA_NF_SAIDA_ROTAS_EXCLUIDAS', 'TI'))
         ))),
     ],
+
+    /*
+    | Manutenção: ao concluir a entrada do equipamento (status "Em bancada"),
+    | abre no Jira um chamado do catálogo "Configuração e Manutenção de
+    | Equipamentos de Informática" (request type 98, issue type 10010 no service
+    | desk 5) com descrição em branco, para a equipe confirmar o defeito com a
+    | unidade. Quando o chamado é finalizado, a descrição volta para a
+    | observação do equipamento (webhook — parte B).
+    */
+    'manutencao' => [
+        // Trava de segurança: a automação só abre chamado quando ativada
+        // explicitamente (BANCADA_MANUT_ATIVO=true no .env). Fica desligada por
+        // padrão para não abrir o backlog sozinha antes de tudo estar pronto
+        // (inclusive o webhook da parte B).
+        'ativo' => (bool) env('BANCADA_MANUT_ATIVO', false),
+
+        // Só abre chamado a partir desta data (Y-m-d). Vazio = assim que ativo.
+        // Serve para "começar amanhã" sem pegar os equipamentos de hoje.
+        'inicio' => env('BANCADA_MANUT_INICIO'),
+
+        'jira_request_type' => env('BANCADA_MANUT_JIRA_REQUEST_TYPE', '98'),
+        'jira_issue_type' => env('BANCADA_MANUT_JIRA_ISSUE_TYPE', '10010'),
+
+        // Campos do catálogo 98 (ver /rest/servicedeskapi/.../requesttype/98/field).
+        'campo_unidade' => env('BANCADA_MANUT_CAMPO_UNIDADE', 'customfield_10067'),     // Unidade/Departamento (cascata)
+        'campo_patrimonio' => env('BANCADA_MANUT_CAMPO_PATRIMONIO', 'customfield_10366'), // Patrimônio do Equipamento
+
+        // Departamento (2º nível da cascata) usado quando o do equipamento não
+        // é conhecido/não casa (ex.: unidades não-Sede).
+        'departamento_padrao' => env('BANCADA_MANUT_DEPTO_PADRAO', 'Administrativo'),
+
+        // Teto de chamados por execução.
+        'jira_max_por_execucao' => (int) env('BANCADA_MANUT_JIRA_MAX', 20),
+
+        // Apelidos: nome da unidade no CoreTI => rótulo da unidade (nível 1) no
+        // campo do Jira, para os nomes que divergem. Sem casar, NÃO abre chamado.
+        'apelidos_unidade' => [
+            'Associação Atlética COCARI' => 'A.A.COCARI',
+            'Fábrica de Ração COCARI' => 'Fábrica de Rações',
+            'Fiação COCARI' => 'Fiação',
+            'Unidades - Colari' => 'Colari',
+            'Loja Agropecuária - Mandaguari' => 'Loja Agropecuária Mandaguari',
+            'CTC - Centro Tecnológico COCARI' => 'Centro Tecnológico',
+        ],
+
+        // Webhook do Jira (parte B): token compartilhado e IPs permitidos.
+        'webhook' => [
+            'token' => env('BANCADA_MANUT_WEBHOOK_TOKEN'),
+            'allowed_ips' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('BANCADA_MANUT_WEBHOOK_IPS', ''))
+            ))),
+        ],
+    ],
 ];

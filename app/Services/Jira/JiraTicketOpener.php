@@ -43,8 +43,10 @@ class JiraTicketOpener
      *                                    este chamado (sobrepõe o padrão global)
      * @param  string|null  $requestTypeId  id do tipo de solicitação (catálogo)
      *                                       só para este chamado (sobrepõe o padrão)
+     * @param  bool  $semEquipe  não envia o campo de equipe (para catálogos que
+     *                           não têm esse campo na tela — senão o Jira recusa)
      */
-    public function abrir(string $titulo, string $descricao, string $contexto = 'coreti', array $extra = [], ?string $equipeNome = null, ?string $requestTypeId = null): ?string
+    public function abrir(string $titulo, string $descricao, string $contexto = 'coreti', array $extra = [], ?string $equipeNome = null, ?string $requestTypeId = null, bool $semEquipe = false): ?string
     {
         if (! $this->configurado()) {
             Log::warning('jira.ticket.nao_configurado', ['contexto' => $contexto, 'titulo' => $titulo]);
@@ -66,7 +68,7 @@ class JiraTicketOpener
             ],
         ], $extra);
 
-        if ($equipe = $this->resolverEquipe($equipeNome)) {
+        if (! $semEquipe && $equipe = $this->resolverEquipe($equipeNome)) {
             $campos[(string) config('backups.jira.fields.team')] = $equipe;
         }
 

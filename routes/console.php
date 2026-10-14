@@ -206,6 +206,15 @@ Schedule::command('bancada:chamados-nota-saida')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
 
+// Chamado de manutenção assim que o equipamento entra na bancada. Roda de 15 em
+// 15 min no horário comercial, para ser quase imediato apos a entrada.
+Schedule::command('bancada:chamados-manutencao')
+    ->everyFifteenMinutes()
+    ->weekdays()
+    ->between('07:00', '19:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();
+
 Artisan::command('cmdb:vcenter-create-servers {--connector=} {--limit=}', function (CmdbVCenterAssetCreationService $service) {
     $connector = $this->option('connector') !== null ? (int) $this->option('connector') : null;
     $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;

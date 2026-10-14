@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\VerifyBackupWebhookToken;
+use App\Http\Middleware\VerifyJiraManutencaoWebhookToken;
 use App\Http\Middleware\VerifyAdPurgeToken;
 use App\Http\Middleware\VerifyImpressaoToken;
 use Illuminate\Session\TokenMismatchException;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => AdminMiddleware::class,
             'module_access' => EnsureModuleAccess::class,
             'backup_webhook' => VerifyBackupWebhookToken::class,
+            'jira_manutencao_webhook' => VerifyJiraManutencaoWebhookToken::class,
             'ad_purge_token' => VerifyAdPurgeToken::class,
             'impressao_token' => VerifyImpressaoToken::class,
         ]);
@@ -32,6 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // token CSRF. A autenticação é feita pelo middleware backup_webhook.
         $middleware->validateCsrfTokens(except: [
             'webhooks/backup',
+            // Webhook do Jira (fechamento de chamado de manutenção da bancada):
+            // sem sessão/CSRF; autenticado pelo jira_manutencao_webhook.
+            'webhooks/jira-manutencao',
             // Chamado pelo servidor do AD via Invoke-RestMethod: não há sessão
             // nem token CSRF. A autenticação é feita pelo ad_purge_token.
             'api/ad/exclusao/*',

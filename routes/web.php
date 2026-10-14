@@ -84,6 +84,12 @@ Route::post('/webhooks/backup', [BackupWebhookController::class, 'store'])
     ->middleware(['backup_webhook', 'throttle:120,1,webhook-backup:'])
     ->name('webhooks.backup');
 
+// Webhook do Jira: fechamento dos chamados de manutenção da bancada traz a
+// descrição de volta para a observação do equipamento. Autenticado por token.
+Route::post('/webhooks/jira-manutencao', [\App\Http\Controllers\JiraManutencaoWebhookController::class, 'store'])
+    ->middleware(['jira_manutencao_webhook', 'throttle:120,1'])
+    ->name('webhooks.jira-manutencao');
+
 /*
  | Expurgo do Active Directory — endpoints consumidos pelo servidor do AD.
  |
