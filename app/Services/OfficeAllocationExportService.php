@@ -69,23 +69,30 @@ class OfficeAllocationExportService
         $sheet->fromArray($headers, null, 'A1');
         $this->styleHeader($sheet, 'A1:M1');
 
+        // Nome da UNIDADE por unidade (organization_unit_id), igual à aba
+        // "Resumo por Unidade" — para a coluna Unidade do detalhe bater com ela
+        // (a Sede é UMA unidade; o departamento vai na coluna própria).
+        $nomesUnidade = $this->allocationService->unitSummary($batch)->keyBy('unit_key');
+
         $rowNum = 2;
         foreach ($batch->rows()
             ->with('officeLicense.organizationDepartment', 'officeLicense.organizationCostCenter')
             ->orderBy('user_name')
             ->orderBy('sku_name')
             ->get() as $row) {
-            // Nome pelo catálogo atual (chave = código); mantém o do snapshot
-            // só quando o código não existe/é ambíguo no catálogo novo.
+            // Nome pelo catálogo atual (chave = código): é o nome do CENTRO DE
+            // CUSTO (departamento na Sede, unidade fora dela).
             $nomeCatalogo = $this->allocationService->nomeCatalogoPorCodigo($row->cost_center_code_snapshot);
+            $unidade = $nomesUnidade->get((int) ($row->organization_unit_id ?? 0))->unit_name ?? null;
+            $departamento = $this->allocationService->departmentNameForAllocationRow($row); // só Sede
             $sheet->fromArray([
                 $row->employee_number,
                 $row->user_name,
                 $row->user_email,
                 $row->sku_id,
                 $row->sku_name,
-                $nomeCatalogo ?: $row->unit_name_snapshot,
-                $nomeCatalogo ?: $this->allocationService->departmentNameForAllocationRow($row),
+                $unidade ?: ($row->unit_name_snapshot ?: '—'),
+                $departamento !== null ? ($nomeCatalogo ?: $departamento) : '—',
                 $row->cost_center_code_snapshot,
                 $nomeCatalogo ?: $row->cost_center_name_snapshot,
                 $row->classification_status,
