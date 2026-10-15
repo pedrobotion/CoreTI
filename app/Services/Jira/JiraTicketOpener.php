@@ -45,8 +45,10 @@ class JiraTicketOpener
      *                                       só para este chamado (sobrepõe o padrão)
      * @param  bool  $semEquipe  não envia o campo de equipe (para catálogos que
      *                           não têm esse campo na tela — senão o Jira recusa)
+     * @param  string|null  $assigneeEmail  e-mail do responsável a atribuir ao
+     *                                       chamado (resolve o accountId no Jira)
      */
-    public function abrir(string $titulo, string $descricao, string $contexto = 'coreti', array $extra = [], ?string $equipeNome = null, ?string $requestTypeId = null, bool $semEquipe = false): ?string
+    public function abrir(string $titulo, string $descricao, string $contexto = 'coreti', array $extra = [], ?string $equipeNome = null, ?string $requestTypeId = null, bool $semEquipe = false, ?string $assigneeEmail = null): ?string
     {
         if (! $this->configurado()) {
             Log::warning('jira.ticket.nao_configurado', ['contexto' => $contexto, 'titulo' => $titulo]);
@@ -74,6 +76,14 @@ class JiraTicketOpener
 
         if ($tipo = $this->resolverTipoDeSolicitacao($requestTypeId)) {
             $campos[(string) config('backups.jira.fields.request_type')] = $tipo;
+        }
+
+        if ($assigneeEmail !== null && trim($assigneeEmail) !== '') {
+            if ($accountId = $this->resolverUsuarioPorEmail(trim($assigneeEmail))) {
+                $campos['assignee'] = ['id' => $accountId];
+            } else {
+                Log::warning('jira.ticket.responsavel_nao_encontrado', ['email' => $assigneeEmail, 'contexto' => $contexto]);
+            }
         }
 
         $campos = $this->comRelator($campos);
@@ -154,6 +164,25 @@ class JiraTicketOpener
         $indice = (int) config('backups.jira.team_option_index', 5);
 
         return isset($opcoes[$indice]['id']) ? ['id' => (string) $opcoes[$indice]['id']] : null;
+    }
+
+    /** Resolve o accountId do usuário pelo e-mail (null se não achar). */
+    private function resolverUsuarioPorEmail(string $email): ?string
+    {
+        $resposta = $this->client()->get($this->url('/rest/api/3/user/search'), ['query' => $email]);
+        if (! $resposta->successful()) {
+            return null;
+        }
+
+        foreach ((array) $resposta->json() as $user) {
+            if (mb_strtolower(trim((string) ($user['emailAddress'] ?? ''))) === mb_strtolower(trim($email))) {
+                $accountId = (string) ($user['accountId'] ?? '');
+
+                return $accountId !== '' ? $accountId : null;
+            }
+        }
+
+        return null;
     }
 
     private function resolverTipoDeSolicitacao(?string $override = null): ?string

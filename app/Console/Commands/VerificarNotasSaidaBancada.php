@@ -143,7 +143,7 @@ class VerificarNotasSaidaBancada extends Command
                 $titulo,
                 $descricao,
                 'bancada-nota-saida',
-                [],
+                ['issuetype' => ['id' => (string) config('bancada.notas_saida.jira_issue_type')]],
                 (string) config('bancada.notas_saida.jira_equipe'),
                 (string) config('bancada.notas_saida.jira_request_type'),
             );

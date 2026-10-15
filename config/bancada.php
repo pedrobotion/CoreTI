@@ -31,6 +31,12 @@ return [
         // (id 1701 no service desk 5), criado para as pendências administrativas.
         // Sem isto cairia no padrão global (713 = "Falha de Backup").
         'jira_request_type' => env('BANCADA_PEND_JIRA_REQUEST_TYPE', '1701'),
+
+        // Pendências de TERCEIROS (equipamento parado em terceiro) vão para a
+        // Bancada e já são atribuídas ao responsável. Os demais tipos seguem o
+        // padrão acima (Time Administrativo de TI).
+        'terceiros_jira_equipe' => env('BANCADA_PEND_TERCEIROS_JIRA_EQUIPE', 'Time Bancada de Serviços'),
+        'terceiros_jira_responsavel' => env('BANCADA_PEND_TERCEIROS_JIRA_RESPONSAVEL', 'gabriel.azevedo@cocari.com.br'),
     ],
 
     /*
@@ -43,6 +49,9 @@ return [
         // Equipamentos = id 160 no service desk 5).
         'jira_equipe' => env('BANCADA_NF_SAIDA_JIRA_EQUIPE', 'Time Administrativo de TI'),
         'jira_request_type' => env('BANCADA_NF_SAIDA_JIRA_REQUEST_TYPE', '160'),
+        // É uma REQUISIÇÃO (10010 = Requisição de Serviço), não um incidente
+        // (10008). O catálogo 160 exige o issue type de requisição.
+        'jira_issue_type' => env('BANCADA_NF_SAIDA_JIRA_ISSUE_TYPE', '10010'),
 
         // Teto de chamados por execução, para não inundar o Jira num dia cheio.
         'jira_max_por_execucao' => (int) env('BANCADA_NF_SAIDA_JIRA_MAX', 20),

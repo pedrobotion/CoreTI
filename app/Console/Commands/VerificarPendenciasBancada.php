@@ -131,14 +131,25 @@ class VerificarPendenciasBancada extends Command
             ."Pendência: {$p['rotulo']}\n"
             ."Parado há: {$p['dias']} dias (limiar {$p['limiar']} dias)\n";
 
+        // Terceiros vai para a Bancada e já atribuído; os demais ficam no padrão.
+        $ehTerceiros = ($p['pendencia'] ?? '') === 'terceiros';
+        $equipe = $ehTerceiros
+            ? (string) config('bancada.pendencias.terceiros_jira_equipe')
+            : (string) config('bancada.pendencias.jira_equipe');
+        $responsavel = $ehTerceiros
+            ? (string) config('bancada.pendencias.terceiros_jira_responsavel')
+            : null;
+
         try {
             return $jira->abrir(
                 $titulo,
                 $descricao,
                 'bancada-pendencia',
                 [],
-                (string) config('bancada.pendencias.jira_equipe'),
+                $equipe,
                 (string) config('bancada.pendencias.jira_request_type'),
+                semEquipe: false,
+                assigneeEmail: $responsavel,
             );
         } catch (Throwable $e) {
             $this->warn("Falha ao abrir chamado para {$id}: ".$e->getMessage());
