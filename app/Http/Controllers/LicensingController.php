@@ -315,96 +315,49 @@ class LicensingController extends Controller
 
     private function officeOrganizationOptions()
     {
-        $normalizer = static function ($value): ?string {
-            $digits = preg_replace('/\D+/', '', trim((string) $value)) ?: '';
-            $digits = ltrim($digits, '0');
-
-            return $digits !== '' ? $digits : null;
-        };
-        $formatUnit = static fn ($value): ?string => ($digits = $normalizer($value)) !== null
-            ? str_pad($digits, 2, '0', STR_PAD_LEFT)
-            : null;
-        $formatArea = static fn ($value): ?string => ($digits = $normalizer($value)) !== null
-            ? str_pad($digits, 3, '0', STR_PAD_LEFT)
-            : null;
-
-        $units = OrganizationUnit::query()
-            ->where('source_system', 'intranet')
-            ->where('active', true)
-            ->get(['id', 'source_id', 'name']);
-        $departments = OrganizationDepartment::query()
-            ->where('source_system', 'intranet')
-            ->where('active', true)
-            ->get(['id', 'source_id', 'source_unit_id', 'source_area_id', 'name']);
-        $costCenters = OrganizationCostCenter::query()
-            ->where('source_system', 'intranet')
-            ->where('active', true)
-            ->whereNotNull('accounting_area_source_id')
-            ->get(['id', 'source_id', 'name', 'unit_source_id', 'accounting_area_source_id']);
-        $coretiNames = CoretiCostCenter::query()
+        // Opções do seletor de "Ajustar organização" vêm do catálogo do CoreTI
+        // (coreti_cost_centers), que é o que a TI mantém. Antes montava ~3.266
+        // opções da intranet (sobretudo todos os departamentos) e, com 3 selects
+        // na tela, gerava ~5 MB de HTML por carregamento — deixando a página
+        // lenta e o dropdown impraticável. Aqui são ~120, leves e corretas.
+        //
+        // Os IDs da intranet ficam nulos de propósito: o salvamento grava pelo
+        // CÓDIGO do CoreTI (ver resolveManualOfficeOrganization) e resolve os
+        // IDs da intranet por conta própria, só quando existirem.
+        $centros = CoretiCostCenter::query()
             ->active()
-            ->get(['code', 'name'])
-            ->keyBy(fn (CoretiCostCenter $center): string => $this->normalizeCostCenterCode($center->code));
+            ->orderBy('name')
+            ->get(['code', 'name']);
 
         $options = collect();
-        foreach ($costCenters as $costCenter) {
-            $unicoop = $formatUnit($costCenter->unit_source_id);
-            $area = $formatArea($costCenter->accounting_area_source_id);
-            if ($unicoop === null || $area === null || $area === '000') {
+        foreach ($centros as $centro) {
+            $code = $this->normalizeCostCenterCode($centro->code); // UU.AAA, ou '' p/ CNPJ/fora do padrão
+            if ($code === '') {
                 continue;
             }
-
-            $unit = $units->first(fn ($item) => $normalizer($item->source_id) === $normalizer($costCenter->unit_source_id));
-            $department = $departments->first(function ($item) use ($normalizer, $costCenter): bool {
-                return $normalizer($item->source_unit_id) === $normalizer($costCenter->unit_source_id)
-                    && $normalizer($item->source_area_id) === $normalizer($costCenter->accounting_area_source_id);
-            });
-            $code = $unicoop . '.' . $area;
-            $name = trim((string) ($coretiNames->get($code)?->name ?: $department?->name ?: $unit?->name ?: $costCenter->name));
+            [$unicoop, $area] = explode('.', $code);
+            $name = trim((string) $centro->name);
             if ($name === '') {
                 continue;
             }
 
             $options->push((object) [
-                'id' => $department?->id ?: $unit?->id,
+                'id' => null,
                 'name' => $name,
-                'display_name' => $name . ' - ' . $unicoop . '.' . $area,
+                'display_name' => $name . ' - ' . $code,
                 'unicoop' => $unicoop,
                 'area' => $area,
-                'source' => $department ? 'departamento' : 'unidade',
-                'organization_unit_id' => $unit?->id,
-                'organization_department_id' => $department?->id,
-                'organization_cost_center_id' => $costCenter->id,
-                'office_key' => mb_strtolower($name) . '|' . $unicoop . '|' . $area,
-                'sort_key' => mb_strtolower($name) . '|' . $unicoop . '|' . $area,
-            ]);
-        }
-
-        foreach ($departments as $department) {
-            $name = trim((string) $department->name);
-            if ($name === '') {
-                continue;
-            }
-
-            $unicoop = $formatUnit($department->source_unit_id);
-            $area = $formatArea($department->source_area_id);
-            $options->push((object) [
-                'id' => $department->id,
-                'name' => $name,
-                'display_name' => $name . ' (Departamento)',
-                'unicoop' => $unicoop,
-                'area' => $area !== '000' ? $area : null,
-                'source' => 'departamento',
+                'source' => str_starts_with($code, '01.') ? 'sede' : 'unidade',
                 'organization_unit_id' => null,
-                'organization_department_id' => $department->id,
+                'organization_department_id' => null,
                 'organization_cost_center_id' => null,
-                'office_key' => mb_strtolower($name) . '|' . ($unicoop ?? '') . '|' . ($area ?? ''),
-                'sort_key' => mb_strtolower($name) . '|zz',
+                'office_key' => mb_strtolower($name) . '|' . $unicoop . '|' . $area,
+                'sort_key' => mb_strtolower($name) . '|' . $code,
             ]);
         }
 
         return $options
-            ->unique(fn ($item) => $item->name . '|' . $item->unicoop . '|' . $item->area . '|' . $item->organization_cost_center_id)
+            ->unique(fn ($item) => $item->name . '|' . $item->unicoop . '|' . $item->area)
             ->sortBy('sort_key')
             ->values();
     }
@@ -856,6 +809,17 @@ class LicensingController extends Controller
                 ->first();
         }
 
+        // O centro de custo do CoreTI escolhido (unicoop.área vindos do option)
+        // é autoritativo: prevalece sobre a resolução por nome da intranet.
+        $postedUnicoop = trim((string) ($data['unicoop_office'] ?? ''));
+        $postedArea = trim((string) ($data['area_office'] ?? ''));
+        if ($postedUnicoop !== '') {
+            $unicoop = $postedUnicoop;
+        }
+        if ($postedArea !== '') {
+            $area = $postedArea;
+        }
+
         $unitDigits = preg_replace('/\D+/', '', (string) $unicoop) ?: '';
         $areaDigits = preg_replace('/\D+/', '', (string) $area) ?: '';
 
@@ -885,22 +849,25 @@ class LicensingController extends Controller
         $normalizedUnicoop = $unitDigits !== '' ? str_pad((string) ((int) $unitDigits), 2, '0', STR_PAD_LEFT) : null;
         $normalizedArea = $areaDigits !== '' ? str_pad((string) ((int) $areaDigits), 3, '0', STR_PAD_LEFT) : null;
 
-        $costCenterCode = null;
-        if ($costCenter !== null) {
-            $costCenterSourceId = preg_replace('/\D+/', '', (string) $costCenter->source_id) ?: '';
-            $costCenterCode = $normalizedUnicoop !== null && $normalizedArea !== null
-                ? $normalizedUnicoop . '.' . $normalizedArea
-                : ($costCenterSourceId !== '' ? $costCenterSourceId : null);
-        }
+        // Grava o código SEMPRE pelo unicoop.área escolhido (código do CoreTI),
+        // mesmo quando não há centro de custo correspondente na intranet.
+        $costCenterCode = $normalizedUnicoop !== null && $normalizedArea !== null
+            ? $normalizedUnicoop . '.' . $normalizedArea
+            : ($costCenter !== null && ($sid = preg_replace('/\D+/', '', (string) $costCenter->source_id)) !== '' ? $sid : null);
+
+        // Nome do centro de custo pelo catálogo do CoreTI (fonte da verdade).
+        $coretiCostCenterName = $costCenterCode !== null
+            ? CoretiCostCenter::query()->active()->where('code', $costCenterCode)->value('name')
+            : null;
 
         return [
             'unicoop' => $normalizedUnicoop,
             'area' => $normalizedArea,
             'unit_id' => $unit?->id,
-            'unit_name' => (string) ($unit?->name ?: ($data['departamento_unidade'] ?? '')),
+            'unit_name' => (string) ($coretiCostCenterName ?: $unit?->name ?: ($data['departamento_unidade'] ?? '')),
             'cost_center_id' => $costCenter?->id,
             'code' => $costCenterCode,
-            'cost_center_name' => (string) ($costCenter?->name ?: ($data['departamento_unidade'] ?? '')),
+            'cost_center_name' => (string) ($coretiCostCenterName ?: $costCenter?->name ?: ($data['departamento_unidade'] ?? '')),
             'department_id' => $department?->id,
             'department_name' => (string) ($department?->name ?: ''),
         ];

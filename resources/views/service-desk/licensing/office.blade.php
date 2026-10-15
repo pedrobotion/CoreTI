@@ -137,7 +137,7 @@
                         <th class="px-4 py-3">Atividade M365</th>
                         <th class="px-4 py-3">Match</th>
                         <th class="px-4 py-3">Licenças</th>
-                        <th class="px-4 py-3">Ações</th>
+                        <th class="px-4 py-3 text-right whitespace-nowrap">Ações</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200">
@@ -178,7 +178,7 @@
                                 @endphp
                                 {{ $skuLabels->isNotEmpty() ? $skuLabels->implode(', ') : 'Licença não catalogada' }}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 whitespace-nowrap">
                                 @if($canManage)
                                     @php
                                         $officeEditPayload = [
@@ -201,7 +201,7 @@
                                             'update_url' => route('administrativo.licensing.office.update', $item),
                                         ];
                                     @endphp
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div class="flex items-center justify-end gap-2 whitespace-nowrap">
                                         @php
                                             $officeOrganizationPayload = [
                                                 'departamento_unidade' => $item->departamento_unidade,
