@@ -140,14 +140,22 @@ class VerificarPendenciasBancada extends Command
             ? (string) config('bancada.pendencias.terceiros_jira_responsavel')
             : null;
 
+        // Catálogo e tipo de issue por pendência: entrada_fiscal/terceiros são
+        // INCIDENTE (1701), aguardando_peca é REQUISIÇÃO (catálogo de requisição,
+        // issue type 10010). Quem não estiver mapeado cai no catálogo padrão.
+        $tipoCfg = (array) config("bancada.pendencias.tipos.{$p['pendencia']}", []);
+        $requestType = (string) ($tipoCfg['request_type'] ?? config('bancada.pendencias.jira_request_type'));
+        $issueType = (string) ($tipoCfg['issue_type'] ?? '');
+        $extra = $issueType !== '' ? ['issuetype' => ['id' => $issueType]] : [];
+
         try {
             return $jira->abrir(
                 $titulo,
                 $descricao,
                 'bancada-pendencia',
-                [],
+                $extra,
                 $equipe,
-                (string) config('bancada.pendencias.jira_request_type'),
+                $requestType,
                 semEquipe: false,
                 assigneeEmail: $responsavel,
             );
@@ -205,10 +213,9 @@ class VerificarPendenciasBancada extends Command
     private function tabelaResumo(array $resumo, int $total): void
     {
         $this->table(
-            ['Entrada fiscal', 'Saída NF', 'Terceiros', 'Aguardando peça', 'Total'],
+            ['Entrada fiscal', 'Terceiros', 'Aguardando peça', 'Total'],
             [[
                 $resumo['entrada_fiscal'] ?? 0,
-                $resumo['saida_nf'] ?? 0,
                 $resumo['terceiros'] ?? 0,
                 $resumo['aguardando_peca'] ?? 0,
                 $total,

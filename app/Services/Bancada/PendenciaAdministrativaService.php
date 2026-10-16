@@ -24,12 +24,10 @@ class PendenciaAdministrativaService
             'dias_cfg' => 'entrada_fiscal_dias',
             'extra' => null,
         ],
-        'saida_nf' => [
-            'rotulo' => 'Nota de saída não emitida',
-            'status' => ['Pronto para entrega'],
-            'dias_cfg' => 'saida_nf_dias',
-            'extra' => 'e.nota_saida_emitida_em IS NULL',
-        ],
+        // A nota de saída NÃO é tratada aqui: o comando bancada:chamados-nota-saida
+        // já abre 1 chamado por ROTA (consolidado) como Requisição, no dia da
+        // separação. Tratar como pendência aqui abria incidentes separados por
+        // equipamento, duplicando aquilo — por isso foi removido.
         'terceiros' => [
             'rotulo' => 'Parado no terceiro',
             'status' => ['Terceiros'],

@@ -29,8 +29,35 @@ return [
 
         // Catálogo (tipo de solicitação) no Jira: "ADM - Atualização Pendente"
         // (id 1701 no service desk 5), criado para as pendências administrativas.
-        // Sem isto cairia no padrão global (713 = "Falha de Backup").
+        // Sem isto cairia no padrão global (713 = "Falha de Backup"). Serve de
+        // padrão para quem não estiver em 'tipos' abaixo.
         'jira_request_type' => env('BANCADA_PEND_JIRA_REQUEST_TYPE', '1701'),
+
+        // Tipo de chamado POR pendência (catálogo + tipo de issue). Regra do
+        // negócio:
+        //  - entrada_fiscal: vira INCIDENTE quando passa do prazo de entrada
+        //    (catálogo "ADM - Atualização Pendente" 1701 = Incidente 10008).
+        //  - terceiros: INCIDENTE (parado no terceiro além do prazo); continua
+        //    indo para a Bancada e já atribuído (ver terceiros_* acima).
+        //  - aguardando_peca: NÃO é incidente, é uma REQUISIÇÃO — usa um catálogo
+        //    de requisição ("ADM - Requisição de Compras" 162 = Requisição 10010).
+        // A nota de saída não entra aqui: tem fluxo próprio (1 Requisição por
+        // rota, catálogo 160) e, se passa do prazo, não abre nada (o entregador
+        // já saiu, não adianta incidente).
+        'tipos' => [
+            'entrada_fiscal' => [
+                'request_type' => env('BANCADA_PEND_EF_REQUEST_TYPE', '1701'),
+                'issue_type' => env('BANCADA_PEND_EF_ISSUE_TYPE', '10008'),
+            ],
+            'terceiros' => [
+                'request_type' => env('BANCADA_PEND_TERC_REQUEST_TYPE', '1701'),
+                'issue_type' => env('BANCADA_PEND_TERC_ISSUE_TYPE', '10008'),
+            ],
+            'aguardando_peca' => [
+                'request_type' => env('BANCADA_PEND_PECA_REQUEST_TYPE', '162'),
+                'issue_type' => env('BANCADA_PEND_PECA_ISSUE_TYPE', '10010'),
+            ],
+        ],
 
         // Pendências de TERCEIROS (equipamento parado em terceiro) vão para a
         // Bancada e já são atribuídas ao responsável. Os demais tipos seguem o
