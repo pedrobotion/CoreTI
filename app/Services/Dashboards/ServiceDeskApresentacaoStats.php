@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Indicadores da apresentação SEMANAL do Service Desk, calculados ao vivo da
- * tabela `jiras` (projeto TIC). Reproduz os 5 painéis do deck: Chamados
- * Atendidos, Backlog, Incidentes de Internet, Top 5 Catálogos e Unidade Pivot.
+ * tabela `jiras` (projeto TIC). Painéis do deck: Chamados Atendidos, Backlog,
+ * Incidentes de Internet e Top 5 Catálogos. Pode ser filtrado por EMPRESA
+ * (Cocari × afiliadas TratorNew/TratorCase/Pivot), via o prefixo da `unidade`.
  *
  * A janela é a semana (segunda 00:00 → domingo 23:59). As datas em `jiras` já
  * estão em horário de Brasília, então a janela é comparada direto, sem fuso.
@@ -28,6 +29,16 @@ class ServiceDeskApresentacaoStats
     /** Squad/time selecionado; null = todos os times. */
     private ?string $squad;
 
+    /** Empresa selecionada (cocari/tratornew/tratorcase/pivot); null = todas. */
+    private ?string $empresa;
+
+    /** Identifica a empresa pelo prefixo da `unidade` em `jiras`. */
+    private const EMPRESAS_PREFIXO = [
+        'pivot' => 'Pivot',
+        'tratornew' => 'Tratornew',
+        'tratorcase' => 'Tratorcase',
+    ];
+
     private const EXCLUIR_CATALOGOS = [
         'Emissor não Habilitado na Receita',
         'Falha na execução de automação',
@@ -45,7 +56,7 @@ class ServiceDeskApresentacaoStats
      * Período analisado. Com $fim, usa [$inicio, $fim] direto (ex.: mês inteiro);
      * sem $fim, trata $inicio como uma data dentro da semana (compatibilidade).
      */
-    public function __construct(?string $inicio = null, ?string $fim = null, ?string $squad = null, string $modo = 'periodo')
+    public function __construct(?string $inicio = null, ?string $fim = null, ?string $squad = null, string $modo = 'periodo', ?string $empresa = null)
     {
         if ($fim !== null) {
             $this->ini = Carbon::createFromFormat('Y-m-d', $inicio)->startOfDay();
@@ -57,6 +68,13 @@ class ServiceDeskApresentacaoStats
         }
         $this->modo = $modo === 'mes' ? 'mes' : 'periodo';
         $this->squad = ($squad !== null && trim($squad) !== '') ? $squad : null;
+        $empresa = $empresa !== null ? mb_strtolower(trim($empresa)) : null;
+        $this->empresa = ($empresa === 'cocari' || isset(self::EMPRESAS_PREFIXO[$empresa])) ? $empresa : null;
+    }
+
+    public function empresa(): ?string
+    {
+        return $this->empresa;
     }
 
     /** Identificador do período: a segunda-feira da semana, ou o 1º dia do mês. */
@@ -128,7 +146,32 @@ class ServiceDeskApresentacaoStats
             });
         }
 
+        $this->aplicarEmpresa($q);
+
         return $q;
+    }
+
+    /** Filtra a empresa pela `unidade`: prefixo p/ afiliadas, resto = Cocari. */
+    private function aplicarEmpresa($q): void
+    {
+        if ($this->empresa === null) {
+            return; // todas as empresas
+        }
+
+        if (isset(self::EMPRESAS_PREFIXO[$this->empresa])) {
+            $q->where('unidade', 'like', self::EMPRESAS_PREFIXO[$this->empresa].'%');
+
+            return;
+        }
+
+        // Cocari = tudo que NÃO é afiliada (inclui unidade vazia/nula).
+        $q->where(function ($w) {
+            $w->whereNull('unidade')->orWhere(function ($x) {
+                foreach (self::EMPRESAS_PREFIXO as $prefixo) {
+                    $x->where('unidade', 'not like', $prefixo.'%');
+                }
+            });
+        });
     }
 
     private function semRobos($q)
@@ -361,39 +404,4 @@ class ServiceDeskApresentacaoStats
         ];
     }
 
-    // --------------------------------------------------------- 5) UNIDADE PIVOT
-
-    public function unidadePivot(): array
-    {
-        $q = fn () => $this->criadosNaSemana($this->base())->where('unidade', 'like', 'Pivot%');
-
-        $total = $q()->count();
-        $requisicoes = $q()->where('tipo_requisicao', 'like', '%Requis%')->count();
-        $incidentes = $q()->where('tipo_requisicao', 'like', '%Incid%')->count();
-        $resolvidos = $q()->whereNotNull('data_hora_resolucao')->count();
-
-        $porFilial = $q()
-            ->selectRaw('CONCAT("Pivot - ", COALESCE(NULLIF(TRIM(departamento),""),"Sem Departamento")) u, COUNT(*) n')
-            ->groupBy('u')->orderByDesc('n')->get();
-        $maisAtiva = $porFilial->first();
-
-        $incidentesList = $q()->where('tipo_requisicao', 'like', '%Incid%')
-            ->orderBy('data_hora_criacao')
-            ->get(['chave', 'catalogo', 'departamento']);
-
-        return [
-            'total' => $total,
-            'requisicoes' => $requisicoes,
-            'incidentes' => $incidentes,
-            'resolvidos' => $resolvidos,
-            'pctReq' => $total > 0 ? round($requisicoes / $total * 100, 2) : 0,
-            'pctInc' => $total > 0 ? round($incidentes / $total * 100, 2) : 0,
-            'pctResolvidos' => $total > 0 ? round($resolvidos / $total * 100, 2) : 0,
-            'porFilial' => $porFilial,
-            'filialMaisAtiva' => $maisAtiva->u ?? '—',
-            'filialMaisAtivaQtd' => $maisAtiva->n ?? 0,
-            'filialMaisAtivaPct' => ($total > 0 && $maisAtiva) ? round($maisAtiva->n / $total * 100, 2) : 0,
-            'incidentesList' => $incidentesList,
-        ];
-    }
 }

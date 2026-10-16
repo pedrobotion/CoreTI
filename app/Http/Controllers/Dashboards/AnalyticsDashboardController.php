@@ -89,7 +89,19 @@ class AnalyticsDashboardController extends Controller
             'fim' => ['nullable', 'date_format:Y-m-d'],
             'mes' => ['nullable', 'regex:/^\d{4}-\d{2}$/'],
             'time' => ['nullable', 'string', 'max:120'],
+            'empresa' => ['nullable', 'string', 'in:cocari,tratornew,tratorcase,pivot,todas'],
         ]);
+
+        // Empresas vinculadas à Cocari (filtro por `unidade` em jiras). "todas"
+        // mantém a visão geral; o padrão é Cocari (a cooperativa).
+        $empresas = [
+            'cocari' => 'Cocari',
+            'tratornew' => 'TratorNew',
+            'tratorcase' => 'TratorCase',
+            'pivot' => 'Pivot',
+            'todas' => 'Todas as empresas',
+        ];
+        $empresaSelecionada = isset($empresas[$filtros['empresa'] ?? '']) ? $filtros['empresa'] : 'cocari';
 
         // Times (squads) disponíveis, do mais ao menos movimentado.
         $times = \Illuminate\Support\Facades\DB::table('jiras')
@@ -132,7 +144,13 @@ class AnalyticsDashboardController extends Controller
             $inicioSel = $fimSel = '';
         }
 
-        $stats = new ServiceDeskApresentacaoStats($ini->format('Y-m-d'), $fim->format('Y-m-d'), $timeSelecionado, $modo);
+        $stats = new ServiceDeskApresentacaoStats(
+            $ini->format('Y-m-d'),
+            $fim->format('Y-m-d'),
+            $timeSelecionado,
+            $modo,
+            $empresaSelecionada === 'todas' ? null : $empresaSelecionada,
+        );
 
         // Seletor de mês: últimos 12 meses (mês/ano). O período livre vem dos calendários.
         $meses = collect(range(0, 11))
@@ -155,12 +173,14 @@ class AnalyticsDashboardController extends Controller
             'mesSelecionado' => $mesSelecionado,
             'times' => $times,
             'timeSelecionado' => $timeSelecionado,
+            'empresas' => $empresas,
+            'empresaSelecionada' => $empresaSelecionada,
+            'empresaLabel' => $empresas[$empresaSelecionada],
             'atendidos' => $stats->chamadosAtendidos(),
             'comparativoMensal' => $stats->comparativoMensal(),
             'backlog' => $stats->backlog(),
             'internet' => $stats->incidentesInternet(),
             'top5' => $stats->top5Catalogos(),
-            'pivot' => $stats->unidadePivot(),
         ]);
     }
 

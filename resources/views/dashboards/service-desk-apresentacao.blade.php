@@ -7,7 +7,6 @@
             'backlog' => 'Backlog',
             'internet' => 'Internet',
             'top5' => 'Top 5 Incidentes',
-            'pivot' => 'Unidade Pivot',
         ];
     @endphp
 
@@ -63,9 +62,12 @@
           <div id="sd-content" class="flex min-h-0 flex-1 flex-col">
             {{-- Cabeçalho --}}
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-                <h1 class="text-lg font-extrabold text-white sm:text-xl">Apresentação {{ $modo === 'mes' ? 'Mensal' : 'por Período' }} — Service Desk</h1>
+                <h1 class="text-lg font-extrabold text-white sm:text-xl">Apresentação {{ $modo === 'mes' ? 'Mensal' : 'por Período' }} — Infraestrutura TI <span class="text-sky-300/80">· {{ $empresaLabel }}</span></h1>
                 <div class="flex items-center gap-2">
-                    <form method="GET" class="flex items-center gap-2">
+                    <form method="GET" id="sd-filtros" class="flex items-center gap-2">
+                        {{-- Empresa é escolhida pelos botões acima das abas; aqui só
+                             preserva o valor nos recarregamentos dos demais filtros. --}}
+                        <input type="hidden" name="empresa" value="{{ $empresaSelecionada }}">
                         <span class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Time</span>
                         <select name="time" @change="reload($event.target.form)" style="color-scheme: dark;"
                                 class="h-8 max-w-[190px] rounded-lg border-white/15 bg-white/10 text-sm font-semibold text-slate-100 focus:border-sky-400 focus:ring-sky-400">
@@ -99,7 +101,7 @@
                                 class="h-8 rounded-lg border border-sky-400/40 bg-sky-500/15 px-3 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/25">Aplicar</button>
                     </form>
                     <span class="hidden items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm sm:inline-flex">
-                        Time: <span class="font-semibold text-sky-400">Service Desk</span>
+                        <span class="font-semibold text-sky-400">Infraestrutura de TI</span>
                     </span>
                     <button type="button" @click="toggleFs()"
                             class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-slate-300 transition hover:border-sky-400/40 hover:text-sky-300"
@@ -108,6 +110,15 @@
                         <svg x-show="fs" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
                     </button>
                 </div>
+            </div>
+
+            {{-- Empresa (filtro de dados — recarrega o conteúdo) --}}
+            <div class="flex flex-wrap items-center gap-1 border-b border-white/10 px-3 py-1.5">
+                @foreach ($empresas as $valor => $label)
+                    <button type="button"
+                            @click="const f = document.getElementById('sd-filtros'); f.empresa.value = '{{ $valor }}'; reload(f)"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold transition {{ $valor === $empresaSelecionada ? 'bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/40' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5' }}">{{ $label }}</button>
+                @endforeach
             </div>
 
             {{-- Abas --}}
@@ -363,66 +374,6 @@
                 @include('dashboards.partials.sd-rodape', ['texto' => 'No período foram '.$fmt($top5['total']).' incidentes (sem catálogos de automação). O Top 5 concentra '.$fmt($top5['concentracao'],1).'%, liderado por “'.($top5['lider']['catalogo'] ?? '—').'” ('.($top5['lider']['atual'] ?? 0).' casos).'])
             </div>
 
-            {{-- =================== 5) PIVOT =================== --}}
-            <div x-show="tab === 'pivot'" x-cloak :style="fs ? 'height: calc(100vh - 96px)' : ''" class="flex min-h-0 flex-1 flex-col p-4">
-                <h2 class="text-lg font-extrabold text-white">Chamados — Unidade Pivot <span class="text-sm font-medium text-sky-300/80">· {{ $rotuloSemana }}</span></h2>
-
-                <div class="mt-3 grid gap-2.5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
-                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Total de Chamados','valor'=>$fmt($pivot['total']),'nota'=>null])
-                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Requisições','valor'=>$fmt($pivot['requisicoes']),'nota'=>$fmt($pivot['pctReq'],1).'%'])
-                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Incidentes','valor'=>$fmt($pivot['incidentes']),'nota'=>$fmt($pivot['pctInc'],1).'%','cor'=>'text-rose-400'])
-                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Resolvidos','valor'=>$fmt($pivot['resolvidos']),'nota'=>$fmt($pivot['pctResolvidos'],1).'%'])
-                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Filial Mais Ativa','valor'=>str_replace('Pivot - ','',$pivot['filialMaisAtiva']),'nota'=>$pivot['filialMaisAtivaQtd'].' chamados','small'=>true])
-                </div>
-
-                <div class="mt-3 flex min-h-[220px] flex-1 flex-col gap-3 lg:flex-row">
-                    <div class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4 lg:flex-1">
-                        <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Composição / Filiais</div>
-                        <div class="flex items-center gap-5">
-                            @php $lReqP = $circ * ($pivot['pctReq']/100); $lIncP = $circ * ($pivot['pctInc']/100); @endphp
-                            <svg viewBox="0 0 120 120" class="h-28 w-28 shrink-0">
-                                <circle cx="60" cy="60" r="54" fill="none" stroke="#13203a" stroke-width="13"/>
-                                <circle cx="60" cy="60" r="54" fill="none" stroke="#38bdf8" stroke-width="13" stroke-dasharray="{{ $lReqP }} {{ $circ - $lReqP }}" transform="rotate(-90 60 60)"/>
-                                <circle cx="60" cy="60" r="54" fill="none" stroke="#f43f5e" stroke-width="13" stroke-dasharray="{{ $lIncP }} {{ $circ - $lIncP }}" stroke-dashoffset="{{ -$lReqP }}" transform="rotate(-90 60 60)"/>
-                                <text x="60" y="58" text-anchor="middle" class="fill-white" style="font-size:22px;font-weight:800">{{ $fmt($pivot['total']) }}</text>
-                                <text x="60" y="73" text-anchor="middle" class="fill-slate-400" style="font-size:9px;font-weight:700">chamados</text>
-                            </svg>
-                            <div class="space-y-2 text-sm">
-                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-sky-400"></span>Requisições <span class="font-bold text-white">{{ $pivot['requisicoes'] }}</span></div>
-                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-rose-500"></span>Incidentes <span class="font-bold text-white">{{ $pivot['incidentes'] }}</span></div>
-                            </div>
-                        </div>
-                        @php $maxF = max(1, $pivot['porFilial']->max('n') ?? 1); @endphp
-                        <div class="mt-3 flex min-h-0 flex-1 flex-col gap-1.5">
-                            @forelse ($pivot['porFilial'] as $f)
-                                <div class="flex items-center gap-3 text-sm">
-                                    <span class="w-40 shrink-0 truncate text-slate-200">{{ $f->u }}</span>
-                                    <div class="h-3.5 flex-1 overflow-hidden rounded bg-white/5"><div class="h-full rounded bg-gradient-to-r from-blue-800 to-sky-400" style="width: {{ max(8, round($f->n/$maxF*100)) }}%"></div></div>
-                                    <span class="w-6 text-right font-bold text-white">{{ $f->n }}</span>
-                                </div>
-                            @empty
-                                <p class="text-sm text-slate-400">Sem chamados do grupo Pivot neste período.</p>
-                            @endforelse
-                        </div>
-                    </div>
-                    <div class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4 lg:flex-1">
-                        <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Incidentes Registrados</div>
-                        <div class="min-h-0 flex-1 space-y-1.5 overflow-auto pr-1">
-                            @forelse ($pivot['incidentesList'] as $r)
-                                <div class="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                                    <span class="font-mono text-sm font-semibold text-sky-300">{{ $r->chave }}</span>
-                                    <span class="text-sm text-slate-200"> · {{ $r->catalogo ?: '—' }}</span>
-                                    <span class="text-xs text-slate-400">{{ $r->departamento ? '· '.$r->departamento : '' }}</span>
-                                </div>
-                            @empty
-                                <p class="text-sm text-slate-400">Nenhum incidente no período.</p>
-                            @endforelse
-                        </div>
-                    </div>
-                </div>
-
-                @include('dashboards.partials.sd-rodape', ['texto' => 'No período o grupo Pivot registrou '.$fmt($pivot['total']).' chamados ('.$pivot['requisicoes'].' requisições e '.$pivot['incidentes'].' incidentes), com '.$fmt($pivot['pctResolvidos'],1).'% resolvidos.'])
-            </div>
 
             </div>{{-- /flex-1 --}}
           </div>{{-- /#sd-content --}}
