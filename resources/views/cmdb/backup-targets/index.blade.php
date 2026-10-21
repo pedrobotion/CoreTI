@@ -72,8 +72,8 @@
 
         <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100">
                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <th class="px-4 py-3">Servidor</th>
                             <th class="px-4 py-3">Banco</th>

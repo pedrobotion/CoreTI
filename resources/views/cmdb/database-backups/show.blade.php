@@ -104,8 +104,8 @@
             <div class="border-b border-slate-200 px-5 py-3">
                 <h2 class="text-sm font-semibold text-slate-900">Últimas execuções deste par</h2>
             </div>
-            <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50">
+            <table class="min-w-full divide-y divide-slate-100 text-sm">
+                <thead class="border-b border-slate-100">
                     <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <th class="px-4 py-2">Quando</th>
                         <th class="px-4 py-2">Situação</th>
@@ -122,7 +122,7 @@
                                 </a>
                             </td>
                             <td class="px-4 py-2">
-                                <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $item->sucesso ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
+                                <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $item->sucesso ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200' }}">
                                     {{ $item->status }}
                                 </span>
                             </td>

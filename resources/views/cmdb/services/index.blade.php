@@ -19,7 +19,7 @@
                     @forelse($services as $service)
                         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                             <div><div class="font-semibold text-slate-900">{{ $service->name }}</div><div class="text-xs text-slate-500">{{ $service->servers_count }} ativo(s) • {{ $service->category ?: 'Sem categoria' }}</div></div>
-                            <div class="flex items-center gap-2"><span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $service->active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600' }}">{{ $service->active ? 'Ativo' : 'Inativo' }}</span><form method="POST" action="{{ route('cmdb.services.toggle', $service) }}">@csrf @method('PATCH')<button class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold">{{ $service->active ? 'Desativar' : 'Ativar' }}</button></form></div>
+                            <div class="flex items-center gap-2"><span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $service->active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-slate-100 text-slate-600' }}">{{ $service->active ? 'Ativo' : 'Inativo' }}</span><form method="POST" action="{{ route('cmdb.services.toggle', $service) }}">@csrf @method('PATCH')<button class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold">{{ $service->active ? 'Desativar' : 'Ativar' }}</button></form></div>
                         </div>
                     @empty
                         <p class="px-5 py-8 text-sm text-slate-500">Nenhum serviço cadastrado.</p>

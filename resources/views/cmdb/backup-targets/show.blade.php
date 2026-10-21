@@ -117,8 +117,8 @@
                     <p class="text-xs text-slate-500">Cada execução gera um registro; nada é sobrescrito.</p>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead class="bg-slate-50">
+                    <table class="min-w-full divide-y divide-slate-100 text-sm">
+                        <thead class="border-b border-slate-100">
                             <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <th class="px-4 py-2">Quando</th>
                                 <th class="px-4 py-2">Status</th>
@@ -158,8 +158,8 @@
                     <h2 class="text-sm font-semibold text-slate-900">Incidentes</h2>
                     <p class="text-xs text-slate-500">Um por problema contínuo — é o que evita chamado repetido a cada execução.</p>
                 </div>
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100">
                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <th class="px-4 py-2">Tipo</th>
                             <th class="px-4 py-2">Situação</th>

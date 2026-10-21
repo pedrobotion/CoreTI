@@ -332,7 +332,7 @@
                         <p class="mt-1 text-sm text-slate-500">Estado calculado a partir da sincronização oficial do Veeam.</p>
                     </div>
                     @if($backup)
-                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ match($backup->protection_status) { 'protected' => 'bg-emerald-100 text-emerald-800', 'overdue' => 'bg-amber-100 text-amber-800', 'failed', 'unprotected' => 'bg-rose-100 text-rose-800', default => 'bg-slate-100 text-slate-700' } }}">{{ ['protected' => 'Protegido', 'overdue' => 'Atrasado', 'failed' => 'Falhou', 'unprotected' => 'Não protegido', 'unknown' => 'Desconhecido'][$backup->protection_status] ?? 'Desconhecido' }}</span>
+                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ match($backup->protection_status) { 'protected' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200', 'overdue' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200', 'failed', 'unprotected' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200', default => 'bg-slate-100 text-slate-700' } }}">{{ ['protected' => 'Protegido', 'overdue' => 'Atrasado', 'failed' => 'Falhou', 'unprotected' => 'Não protegido', 'unknown' => 'Desconhecido'][$backup->protection_status] ?? 'Desconhecido' }}</span>
                     @endif
                 </div>
                 @if($backup)

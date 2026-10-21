@@ -32,8 +32,8 @@
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Nome</th>
                             <th class="px-5 py-3">Slug</th>
@@ -42,14 +42,14 @@
                             <th class="px-5 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($items as $item)
                             <tr>
                                 <td class="px-5 py-3 font-semibold text-slate-900">{{ $item->name }}</td>
                                 <td class="px-5 py-3 text-slate-700">{{ $item->slug }}</td>
                                 <td class="px-5 py-3 text-slate-700">{{ $item->models_count ?? 0 }}</td>
                                 <td class="px-5 py-3">
-                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $item->is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700' }}">{{ $item->is_active ? 'Sim' : 'Não' }}</span>
+                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $item->is_active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-slate-100 text-slate-700' }}">{{ $item->is_active ? 'Sim' : 'Não' }}</span>
                                 </td>
                                 <td class="px-5 py-3">
                                     <div class="flex flex-wrap gap-2">

@@ -1,24 +1,24 @@
 <x-app-layout>
         @php
             $typeBadgeClass = fn (string $type) => match ($type) {
-            'server' => 'bg-blue-100 text-blue-800',
-            'virtual_machine' => 'bg-cyan-100 text-cyan-800',
-            'database' => 'bg-violet-100 text-violet-800',
-            'switch' => 'bg-emerald-100 text-emerald-800',
-            'firewall', 'sonicwall' => 'bg-orange-100 text-orange-800',
+            'server' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+            'virtual_machine' => 'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200',
+            'database' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+            'switch' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'firewall', 'sonicwall' => 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200',
             'storage' => 'bg-slate-100 text-slate-700',
-            'ups' => 'bg-amber-100 text-amber-800',
-            'link', 'circuit' => 'bg-indigo-100 text-indigo-800',
-            'certificate' => 'bg-fuchsia-100 text-fuchsia-800',
-            'backup' => 'bg-rose-100 text-rose-800',
+            'ups' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+            'link', 'circuit' => 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200',
+            'certificate' => 'bg-fuchsia-50 text-fuchsia-700 ring-1 ring-inset ring-fuchsia-200',
+            'backup' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
             default => 'bg-slate-100 text-slate-700',
         };
             $statusBadgeClass = fn (string $status) => match ($status) {
-            'active' => 'bg-emerald-100 text-emerald-800',
+            'active' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
             'inactive' => 'bg-slate-100 text-slate-700',
-            'maintenance' => 'bg-amber-100 text-amber-800',
-            'decommissioned' => 'bg-rose-100 text-rose-800',
-            'planned' => 'bg-blue-100 text-blue-800',
+            'maintenance' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+            'decommissioned' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
+            'planned' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
                 default => 'bg-slate-100 text-slate-700',
             };
             $cardToneClass = fn (string $tone) => match ($tone) {

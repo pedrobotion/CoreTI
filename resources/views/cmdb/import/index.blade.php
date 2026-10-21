@@ -65,8 +65,8 @@
                 </div>
 
                 <div class="mt-5 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <table class="min-w-full divide-y divide-slate-100 text-sm">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-4 py-3">Linha</th>
                                 <th class="px-4 py-3">Tipo</th>
@@ -83,7 +83,7 @@
                                     <td class="px-4 py-3">{{ data_get($row->data, 'normalized.asset_type', '-') }}</td>
                                     <td class="px-4 py-3">{{ data_get($row->data, 'normalized.name', '-') }}</td>
                                     <td class="px-4 py-3">
-                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $row->status === 'valid' ? 'bg-emerald-100 text-emerald-800' : ($row->status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800') }}">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $row->status === 'valid' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : ($row->status === 'warning' ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200' : 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200') }}">
                                             {{ ucfirst($row->status) }}
                                         </span>
                                     </td>

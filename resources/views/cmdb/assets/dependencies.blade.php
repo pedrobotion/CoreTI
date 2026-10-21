@@ -19,16 +19,16 @@
     $networkRelations = $asset->outgoingRelationships->filter(fn ($relationship) => in_array($relationship->relationship_type, ['connects_to', 'protects', 'backs_up_to', 'replicates_to', 'located_in', 'monitored_by'], true));
     $networkIncoming = $asset->incomingRelationships->filter(fn ($relationship) => in_array($relationship->relationship_type, ['connects_to', 'protects', 'backs_up_to', 'replicates_to', 'located_in', 'monitored_by'], true));
     $badgeClass = fn (string $type) => match ($type) {
-        'hosts' => 'bg-blue-100 text-blue-800',
-        'depends_on' => 'bg-amber-100 text-amber-800',
-        'connects_to' => 'bg-cyan-100 text-cyan-800',
-        'protects' => 'bg-emerald-100 text-emerald-800',
-        'backs_up_to' => 'bg-violet-100 text-violet-800',
-        'replicates_to' => 'bg-fuchsia-100 text-fuchsia-800',
+        'hosts' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+        'depends_on' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+        'connects_to' => 'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200',
+        'protects' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+        'backs_up_to' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+        'replicates_to' => 'bg-fuchsia-50 text-fuchsia-700 ring-1 ring-inset ring-fuchsia-200',
         'uses' => 'bg-slate-100 text-slate-700',
-        'located_in' => 'bg-indigo-100 text-indigo-800',
-        'powered_by' => 'bg-orange-100 text-orange-800',
-        'monitored_by' => 'bg-rose-100 text-rose-800',
+        'located_in' => 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200',
+        'powered_by' => 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200',
+        'monitored_by' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
         default => 'bg-slate-100 text-slate-700',
     };
 @endphp

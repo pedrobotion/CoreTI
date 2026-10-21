@@ -2,10 +2,10 @@
     @php
         $statusBadgeClass = fn (string $status) => match ($status) {
             'manual' => 'bg-slate-100 text-slate-700',
-            'hourly' => 'bg-blue-100 text-blue-800',
-            'daily' => 'bg-emerald-100 text-emerald-800',
-            'weekly' => 'bg-violet-100 text-violet-800',
-            'custom' => 'bg-amber-100 text-amber-800',
+            'hourly' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+            'daily' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'weekly' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+            'custom' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
             default => 'bg-slate-100 text-slate-700',
         };
     @endphp
@@ -47,8 +47,8 @@
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Nome</th>
                             <th class="px-5 py-3">Conector</th>
@@ -60,7 +60,7 @@
                             <th class="px-5 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($items as $item)
                             <tr>
                                 <td class="px-5 py-3 font-semibold text-slate-900">{{ $item->name }}</td>

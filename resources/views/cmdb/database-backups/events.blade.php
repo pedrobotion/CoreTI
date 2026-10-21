@@ -42,8 +42,8 @@
 
         <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100">
                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                             <th class="px-4 py-3">Quando</th>
                             <th class="px-4 py-3">Servidor / Banco</th>
@@ -67,7 +67,7 @@
                                     <p class="text-xs text-slate-400">{{ $evento->database_name }}</p>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $evento->sucesso ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
+                                    <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $evento->sucesso ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200' }}">
                                         {{ $evento->status }}
                                     </span>
                                 </td>

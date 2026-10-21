@@ -2,22 +2,22 @@
     @php
         $typeBadgeClass = fn (string $type) => match ($type) {
             'manual' => 'bg-slate-100 text-slate-700',
-            'vmware' => 'bg-blue-100 text-blue-800',
-            'proxmox' => 'bg-orange-100 text-orange-800',
-            'hyperv' => 'bg-cyan-100 text-cyan-800',
-            'snmp' => 'bg-emerald-100 text-emerald-800',
-            'ssh' => 'bg-indigo-100 text-indigo-800',
-            'winrm' => 'bg-violet-100 text-violet-800',
-            'sonicwall', 'fortigate' => 'bg-rose-100 text-rose-800',
-            'mikrotik', 'idrac', 'ilo' => 'bg-amber-100 text-amber-800',
-            'api' => 'bg-fuchsia-100 text-fuchsia-800',
+            'vmware' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+            'proxmox' => 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200',
+            'hyperv' => 'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200',
+            'snmp' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'ssh' => 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200',
+            'winrm' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+            'sonicwall', 'fortigate' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
+            'mikrotik', 'idrac', 'ilo' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+            'api' => 'bg-fuchsia-50 text-fuchsia-700 ring-1 ring-inset ring-fuchsia-200',
             default => 'bg-slate-100 text-slate-700',
         };
         $statusBadgeClass = fn (string $status) => match ($status) {
-            'active' => 'bg-emerald-100 text-emerald-800',
+            'active' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
             'inactive' => 'bg-slate-100 text-slate-700',
-            'error' => 'bg-rose-100 text-rose-800',
-            'testing' => 'bg-amber-100 text-amber-800',
+            'error' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
+            'testing' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
             default => 'bg-slate-100 text-slate-700',
         };
     @endphp
@@ -39,7 +39,7 @@
                         <h2 class="text-base font-semibold text-slate-900">Teste de conexão</h2>
                         <p class="text-sm text-slate-500">Resumo técnico da última verificação.</p>
                     </div>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ ($testResult['status'] ?? 'failed') === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">{{ $testResult['status'] ?? 'failed' }}</span>
+                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ ($testResult['status'] ?? 'failed') === 'success' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200' }}">{{ $testResult['status'] ?? 'failed' }}</span>
                 </div>
 
                 <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

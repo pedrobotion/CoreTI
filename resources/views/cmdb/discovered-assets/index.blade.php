@@ -1,12 +1,12 @@
 <x-app-layout>
     @php
         $statusBadgeClass = fn (string $status) => match ($status) {
-            'pending' => 'bg-amber-100 text-amber-800',
-            'linked' => 'bg-emerald-100 text-emerald-800',
-            'created' => 'bg-blue-100 text-blue-800',
+            'pending' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+            'linked' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'created' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
             'ignored' => 'bg-slate-100 text-slate-700',
-            'duplicate' => 'bg-violet-100 text-violet-800',
-            'error' => 'bg-rose-100 text-rose-800',
+            'duplicate' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+            'error' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
             default => 'bg-slate-100 text-slate-700',
         };
     @endphp
@@ -117,8 +117,8 @@
                 <button type="submit" form="bulk-discovery-form" formaction="{{ route('cmdb.discovered-assets.bulk-reopen') }}" class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700" onclick="return confirm('Deseja reabrir as descobertas selecionadas?');">Reabrir selecionados</button>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Selecionar</th>
                             <th class="px-5 py-3">Situação</th>
@@ -129,7 +129,7 @@
                             <th class="px-5 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($items as $item)
                             <tr>
                                 <td class="px-5 py-3"><input type="checkbox" name="discovery_ids[]" value="{{ $item->id }}" form="bulk-discovery-form" class="rounded border-slate-300"></td>

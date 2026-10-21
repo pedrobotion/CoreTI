@@ -1,16 +1,16 @@
 <x-app-layout>
     @php
         $badgeClass = fn (string $type) => match ($type) {
-            'hosts' => 'bg-blue-100 text-blue-800',
-            'depends_on' => 'bg-amber-100 text-amber-800',
-            'connects_to' => 'bg-cyan-100 text-cyan-800',
-            'protects' => 'bg-emerald-100 text-emerald-800',
-            'backs_up_to' => 'bg-violet-100 text-violet-800',
-            'replicates_to' => 'bg-fuchsia-100 text-fuchsia-800',
+            'hosts' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+            'depends_on' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+            'connects_to' => 'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-200',
+            'protects' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'backs_up_to' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+            'replicates_to' => 'bg-fuchsia-50 text-fuchsia-700 ring-1 ring-inset ring-fuchsia-200',
             'uses' => 'bg-slate-100 text-slate-700',
-            'located_in' => 'bg-indigo-100 text-indigo-800',
-            'powered_by' => 'bg-orange-100 text-orange-800',
-            'monitored_by' => 'bg-rose-100 text-rose-800',
+            'located_in' => 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200',
+            'powered_by' => 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200',
+            'monitored_by' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
             default => 'bg-slate-100 text-slate-700',
         };
     @endphp
@@ -64,8 +64,8 @@
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Origem</th>
                             <th class="px-5 py-3">Destino</th>
@@ -74,7 +74,7 @@
                             <th class="px-5 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($items as $item)
                             <tr>
                                 <td class="px-5 py-3">

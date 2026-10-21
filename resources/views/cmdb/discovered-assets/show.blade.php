@@ -1,12 +1,12 @@
 <x-app-layout>
     @php
         $statusBadgeClass = fn (string $status) => match ($status) {
-            'pending' => 'bg-amber-100 text-amber-800',
-            'linked' => 'bg-emerald-100 text-emerald-800',
-            'created' => 'bg-blue-100 text-blue-800',
+            'pending' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+            'linked' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'created' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
             'ignored' => 'bg-slate-100 text-slate-700',
-            'duplicate' => 'bg-violet-100 text-violet-800',
-            'error' => 'bg-rose-100 text-rose-800',
+            'duplicate' => 'bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200',
+            'error' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
             default => 'bg-slate-100 text-slate-700',
         };
     @endphp

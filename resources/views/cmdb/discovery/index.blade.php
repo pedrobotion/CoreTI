@@ -1,14 +1,14 @@
 <x-app-layout>
     @php
         $statusBadgeClass = fn (string $status) => match ($status) {
-            'active' => 'bg-emerald-100 text-emerald-800',
-            'success' => 'bg-emerald-100 text-emerald-800',
-            'error' => 'bg-rose-100 text-rose-800',
-            'testing' => 'bg-amber-100 text-amber-800',
+            'active' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'success' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+            'error' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
+            'testing' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
             'inactive' => 'bg-slate-100 text-slate-700',
-            'running' => 'bg-blue-100 text-blue-800',
-            'failed' => 'bg-rose-100 text-rose-800',
-            'warning' => 'bg-amber-100 text-amber-800',
+            'running' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+            'failed' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200',
+            'warning' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
             'simulated' => 'bg-slate-100 text-slate-700',
             default => 'bg-slate-100 text-slate-700',
         };
@@ -49,7 +49,7 @@
                                 <div class="text-xs text-slate-500">{{ $item->connector?->name ?: 'Sem conector' }} • {{ $item->ip_address ?: '-' }}</div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800">Pendente</span>
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200">Pendente</span>
                                 <a href="{{ route('cmdb.discovered-assets.show', $item) }}" class="inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Revisar</a>
                             </div>
                         </div>
@@ -83,10 +83,10 @@
                             default => 'Revisado',
                         };
                         $recentBadgeClass = match ($item['recommendation']) {
-                            'review_required' => 'bg-amber-100 text-amber-800',
+                            'review_required' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
                             'ignored' => 'bg-slate-100 text-slate-700',
-                            'created' => 'bg-blue-100 text-blue-800',
-                            default => 'bg-emerald-100 text-emerald-800',
+                            'created' => 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200',
+                            default => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
                         };
                     @endphp
                     <div class="rounded-md border border-slate-200 p-3 text-sm">

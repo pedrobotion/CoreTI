@@ -48,8 +48,8 @@
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Ativo</th>
                             <th class="px-5 py-3">IP</th>
@@ -62,7 +62,7 @@
                             <th class="px-5 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($items as $item)
                             <tr>
                                 <td class="px-5 py-3">

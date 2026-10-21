@@ -125,8 +125,8 @@
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3"><span class="sr-only">Selecionar</span></th>
                             <th class="px-5 py-3">Ativo</th>
@@ -140,7 +140,7 @@
                             <th class="px-5 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($assets as $asset)
                             <tr>
                                 <td class="px-5 py-3"><input type="checkbox" name="asset_ids[]" value="{{ $asset->id }}" form="bulk-assets-form" class="rounded border-slate-300" aria-label="Selecionar {{ $asset->hostname ?: $asset->name }}"></td>
@@ -177,7 +177,7 @@
                                     @php($backup = $asset->backupRecords->sortByDesc('last_synced_at')->first())
                                     <td class="min-w-40 px-5 py-3">
                                         @if($backup)
-                                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ match($backup->protection_status) { 'protected' => 'bg-emerald-100 text-emerald-800', 'overdue' => 'bg-amber-100 text-amber-800', 'failed', 'unprotected' => 'bg-rose-100 text-rose-800', default => 'bg-slate-100 text-slate-700' } }}">{{ $backupStatuses[$backup->protection_status] ?? 'Desconhecido' }}</span>
+                                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ match($backup->protection_status) { 'protected' => 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200', 'overdue' => 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200', 'failed', 'unprotected' => 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200', default => 'bg-slate-100 text-slate-700' } }}">{{ $backupStatuses[$backup->protection_status] ?? 'Desconhecido' }}</span>
                                             <div class="mt-1 text-xs text-slate-500">{{ optional($backup->last_successful_backup_at)->format('d/m/Y H:i') ?: '-' }}</div>
                                         @else
                                             <span class="text-slate-400">Sem sincronização</span>

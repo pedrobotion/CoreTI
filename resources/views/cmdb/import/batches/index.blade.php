@@ -69,8 +69,8 @@
             </div>
 
             <div class="mt-4 overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-4 py-3">ID</th>
                             <th class="px-4 py-3">Arquivo</th>
@@ -95,7 +95,7 @@
                                 <td class="px-4 py-3">{{ $batch->original_name }}</td>
                                 <td class="px-4 py-3">{{ $batch->user?->name ?? '-' }}</td>
                                 <td class="px-4 py-3">
-                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $batch->status === 'completed' ? 'bg-emerald-100 text-emerald-800' : ($batch->status === 'failed' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700') }}">
+                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $batch->status === 'completed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200' : ($batch->status === 'failed' ? 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200' : 'bg-slate-100 text-slate-700') }}">
                                         {{ $batchStatusLabels[$batch->status] ?? $batch->status }}
                                     </span>
                                 </td>
