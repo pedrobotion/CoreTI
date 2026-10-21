@@ -34,7 +34,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 class="text-base font-bold text-slate-900">Lançamentos</h2>
@@ -75,7 +75,7 @@
                 </form>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <h2 class="text-base font-bold text-slate-900">Cartões</h2>
@@ -84,7 +84,7 @@
                 </div>
 
                 <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <table class="min-w-full divide-y divide-slate-100 text-sm">
                         <thead class="bg-slate-900 text-left text-xs font-semibold uppercase tracking-wide text-white">
                             <tr>
                                 <th class="px-3 py-2">Nome</th>
@@ -95,7 +95,7 @@
                                 <th class="px-3 py-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200 bg-white">
+                        <tbody class="divide-y divide-slate-100 bg-white">
                             @forelse($cards as $card)
                                 <tr>
                                     <td class="px-3 py-2 font-medium text-slate-900">{{ $card->name }}</td>
@@ -130,7 +130,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <h2 class="text-base font-bold text-slate-900">Lançamentos recentes</h2>
@@ -139,7 +139,7 @@
                 </div>
 
                 <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <table class="min-w-full divide-y divide-slate-100 text-sm">
                         <thead class="bg-slate-900 text-left text-xs font-semibold uppercase tracking-wide text-white">
                             <tr>
                                 <th class="px-3 py-2">Compra</th>
@@ -152,7 +152,7 @@
                                 <th class="px-3 py-2">Ações</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200 bg-white">
+                        <tbody class="divide-y divide-slate-100 bg-white">
                             @forelse($purchases as $purchase)
                                 <tr>
                                     <td class="px-3 py-2">

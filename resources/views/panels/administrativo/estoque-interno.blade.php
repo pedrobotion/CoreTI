@@ -64,9 +64,9 @@
             <button class="h-10 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Filtrar</button>
         </form>
 
-        <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <table class="w-full min-w-[800px] text-sm">
-                <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                     <tr>
                         <th class="px-4 py-3">Categoria</th>
                         <th class="px-4 py-3">Produto</th>
@@ -104,7 +104,7 @@
         </section>
 
         <section class="grid gap-5 xl:grid-cols-2">
-            <div class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
                     <h2 class="text-lg font-bold text-slate-950 dark:text-white">Movimentações recentes</h2>
                     <a href="{{ route($eb.'.movimentos') }}" class="text-xs font-semibold text-slate-600 underline dark:text-slate-300">ver tudo</a>
@@ -126,7 +126,7 @@
                 </div>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="border-b border-slate-200 px-6 py-4 dark:border-slate-800">
                     <h2 class="text-lg font-bold text-slate-950 dark:text-white">Reposição pela bancada</h2>
                     <p class="mt-1 text-xs text-slate-500">Peças do estoque da TI consumidas em reparos aguardando reposição.</p>

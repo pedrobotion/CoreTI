@@ -37,22 +37,7 @@
 >
     <header class="top-header bg-white">
         <div class="header-bar flex h-full items-center gap-4 px-4 sm:px-6 lg:px-8">
-            <div class="header-brand flex shrink-0 items-center">
-                <a href="{{ route('dashboard') }}" class="inline-flex items-center">
-                    <img
-                        src="{{ asset('images/branding/cocari-logo-black.png') }}"
-                        alt="Cocari"
-                        class="cocari-logo cocari-logo--black brand-logo"
-                    >
-                    <img
-                        src="{{ asset('images/branding/cocari-logo-white.png') }}"
-                        alt="Cocari"
-                        class="cocari-logo cocari-logo--white brand-logo"
-                    >
-                </a>
-            </div>
-
-            <nav aria-label="Trilha" class="header-crumb hidden min-w-0 items-center gap-2 pl-3 text-sm md:flex">
+            <nav aria-label="Trilha" class="header-crumb flex min-w-0 items-center gap-2 text-sm">
                 <a href="{{ route('dashboard') }}" class="font-semibold text-slate-500 transition hover:text-slate-700">CoreTI</a>
                 @if ($secaoAtual)
                     <svg class="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>

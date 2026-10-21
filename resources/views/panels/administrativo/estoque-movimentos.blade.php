@@ -6,9 +6,9 @@
             <h1 class="mt-2 text-2xl font-bold text-slate-950 dark:text-white">Histórico de movimentações</h1>
         </div>
 
-        <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <table class="w-full min-w-[900px] text-sm">
-                <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                     <tr>
                         <th class="px-4 py-3">Quando</th>
                         <th class="px-4 py-3">Tipo</th>

@@ -9,7 +9,7 @@
             <a href="{{ route('administrativo.cartao-ti.index') }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Voltar</a>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <form method="POST" action="{{ $action }}" enctype="multipart/form-data" class="grid gap-4">
                 @csrf
                 @if(($method ?? 'POST') !== 'POST')

@@ -1,13 +1,13 @@
 <x-app-layout>
     <div class="mx-auto max-w-7xl space-y-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Administrativo</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950">Consulta de Equipamento</h1>
-            <p class="mt-2 text-sm text-slate-600">Localize um equipamento por plaqueta e veja dados completos, anexos e histórico.</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">CoreTI · Administrativo</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Consulta de Equipamento</h1>
+            <p class="mt-1 text-sm text-slate-500">Localize um equipamento por plaqueta e veja dados completos, anexos e histórico.</p>
         </div>
 
         <section class="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <h2 class="text-base font-bold text-slate-900">Consulta de Equipamento</h2>
@@ -31,7 +31,7 @@
                 </form>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 @if(filled($equipmentSearchPlaqueta ?? ''))
                     @if(($equipmentSearchResults ?? collect())->count() > 1 && !($equipmentSearchExactMatch ?? false))
                         <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -44,7 +44,7 @@
                             </div>
                             <div class="mt-4 overflow-x-auto">
                                 <table class="w-full min-w-[720px] text-sm">
-                                    <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                                         <tr>
                                             <th class="px-3 py-2">Plaqueta</th>
                                             <th class="px-3 py-2">Tipo</th>
@@ -54,7 +54,7 @@
                                             <th class="px-3 py-2">Ação</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-slate-200">
+                                    <tbody class="divide-y divide-slate-100">
                                         @foreach($equipmentSearchResults as $candidate)
                                             <tr class="odd:bg-white even:bg-slate-50">
                                                 <td class="px-3 py-2">{{ $candidate->plaqueta }}</td>
@@ -138,7 +138,7 @@
                                 <h3 class="text-sm font-bold uppercase tracking-wide text-slate-700">Anexos</h3>
                                 <div class="mt-3 overflow-x-auto">
                                     <table class="w-full min-w-[760px] text-sm">
-                                        <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                                             <tr>
                                                 <th class="px-3 py-2">Tipo</th>
                                                 <th class="px-3 py-2">Nome</th>
@@ -147,7 +147,7 @@
                                                 <th class="px-3 py-2">Ação</th>
                                             </tr>
                                         </thead>
-                                        <tbody class="divide-y divide-slate-200">
+                                        <tbody class="divide-y divide-slate-100">
                                             @forelse($equipmentSearchRecord->attachments ?? collect() as $attachment)
                                                 <tr>
                                                     <td class="px-3 py-2">{{ $attachment->attachment_type }}</td>
@@ -170,7 +170,7 @@
                                 <h3 class="text-sm font-bold uppercase tracking-wide text-slate-700">Histórico</h3>
                                 <div class="mt-3 overflow-x-auto">
                                     <table class="w-full min-w-[980px] text-sm">
-                                        <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                                             <tr>
                                                 <th class="px-3 py-2">Data/Hora</th>
                                                 <th class="px-3 py-2">Módulo</th>
@@ -181,7 +181,7 @@
                                                 <th class="px-3 py-2">Obs.</th>
                                             </tr>
                                         </thead>
-                                        <tbody class="divide-y divide-slate-200">
+                                        <tbody class="divide-y divide-slate-100">
                                             @forelse(($equipmentSearchRecord->events ?? collect())->take(12) as $event)
                                                 <tr>
                                                     <td class="px-3 py-2">{{ optional($event->created_at)->format('d/m/Y H:i') ?: '-' }}</td>

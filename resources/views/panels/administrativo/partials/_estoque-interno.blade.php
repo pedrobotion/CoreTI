@@ -5,10 +5,10 @@
     </div>
     <div class="overflow-x-auto">
         <table class="w-full min-w-[900px] text-sm">
-            <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+            <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                 <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Unidade/Departamento</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Data chegada</th><th class="px-3 py-2">Peça usada</th><th class="px-3 py-2">Quantidade</th></tr>
             </thead>
-            <tbody class="divide-y divide-slate-200">
+            <tbody class="divide-y divide-slate-100">
                 @forelse(($internalStockReplenishments ?? collect()) as $item)
                     <tr><td class="px-3 py-2">{{ $item->plaqueta }}</td><td class="px-3 py-2">{{ $item->unidade_setor }}</td><td class="px-3 py-2">{{ $item->tipo_equipamento }}</td><td class="px-3 py-2">{{ optional($item->data_chegada)->format('d/m/Y') ?: '-' }}</td><td class="px-3 py-2">{{ $item->peca_nome ?: '-' }}</td><td class="px-3 py-2">{{ $item->peca_quantidade ?: '-' }}</td></tr>
                 @empty

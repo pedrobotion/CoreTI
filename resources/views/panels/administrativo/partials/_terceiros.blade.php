@@ -1,12 +1,20 @@
-<section class="rounded-lg border-2 border-rose-200 bg-rose-50 p-5 shadow-sm">
-    <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-bold text-rose-900">Pendências Terceiros</h2>
-        <span class="rounded-md bg-rose-200 px-2 py-1 text-xs font-semibold text-rose-900">{{ $pendingThirdParty->count() }} pendências</span>
+<section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 sm:px-6">
+        <div class="flex items-center gap-3">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
+                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 6.5a3 3 0 0 1 0 5M18 20a6 6 0 0 0-3-5.2"/></svg>
+            </span>
+            <div>
+                <h2 class="text-base font-bold text-slate-900">Pendências Terceiros</h2>
+                <p class="mt-0.5 text-sm text-slate-500">Equipamentos enviados a terceiros e o acompanhamento do reparo.</p>
+            </div>
+        </div>
+        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">{{ $pendingThirdParty->count() }} pendências</span>
     </div>
 
     <div class="overflow-x-auto">
         <table class="w-full min-w-[980px] text-sm">
-            <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+            <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                 <tr>
                     <th class="px-3 py-2">Plaqueta</th>
                     <th class="px-3 py-2">Tipo</th>
@@ -16,7 +24,7 @@
                     <th class="px-3 py-2">Ação</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200">
+            <tbody class="divide-y divide-slate-100">
                 @forelse($pendingThirdParty as $item)
                     @php
                         $thirdPartyStage = $item->thirdPartyWorkflowStage();
