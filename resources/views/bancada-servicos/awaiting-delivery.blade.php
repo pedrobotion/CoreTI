@@ -12,7 +12,7 @@
                 <input name="tipo" value="{{ $tipo ?? '' }}" placeholder="Tipo" class="h-10 w-full min-w-[120px] rounded-md border-slate-300 text-sm md:w-32">
                 <input name="unidade" value="{{ $unidade ?? '' }}" placeholder="Unidade/Setor" class="h-10 w-full min-w-[170px] rounded-md border-slate-300 text-sm md:w-48">
                 <div class="flex h-10 w-full gap-2 md:w-auto">
-                    <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Buscar</button>
+                    <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Buscar</button>
                     <a href="{{ route('bancada-servicos.awaiting-delivery') }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Limpar</a>
                 </div>
             </form>

@@ -16,7 +16,7 @@
                     </select>
                     <input name="q" value="{{ $search }}" placeholder="Buscar ID, resumo, status, prioridade..." class="h-10 w-full min-w-[260px] rounded-md border-slate-300 text-sm md:flex-1 md:w-auto">
                     <div class="flex h-10 w-full gap-2 md:w-auto">
-                        <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Buscar</button>
+                        <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Buscar</button>
                         <a href="{{ route('bancada-servicos.tickets') }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Limpar</a>
                     </div>
                 </form>

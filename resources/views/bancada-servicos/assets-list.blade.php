@@ -12,7 +12,7 @@
                         Imprimir etiqueta de Backup
                     </a>
                 @endif
-                <button type="button" @click="addModalOpen = true" style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Adicionar equipamento</button>
+                <button type="button" @click="addModalOpen = true" style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Adicionar equipamento</button>
             </div>
         </div>
         @if(isset($statusCounts) && $statusCounts->isNotEmpty())
@@ -76,7 +76,7 @@
                         <option value="oldest" @selected(($sortOrder ?? 'newest') === 'oldest')>Mais antigos primeiro</option>
                     </select>
                     <div class="flex h-10 shrink-0 items-center gap-2">
-                        <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Buscar</button>
+                        <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Buscar</button>
                         <a href="{{ route($resetRoute) }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Limpar</a>
                     </div>
                 </form>
@@ -104,7 +104,7 @@
                                 <th class="px-3 py-3">Data backup</th>
                             @endif
                             <th class="px-3 py-3 {{ $isBackup ? 'w-[230px]' : 'w-[200px]' }}">Observação</th>
-                            <th class="sticky right-0 z-20 min-w-[200px] bg-[#033151] px-3 py-3">Ações</th>
+                            <th class="sticky right-0 z-20 min-w-[200px] bg-white px-3 py-3 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -608,7 +608,7 @@
                                                 </div>
                                                 <div class="sm:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                     <button type="button" @click="editModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                    <button style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Salvar alterações</button>
+                                                    <button style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Salvar alterações</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -713,7 +713,7 @@
                     </div>
                     <div class="mt-5 flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
                         <button type="button" @click="addModalOpen = false; $refs.addEquipmentForm.reset()" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">Cancelar</button>
-                        <button style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90">Adicionar equipamento</button>
+                        <button style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Adicionar equipamento</button>
                     </div>
                 </form>
             </div>
