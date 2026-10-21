@@ -16,20 +16,16 @@
         default => null,
     };
 
-    // Avisos/alertas em que o colaborador está cadastrado (para o sino do topo).
-    // Defensivo: roda em toda página, não pode quebrar o layout.
-    $avisosAtivos = collect();
+    // Alertas REAIS acontecendo agora (sino do topo): sincronizações com
+    // falha/atraso/aviso e lotes de exclusão de AD aguardando aprovação,
+    // filtrados pelos tipos que o usuário recebe. Defensivo + cacheado.
+    $alertas = collect();
     try {
-        $recAviso = \App\Models\CoreTiNotificationRecipient::query()
-            ->where('email', $user->email)
-            ->where('active', true)
-            ->with(['rules' => fn ($q) => $q->where('active', true)->orderBy('label')])
-            ->first();
-        $avisosAtivos = $recAviso ? $recAviso->rules : collect();
+        $alertas = collect(app(\App\Services\UserAlertFeedService::class)->paraUsuario($user));
     } catch (\Throwable $e) {
-        $avisosAtivos = collect();
+        $alertas = collect();
     }
-    $avisosCount = $avisosAtivos->count();
+    $avisosCount = $alertas->count();
     $cargoUsuario = $user->role === 'admin' ? 'Administrador' : 'SED';
     $inicialUsuario = mb_strtoupper(mb_substr(trim((string) $user->name), 0, 1));
 @endphp
@@ -113,20 +109,27 @@
                             <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $avisosCount }}</span>
                         </div>
                         <div class="max-h-80 overflow-y-auto">
-                            @forelse ($avisosAtivos as $aviso)
-                                <div class="flex items-start gap-2.5 px-4 py-2.5 transition hover:bg-slate-50">
-                                    <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600">
-                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            @forelse ($alertas as $alerta)
+                                @php $sevChip = ($alerta['severidade'] ?? 'aviso') === 'critico' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'; @endphp
+                                <a @if(!empty($alerta['url'])) href="{{ $alerta['url'] }}" @endif class="flex items-start gap-2.5 px-4 py-2.5 transition hover:bg-slate-50">
+                                    <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg {{ $sevChip }}">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     </span>
                                     <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-slate-800">{{ $aviso->label }}</p>
-                                        @if ($aviso->description)
-                                            <p class="mt-0.5 text-xs text-slate-500">{{ $aviso->description }}</p>
+                                        <p class="text-sm font-semibold text-slate-800">{{ $alerta['titulo'] }}</p>
+                                        @if (!empty($alerta['descricao']))
+                                            <p class="mt-0.5 text-xs text-slate-500">{{ $alerta['descricao'] }}</p>
                                         @endif
                                     </div>
-                                </div>
+                                </a>
                             @empty
-                                <p class="px-4 py-6 text-center text-sm text-slate-400">Você não está cadastrado em nenhum aviso.</p>
+                                <div class="px-4 py-8 text-center">
+                                    <span class="mx-auto grid h-9 w-9 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </span>
+                                    <p class="mt-2 text-sm font-medium text-slate-600">Tudo em dia</p>
+                                    <p class="text-xs text-slate-400">Nenhum alerta no momento.</p>
+                                </div>
                             @endforelse
                         </div>
                         @if ($user->role === 'admin')
