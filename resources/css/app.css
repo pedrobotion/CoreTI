@@ -1186,12 +1186,18 @@ html.dark .filter-control:focus {
 
 @media (min-width: 768px) {
     .top-header {
-        display: none;
+        display: block;
+        left: 16rem;
+        width: auto;
+    }
+
+    .top-header-cmdb {
+        left: 18rem;
     }
 
     .content-shell {
         margin-left: 16rem;
-        padding-top: 24px;
+        padding-top: 88px;
     }
 }
 

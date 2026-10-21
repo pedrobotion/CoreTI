@@ -53,7 +53,7 @@
         }
     }"
 >
-    <header class="top-header bg-white">
+    <header class="top-header {{ request()->routeIs('cmdb.*') ? 'top-header-cmdb' : '' }} bg-white">
         <div class="header-bar flex h-full items-center gap-4 px-4 sm:px-6 lg:px-8">
             <nav aria-label="Trilha" class="header-crumb flex min-w-0 items-center gap-2 text-sm">
                 <a href="{{ route('dashboard') }}" class="font-semibold text-slate-500 transition hover:text-slate-700">CoreTI</a>
