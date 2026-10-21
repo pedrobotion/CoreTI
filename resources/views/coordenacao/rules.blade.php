@@ -106,7 +106,7 @@
                                 <td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ $billingCycles[$rule->billing_cycle] ?? $rule->billing_cycle }}</td>
                                 <td class="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">{{ 'R$ ' . number_format((float) $rule->amount, 2, ',', '.') }}</td>
                                 <td class="px-5 py-4">
-                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $rule->is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200' }}">
+                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $rule->is_active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200' }}">
                                         {{ $rule->is_active ? 'Sim' : 'Não' }}
                                     </span>
                                 </td>

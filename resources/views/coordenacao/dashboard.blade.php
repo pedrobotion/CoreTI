@@ -212,7 +212,7 @@
                                         <td class="px-5 py-4 font-medium text-slate-900 dark:text-slate-100">{{ $group->group }}</td>
                                         <td class="px-5 py-4 text-slate-600 dark:text-slate-300">{{ number_format($group->users, 0, ',', '.') }}</td>
                                         <td class="px-5 py-4">
-                                            <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $isCandidate ? 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200' }}">
+                                            <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $isCandidate ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-400/15 dark:text-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-400/15 dark:text-emerald-200' }}">
                                                 {{ $isCandidate ? 'Sim' : 'Não' }}
                                             </span>
                                         </td>
