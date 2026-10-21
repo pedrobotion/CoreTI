@@ -35,6 +35,11 @@ class BancadaServicosController extends Controller
         'Switch',
         'Televisão',
     ];
+
+    /** Opções de bateria para Nobreak (casam com as opções do catálogo 85 no Jira). */
+    private const NOBREAK_BATTERY_MODELS = ['7Ah', '18Ah', '45Ah'];
+
+    private const NOBREAK_BATTERY_QUANTITIES = [1, 2, 4, 6];
     private const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
     private const ACTIVE_STATUSES = [
         BancadaStatusFlowService::STATUS_AGUARDANDO_ENTRADA_FISCAL,
@@ -439,6 +444,8 @@ class BancadaServicosController extends Controller
             'mode' => 'create',
             'unitOptionsByOrigin' => $this->equipmentUnitOptionsByOrigin(),
             'equipmentTypeOptions' => self::EQUIPMENT_TYPE_OPTIONS,
+            'nobreakBatteryModels' => self::NOBREAK_BATTERY_MODELS,
+            'nobreakBatteryQuantities' => self::NOBREAK_BATTERY_QUANTITIES,
             'statusOptions' => $this->statusOptionsGrouped(),
         ]);
     }
@@ -516,7 +523,10 @@ class BancadaServicosController extends Controller
             'unidade_setor' => ['required', 'string', 'max:255'],
             'tic' => ['nullable', 'string', 'max:40'],
             'observacao' => ['nullable', 'string', 'max:1000'],
+            'nobreak_modelo_bateria' => ['nullable', 'in:' . implode(',', self::NOBREAK_BATTERY_MODELS)],
+            'nobreak_qtd_baterias' => ['nullable', 'integer', 'in:' . implode(',', self::NOBREAK_BATTERY_QUANTITIES)],
         ]);
+        $data = $this->applyNobreakBatteryRules($request, $data);
         $originOptions = $this->equipmentUnitOptionsByOrigin();
         $allowed = collect($originOptions[$data['origem_tipo']] ?? [])
             ->map(fn ($value) => mb_strtolower(trim((string) $value)))
@@ -1796,6 +1806,27 @@ class BancadaServicosController extends Controller
 
         return preg_replace('/[\s\.\-\/_]+/u', '', $value) ?: '';
     }
+    /**
+     * Bateria do Nobreak (catálogo 85): obrigatória quando o tipo é Nobreak;
+     * zerada para os demais tipos. Devolve $data com os dois campos resolvidos.
+     */
+    private function applyNobreakBatteryRules(Request $request, array $data): array
+    {
+        if (($data['tipo_equipamento'] ?? '') === 'Nobreak') {
+            $bateria = $request->validate([
+                'nobreak_modelo_bateria' => ['required', 'in:' . implode(',', self::NOBREAK_BATTERY_MODELS)],
+                'nobreak_qtd_baterias' => ['required', 'integer', 'in:' . implode(',', self::NOBREAK_BATTERY_QUANTITIES)],
+            ]);
+            $data['nobreak_modelo_bateria'] = $bateria['nobreak_modelo_bateria'];
+            $data['nobreak_qtd_baterias'] = (int) $bateria['nobreak_qtd_baterias'];
+        } else {
+            $data['nobreak_modelo_bateria'] = null;
+            $data['nobreak_qtd_baterias'] = null;
+        }
+
+        return $data;
+    }
+
     private function validateAsset(Request $request, bool $isCreate, ?int $id = null): array
     {
         $rules = [
@@ -1812,6 +1843,8 @@ class BancadaServicosController extends Controller
             'nota_anexo_entrada' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
             'observacao' => ['nullable', 'string', 'max:1000'],
             'tic' => ['nullable', 'string', 'max:40'],
+            'nobreak_modelo_bateria' => ['nullable', 'in:' . implode(',', self::NOBREAK_BATTERY_MODELS)],
+            'nobreak_qtd_baterias' => ['nullable', 'integer', 'in:' . implode(',', self::NOBREAK_BATTERY_QUANTITIES)],
             'peca_nome' => ['nullable', 'string', 'max:255'],
             'peca_quantidade' => ['nullable', 'integer', 'min:1', 'max:999'],
             'peca_origem' => ['nullable', 'in:cd,compra_internet,estoque_ti,dell'],
@@ -1831,6 +1864,7 @@ class BancadaServicosController extends Controller
             'terceiros_orcamento_status' => ['nullable', 'in:aprovado,reprovado'],
         ];
         $data = $request->validate($rules);
+        $data = $this->applyNobreakBatteryRules($request, $data);
         $data['backup_pronto_emprestimo'] = (bool) ($data['backup_pronto_emprestimo'] ?? false);
         $origin = $data['origem_tipo'] ?? 'unidade';
         $unitName = (string) ($data['unidade_setor'] ?? '');

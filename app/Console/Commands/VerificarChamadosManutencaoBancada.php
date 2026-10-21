@@ -111,6 +111,9 @@ class VerificarChamadosManutencaoBancada extends Command
 
             $chave = $this->abrirChamado($jira, $equipment, $unidade);
             if ($chave !== null) {
+                // Grava a TIC no equipamento: a lista de ativos a mostra como
+                // link direto para o chamado no Jira (coluna TIC).
+                $equipment->update(['tic' => $chave]);
                 $this->registrarEvento($equipment, $chave, $jira->urlDoChamado($chave), [
                     'unidade' => $unidade['unidade'],
                     'departamento' => $unidade['departamento'],
@@ -131,29 +134,58 @@ class VerificarChamadosManutencaoBancada extends Command
     private function abrirChamado(JiraTicketOpener $jira, BancadaEquipment $equipment, array $unidade): ?string
     {
         $plaqueta = trim((string) $equipment->plaqueta);
-        $resumo = 'Confirmar com a unidade o defeito do ' . $equipment->tipo_equipamento
-            . ($plaqueta !== '' ? ' ' . $plaqueta : '');
+        $resumo = 'Manutenção ' . $equipment->tipo_equipamento
+            . ($plaqueta !== '' ? ' - PLQ: ' . $plaqueta : '');
+
+        // A observação do equipamento no Core vira a Descrição do chamado.
+        $observacao = trim((string) $equipment->observacao);
+
+        // Nobreak tem catálogo próprio (85) e exige Modelo/Quantidade de bateria.
+        $ehNobreak = mb_strtolower(trim((string) $equipment->tipo_equipamento)) === 'nobreak';
+        $requestType = $ehNobreak
+            ? (string) config('bancada.manutencao.nobreak.jira_request_type')
+            : (string) config('bancada.manutencao.jira_request_type');
 
         $extra = [
-            // Catálogo 98 usa "Requisição de Serviço" (10010), não o tipo padrão.
+            // Catálogos 98 e 85 usam "Requisição de Serviço" (10010).
             'issuetype' => ['id' => (string) config('bancada.manutencao.jira_issue_type')],
-            // Descrição em branco (doc ADF vazio — a equipe preenche depois).
-            'description' => ['type' => 'doc', 'version' => 1, 'content' => []],
             (string) config('bancada.manutencao.campo_unidade') => $unidade['value'],
         ];
-        if ($plaqueta !== '') {
-            $extra[(string) config('bancada.manutencao.campo_patrimonio')] = $plaqueta;
+        // Sem observação: descrição em branco (doc ADF vazio — senão o Jira recusa
+        // um nó de texto vazio). Com observação, o JiraTicketOpener monta o ADF.
+        if ($observacao === '') {
+            $extra['description'] = ['type' => 'doc', 'version' => 1, 'content' => []];
+        }
+        // customfield_10366 (Patrimônio) é numérico no Jira — enviar como número,
+        // não como texto, senão recusa com "O valor da operação deve ser um número".
+        if ($plaqueta !== '' && is_numeric($plaqueta)) {
+            $extra[(string) config('bancada.manutencao.campo_patrimonio')] = (int) $plaqueta;
+        }
+
+        if ($ehNobreak) {
+            $modeloMap = (array) config('bancada.manutencao.nobreak.modelos', []);
+            $qtdMap = (array) config('bancada.manutencao.nobreak.quantidades', []);
+            $modelo = trim((string) $equipment->nobreak_modelo_bateria);
+            $qtd = (int) $equipment->nobreak_qtd_baterias;
+            // Campos obrigatórios do catálogo 85 — sem o dado de bateria no
+            // cadastro, não abre (reabre sozinho quando for preenchido).
+            if (! isset($modeloMap[$modelo]) || ! isset($qtdMap[$qtd])) {
+                $this->warn("  ⚠ #{$equipment->id} Nobreak sem Modelo/Quantidade de bateria no cadastro — não aberto.");
+
+                return null;
+            }
+            $extra[(string) config('bancada.manutencao.nobreak.campo_modelo_bateria')] = ['id' => (string) $modeloMap[$modelo]];
+            $extra[(string) config('bancada.manutencao.nobreak.campo_qtd_baterias')] = ['id' => (string) $qtdMap[$qtd]];
         }
 
         try {
             return $jira->abrir(
                 $resumo,
-                '',
+                $observacao,
                 'bancada-manutencao',
                 $extra,
-                null,
-                (string) config('bancada.manutencao.jira_request_type'),
-                semEquipe: true,
+                (string) config('bancada.manutencao.jira_equipe'),
+                $requestType,
             );
         } catch (Throwable $ex) {
             $this->warn("Falha ao abrir chamado para #{$equipment->id}: " . $ex->getMessage());

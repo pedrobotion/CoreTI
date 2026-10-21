@@ -128,6 +128,32 @@ return [
         'jira_request_type' => env('BANCADA_MANUT_JIRA_REQUEST_TYPE', '98'),
         'jira_issue_type' => env('BANCADA_MANUT_JIRA_ISSUE_TYPE', '10010'),
 
+        // "Equipe de atendimento" (customfield_10087) — obrigatória no catálogo
+        // 98. É a equipe da bancada, que liga para a unidade e confirma o defeito.
+        'jira_equipe' => env('BANCADA_MANUT_JIRA_EQUIPE', 'Time Bancada de Serviços'),
+
+        // Nobreak tem catálogo próprio (85 — "Configuração e Manutenção de
+        // Nobreaks - TI"), que exige Modelo da Bateria e Quantidade de Baterias.
+        // Esses dados vêm do cadastro do equipamento (nobreak_modelo_bateria /
+        // nobreak_qtd_baterias) e são mapeados para as opções do Jira abaixo.
+        'nobreak' => [
+            'jira_request_type' => env('BANCADA_MANUT_NOBREAK_REQUEST_TYPE', '85'),
+            'campo_modelo_bateria' => env('BANCADA_MANUT_NOBREAK_CAMPO_MODELO', 'customfield_10402'),
+            'campo_qtd_baterias' => env('BANCADA_MANUT_NOBREAK_CAMPO_QTD', 'customfield_10404'),
+            // Rótulo do Core => id da opção no Jira.
+            'modelos' => [
+                '7Ah' => '11407',
+                '18Ah' => '11408',
+                '45Ah' => '11409',
+            ],
+            'quantidades' => [
+                1 => '11410',
+                2 => '11411',
+                4 => '11412',
+                6 => '11413',
+            ],
+        ],
+
         // Campos do catálogo 98 (ver /rest/servicedeskapi/.../requesttype/98/field).
         'campo_unidade' => env('BANCADA_MANUT_CAMPO_UNIDADE', 'customfield_10067'),     // Unidade/Departamento (cascata)
         'campo_patrimonio' => env('BANCADA_MANUT_CAMPO_PATRIMONIO', 'customfield_10366'), // Patrimônio do Equipamento
@@ -148,6 +174,10 @@ return [
             'Unidades - Colari' => 'Colari',
             'Loja Agropecuária - Mandaguari' => 'Loja Agropecuária Mandaguari',
             'CTC - Centro Tecnológico COCARI' => 'Centro Tecnológico',
+            'Mandaguari II' => 'Mandaguari - Operacional',
+            'Jandaia do Sul II' => 'São José',
+            'UBP Alvorada' => 'Alvorada do Sul (UBP)',
+            'Ortigueira II' => 'Ortigueira',
         ],
 
         // Webhook do Jira (parte B): token compartilhado e IPs permitidos.

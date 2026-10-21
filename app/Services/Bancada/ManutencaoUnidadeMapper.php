@@ -47,14 +47,27 @@ class ManutencaoUnidadeMapper
         // Unidade não-Sede: aplica apelido e exige casar o nível 1.
         $apelidos = (array) config('bancada.manutencao.apelidos_unidade', []);
         $canonico = $apelidos[$nome] ?? $nome;
+
+        // O apelido pode fixar também o departamento como "Unidade - Departamento".
+        // Só separa se o valor inteiro NÃO casar uma unidade (preserva rótulos que
+        // já contenham " - " e os apelidos de nível 1).
+        $deptForcado = null;
         $pai = $opcoes[$this->norm($canonico)] ?? null;
+        if (! $pai && str_contains($canonico, ' - ')) {
+            [$u, $d] = array_map('trim', explode(' - ', $canonico, 2));
+            $pai = $opcoes[$this->norm($u)] ?? null;
+            $deptForcado = $d !== '' ? $d : null;
+        }
         if (! $pai) {
             return null;
         }
 
-        // Departamento padrão (ex.: Administrativo); se não existir, primeiro filho.
-        $padrao = (string) config('bancada.manutencao.departamento_padrao', '');
-        $filho = $pai['children'][$this->norm($padrao)] ?? (($pai['children'] ?? []) ? reset($pai['children']) : null);
+        // Departamento: fixado no apelido > padrão (ex.: Administrativo) > 1º filho.
+        $filho = $deptForcado !== null ? ($pai['children'][$this->norm($deptForcado)] ?? null) : null;
+        if ($filho === null) {
+            $padrao = (string) config('bancada.manutencao.departamento_padrao', '');
+            $filho = $pai['children'][$this->norm($padrao)] ?? (($pai['children'] ?? []) ? reset($pai['children']) : null);
+        }
 
         return $this->montar($pai, $filho);
     }

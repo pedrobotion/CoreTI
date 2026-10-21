@@ -39,6 +39,8 @@ class BancadaEquipment extends Model
         'entrada_realizada_em',
         'observacao',
         'tic',
+        'nobreak_modelo_bateria',
+        'nobreak_qtd_baterias',
         'peca_nome',
         'peca_quantidade',
         'peca_origem',

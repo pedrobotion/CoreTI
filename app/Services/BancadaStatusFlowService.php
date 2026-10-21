@@ -157,12 +157,12 @@ class BancadaStatusFlowService
 
         $allowed = match ($from) {
             self::STATUS_EM_BANCADA => [
-                self::STATUS_TERCEIROS,
-                self::STATUS_AGUARDANDO_PECA,
                 self::STATUS_EM_MANUTENCAO,
-                self::STATUS_BACKUP,
             ],
             self::STATUS_EM_MANUTENCAO => [
+                self::STATUS_TERCEIROS,
+                self::STATUS_AGUARDANDO_PECA,
+                self::STATUS_BACKUP,
                 self::STATUS_MANUTENCAO_REALIZADA,
                 self::STATUS_SEM_CONSERTO,
             ],
@@ -264,12 +264,12 @@ class BancadaStatusFlowService
 
         return match ($from) {
             self::STATUS_EM_BANCADA => [
-                self::STATUS_TERCEIROS,
-                self::STATUS_AGUARDANDO_PECA,
                 self::STATUS_EM_MANUTENCAO,
-                self::STATUS_BACKUP,
             ],
             self::STATUS_EM_MANUTENCAO => [
+                self::STATUS_TERCEIROS,
+                self::STATUS_AGUARDANDO_PECA,
+                self::STATUS_BACKUP,
                 self::STATUS_MANUTENCAO_REALIZADA,
                 self::STATUS_SEM_CONSERTO,
             ],

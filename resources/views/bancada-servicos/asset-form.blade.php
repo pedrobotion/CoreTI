@@ -6,12 +6,12 @@
         </div>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <form method="POST" enctype="multipart/form-data" action="{{ $mode === 'create' ? route('bancada-servicos.assets.store') : route('bancada-servicos.assets.update', $asset) }}" class="grid gap-3 sm:grid-cols-2" x-data="{ origem: @js(old('origem_tipo', $asset->origem_tipo ?: 'unidade')) }">
+            <form method="POST" enctype="multipart/form-data" action="{{ $mode === 'create' ? route('bancada-servicos.assets.store') : route('bancada-servicos.assets.update', $asset) }}" class="grid gap-3 sm:grid-cols-2" x-data="{ origem: @js(old('origem_tipo', $asset->origem_tipo ?: 'unidade')), tipo: @js(old('tipo_equipamento', $asset->tipo_equipamento)) }">
                 @csrf
                 @if($mode === 'edit') @method('PUT') @endif
                 <div>
                     <label class="text-sm font-medium text-slate-700">Tipo do equipamento</label>
-                    <select name="tipo_equipamento" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                    <select name="tipo_equipamento" x-model="tipo" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
                         <option value="">Selecione</option>
                         @foreach(($equipmentTypeOptions ?? []) as $typeOption)
                             <option value="{{ $typeOption }}" @selected(old('tipo_equipamento', $asset->tipo_equipamento) === $typeOption)>{{ $typeOption }}</option>
@@ -21,6 +21,24 @@
                 <div>
                     <label class="text-sm font-medium text-slate-700">Plaqueta</label>
                     <input name="plaqueta" value="{{ old('plaqueta', $asset->plaqueta) }}" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                </div>
+                <div x-show="tipo === 'Nobreak'" x-cloak>
+                    <label class="text-sm font-medium text-slate-700">Modelo da bateria</label>
+                    <select name="nobreak_modelo_bateria" :required="tipo === 'Nobreak'" :disabled="tipo !== 'Nobreak'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                        <option value="">Selecione</option>
+                        @foreach(($nobreakBatteryModels ?? []) as $modelo)
+                            <option value="{{ $modelo }}" @selected(old('nobreak_modelo_bateria', $asset->nobreak_modelo_bateria) === $modelo)>{{ $modelo }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div x-show="tipo === 'Nobreak'" x-cloak>
+                    <label class="text-sm font-medium text-slate-700">Quantidade de baterias</label>
+                    <select name="nobreak_qtd_baterias" :required="tipo === 'Nobreak'" :disabled="tipo !== 'Nobreak'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                        <option value="">Selecione</option>
+                        @foreach(($nobreakBatteryQuantities ?? []) as $qtd)
+                            <option value="{{ $qtd }}" @selected((string) old('nobreak_qtd_baterias', $asset->nobreak_qtd_baterias) === (string) $qtd)>{{ $qtd }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label class="text-sm font-medium text-slate-700">Data chegada</label>

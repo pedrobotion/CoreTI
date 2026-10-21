@@ -1,4 +1,8 @@
 <x-app-layout>
+    @php
+        $nobreakBatteryModels = array_keys((array) config('bancada.manutencao.nobreak.modelos', []));
+        $nobreakBatteryQuantities = array_keys((array) config('bancada.manutencao.nobreak.quantidades', []));
+    @endphp
     @include('bancada-servicos.partials.label-printer')
     <div class="mx-auto max-w-7xl space-y-6" x-data="{ addModalOpen: {{ old('tipo_equipamento') || old('plaqueta') ? 'true' : 'false' }}, documentsModalOpen: false, documentsList: null, documentEquipmentTag: '', loadingDocuments: false, openDocuments: async function(url, plaqueta) { this.documentsList = null; this.documentEquipmentTag = plaqueta; this.loadingDocuments = true; try { const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }, credentials: 'same-origin' }); if (!res.ok) { const body = await res.text().catch(() => ''); console.error('Erro ao carregar documentos', { status: res.status, statusText: res.statusText, body }); throw new Error(`Erro HTTP ${res.status}`); } const data = await res.json(); this.documentsList = data.documents || []; this.documentsModalOpen = true; } catch (e) { console.error(e); alert('Erro ao carregar documentos do equipamento.'); } finally { this.loadingDocuments = false; } } }">
         <div class="flex items-end justify-between gap-3">
@@ -404,7 +408,7 @@
                                 <td class="{{ $isBackup ? 'max-w-[230px]' : 'max-w-[200px]' }} px-3 py-3 align-top break-words" title="{{ $asset->observacao ?: '' }}">
                                     <div style="display:-webkit-box;-webkit-line-clamp:{{ $isBackup ? 3 : 2 }};-webkit-box-orient:vertical;overflow:hidden;">{{ $asset->observacao ?: '-' }}</div>
                                 </td>
-                                <td class="sticky right-0 z-10 min-w-[200px] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)] group-odd:bg-slate-50 group-even:bg-white" x-data="{ editModalOpen: false, editOrigem: @js($asset->origem_tipo ?: 'unidade'), backupModalOpen: false, loanModalOpen: false }">
+                                <td class="sticky right-0 z-10 min-w-[200px] bg-white px-3 py-3 align-top shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)] group-odd:bg-slate-50 group-even:bg-white" x-data="{ editModalOpen: false, editOrigem: @js($asset->origem_tipo ?: 'unidade'), editTipo: @js($asset->tipo_equipamento), backupModalOpen: false, loanModalOpen: false }">
                                     @if($scope === 'descartados')
                                         <form method="POST" action="{{ route('bancada-servicos.assets.discard.update', $asset) }}" class="mb-2 space-y-2 rounded-md border border-slate-200 p-2">
                                             @csrf
@@ -565,7 +569,7 @@
                                                 @method('PUT')
                                                 <div>
                                                     <label class="text-sm font-medium text-slate-700">Tipo do equipamento</label>
-                                                    <select name="tipo_equipamento" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                    <select name="tipo_equipamento" x-model="editTipo" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                                         <option value="">Selecione</option>
                                                         @foreach(($equipmentTypeOptions ?? []) as $typeOption)
                                                             <option value="{{ $typeOption }}" @selected($asset->tipo_equipamento === $typeOption)>{{ $typeOption }}</option>
@@ -575,6 +579,24 @@
                                                 <div>
                                                     <label class="text-sm font-medium text-slate-700">Plaqueta</label>
                                                     <input name="plaqueta" value="{{ $asset->plaqueta }}" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                </div>
+                                                <div x-show="editTipo === 'Nobreak'" x-cloak>
+                                                    <label class="text-sm font-medium text-slate-700">Modelo da bateria</label>
+                                                    <select name="nobreak_modelo_bateria" :required="editTipo === 'Nobreak'" :disabled="editTipo !== 'Nobreak'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                        <option value="">Selecione</option>
+                                                        @foreach($nobreakBatteryModels as $modelo)
+                                                            <option value="{{ $modelo }}" @selected($asset->nobreak_modelo_bateria === $modelo)>{{ $modelo }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div x-show="editTipo === 'Nobreak'" x-cloak>
+                                                    <label class="text-sm font-medium text-slate-700">Quantidade de baterias</label>
+                                                    <select name="nobreak_qtd_baterias" :required="editTipo === 'Nobreak'" :disabled="editTipo !== 'Nobreak'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                        <option value="">Selecione</option>
+                                                        @foreach($nobreakBatteryQuantities as $qtd)
+                                                            <option value="{{ $qtd }}" @selected((string) $asset->nobreak_qtd_baterias === (string) $qtd)>{{ $qtd }}</option>
+                                                        @endforeach
+                                                    </select>
                                                 </div>
                                                 <div>
                                                     <label class="text-sm font-medium text-slate-700">Origem</label>
@@ -657,13 +679,13 @@
                     enctype="multipart/form-data"
                     action="{{ route('bancada-servicos.assets.store') }}"
                     class="max-h-[78vh] overflow-y-auto px-6 py-5"
-                    x-data="{ origem: @js(old('origem_tipo', 'unidade')) }"
+                    x-data="{ origem: @js(old('origem_tipo', 'unidade')), tipo: @js(old('tipo_equipamento')) }"
                 >
                     @csrf
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <div>
                             <label class="text-sm font-medium text-slate-700">Tipo do equipamento</label>
-                            <select name="tipo_equipamento" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                            <select name="tipo_equipamento" x-model="tipo" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                 <option value="">Selecione</option>
                                 @foreach(($equipmentTypeOptions ?? []) as $typeOption)
                                     <option value="{{ $typeOption }}" @selected(old('tipo_equipamento') === $typeOption)>{{ $typeOption }}</option>
@@ -673,6 +695,24 @@
                         <div>
                             <label class="text-sm font-medium text-slate-700">Plaqueta</label>
                             <input name="plaqueta" value="{{ old('plaqueta') }}" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                        </div>
+                        <div x-show="tipo === 'Nobreak'" x-cloak>
+                            <label class="text-sm font-medium text-slate-700">Modelo da bateria</label>
+                            <select name="nobreak_modelo_bateria" :required="tipo === 'Nobreak'" :disabled="tipo !== 'Nobreak'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                <option value="">Selecione</option>
+                                @foreach($nobreakBatteryModels as $modelo)
+                                    <option value="{{ $modelo }}" @selected(old('nobreak_modelo_bateria') === $modelo)>{{ $modelo }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div x-show="tipo === 'Nobreak'" x-cloak>
+                            <label class="text-sm font-medium text-slate-700">Quantidade de baterias</label>
+                            <select name="nobreak_qtd_baterias" :required="tipo === 'Nobreak'" :disabled="tipo !== 'Nobreak'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                <option value="">Selecione</option>
+                                @foreach($nobreakBatteryQuantities as $qtd)
+                                    <option value="{{ $qtd }}" @selected((string) old('nobreak_qtd_baterias') === (string) $qtd)>{{ $qtd }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-slate-700">Data chegada</label>
