@@ -970,6 +970,42 @@ html.dark .filter-control:focus {
     color: #6c7c93;
 }
 
+/* Grupos retráteis do menu: o título vira um botão que abre/fecha os itens. */
+.coreti-sidebar-heading-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 8px;
+    padding: 4px 6px;
+    margin: 16px 4px 4px;
+    transition: color .15s ease, background .15s ease;
+}
+
+.coreti-sidebar-heading-toggle:hover {
+    color: #aab6c8;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.coreti-sidebar-group-chevron {
+    font-size: 12px;
+    line-height: 1;
+    transition: transform .18s ease;
+    opacity: 0.8;
+}
+
+.coreti-sidebar-heading-toggle.is-collapsed .coreti-sidebar-group-chevron {
+    transform: rotate(-90deg);
+}
+
+.coreti-sidebar-group-items {
+    display: grid;
+    gap: 4px;
+    overflow: hidden;
+}
+
 .coreti-sidebar-link {
     display: grid;
     min-height: 40px;

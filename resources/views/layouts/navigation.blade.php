@@ -15,11 +15,29 @@
         request()->routeIs('dashboard') => 'Início',
         default => null,
     };
+
+    // Avisos/alertas em que o colaborador está cadastrado (para o sino do topo).
+    // Defensivo: roda em toda página, não pode quebrar o layout.
+    $avisosAtivos = collect();
+    try {
+        $recAviso = \App\Models\CoreTiNotificationRecipient::query()
+            ->where('email', $user->email)
+            ->where('active', true)
+            ->with(['rules' => fn ($q) => $q->where('active', true)->orderBy('label')])
+            ->first();
+        $avisosAtivos = $recAviso ? $recAviso->rules : collect();
+    } catch (\Throwable $e) {
+        $avisosAtivos = collect();
+    }
+    $avisosCount = $avisosAtivos->count();
+    $cargoUsuario = $user->role === 'admin' ? 'Administrador' : 'SED';
+    $inicialUsuario = mb_strtoupper(mb_substr(trim((string) $user->name), 0, 1));
 @endphp
 
 <nav
     x-data="{
         profileOpen: false,
+        bellOpen: false,
         mobileMenuOpen: false,
         theme: window.getTheme ? window.getTheme() : 'system',
         circuitsOpen: false,
@@ -73,15 +91,65 @@
                 <div class="relative">
                     <button
                         type="button"
+                        @click="bellOpen = !bellOpen"
+                        class="relative grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                        aria-label="Avisos e alertas"
+                    >
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        @if ($avisosCount > 0)
+                            <span class="absolute -right-0.5 -top-0.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">{{ $avisosCount > 9 ? '9+' : $avisosCount }}</span>
+                        @endif
+                    </button>
+
+                    <div
+                        x-cloak
+                        x-show="bellOpen"
+                        x-transition
+                        @click.outside="bellOpen = false"
+                        class="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 bg-white py-2 shadow-lg"
+                    >
+                        <div class="flex items-center justify-between border-b border-slate-100 px-4 py-2">
+                            <p class="text-sm font-semibold text-slate-900">Avisos e alertas</p>
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $avisosCount }}</span>
+                        </div>
+                        <div class="max-h-80 overflow-y-auto">
+                            @forelse ($avisosAtivos as $aviso)
+                                <div class="flex items-start gap-2.5 px-4 py-2.5 transition hover:bg-slate-50">
+                                    <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-600">
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-slate-800">{{ $aviso->label }}</p>
+                                        @if ($aviso->description)
+                                            <p class="mt-0.5 text-xs text-slate-500">{{ $aviso->description }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <p class="px-4 py-6 text-center text-sm text-slate-400">Você não está cadastrado em nenhum aviso.</p>
+                            @endforelse
+                        </div>
+                        @if ($user->role === 'admin')
+                            <div class="border-t border-slate-100 px-4 pt-2">
+                                <a href="{{ route('service-desk.notification-settings') }}" class="block py-1 text-xs font-semibold text-[#033151] hover:underline">Gerenciar destinatários de avisos →</a>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <button
+                        type="button"
                         @click="profileOpen = !profileOpen"
-                        class="profile-button flex items-center justify-center overflow-hidden rounded-full border border-slate-300 bg-white ring-2 ring-slate-200 hover:bg-slate-100"
+                        class="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-2.5 transition hover:bg-slate-50"
                         aria-label="Abrir menu do perfil"
                     >
-                        <img
-                            src="{{ asset('images/ui/profile-avatar.png') }}"
-                            alt="Perfil"
-                            class="profile-avatar"
-                        >
+                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#033151] text-sm font-bold text-white">{{ $inicialUsuario }}</span>
+                        <span class="hidden min-w-0 text-left sm:block">
+                            <span class="block max-w-[160px] truncate text-sm font-semibold leading-tight text-slate-900">{{ $user->name }}</span>
+                            <span class="block truncate text-xs leading-tight text-slate-500">{{ $cargoUsuario }}</span>
+                        </span>
+                        <svg class="hidden h-4 w-4 shrink-0 text-slate-400 sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </button>
 
                     <div
@@ -146,3 +214,68 @@
         @include('layouts.partials.sidebar-menu', ['containerClass' => 'coreti-sidebar-shell'])
     </aside>
 </nav>
+
+@push('scripts')
+<script>
+(function () {
+    // Transforma cada título do menu (.coreti-sidebar-heading) num grupo
+    // retrátil: clicar no título abre/fecha os itens daquele bloco. O estado
+    // fica no localStorage e a seção da página atual começa sempre aberta.
+    function buildGroups(nav) {
+        if (!nav || nav.dataset.sbGroups) return;
+        nav.dataset.sbGroups = '1';
+        Array.prototype.slice.call(nav.querySelectorAll('.coreti-sidebar-heading')).forEach(function (h) {
+            var title = (h.textContent || '').trim();
+            var items = [];
+            var el = h.nextElementSibling;
+            while (el && !el.classList.contains('coreti-sidebar-heading')) {
+                var next = el.nextElementSibling;
+                items.push(el);
+                el = next;
+            }
+            if (!items.length) return;
+            var wrap = document.createElement('div');
+            wrap.className = 'coreti-sidebar-group-items';
+            h.parentNode.insertBefore(wrap, h.nextSibling);
+            items.forEach(function (i) { wrap.appendChild(i); });
+            h.classList.add('coreti-sidebar-heading-toggle');
+            h.setAttribute('role', 'button');
+            h.setAttribute('tabindex', '0');
+            var chev = document.createElement('span');
+            chev.className = 'coreti-sidebar-group-chevron';
+            chev.textContent = '⌄';
+            h.appendChild(chev);
+            var key = 'coreti.sbgrp.' + title;
+            var hasActive = !!wrap.querySelector('.coreti-sidebar-link-active');
+            var stored = null;
+            try { stored = localStorage.getItem(key); } catch (e) {}
+            var open = stored === null ? true : stored === '1';
+            if (hasActive) open = true;
+            function apply(o) {
+                wrap.style.display = o ? '' : 'none';
+                h.classList.toggle('is-collapsed', !o);
+                h.setAttribute('aria-expanded', o ? 'true' : 'false');
+            }
+            apply(open);
+            function toggle() {
+                open = !open;
+                apply(open);
+                try { localStorage.setItem(key, open ? '1' : '0'); } catch (e) {}
+            }
+            h.addEventListener('click', toggle);
+            h.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+            });
+        });
+    }
+    function init() {
+        document.querySelectorAll('.coreti-sidebar-nav').forEach(buildGroups);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
+@endpush

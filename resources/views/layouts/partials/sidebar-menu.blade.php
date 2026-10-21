@@ -45,18 +45,6 @@
         </a>
     </div>
 
-    <a href="{{ route('profile.edit') }}" class="coreti-sidebar-user">
-        <span class="coreti-sidebar-avatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.8 8.8a3.8 3.8 0 1 1-7.6 0 3.8 3.8 0 0 1 7.6 0ZM4.8 20a7.2 7.2 0 0 1 14.4 0" />
-            </svg>
-        </span>
-        <span class="min-w-0">
-            <span class="coreti-sidebar-user-name">{{ $user->name }}</span>
-            <span class="coreti-sidebar-user-role">{{ $user->role === 'admin' ? 'Administrador' : 'SED' }}</span>
-        </span>
-    </a>
-
     <div class="coreti-sidebar-divider"></div>
 
     <nav class="coreti-sidebar-nav" aria-label="{{ $isServiceDesk ? 'Menu ServiceDesk' : ($isBancadaServicos ? 'Menu Bancada de Serviços' : ($isAdministrativo ? 'Menu Administrativo' : ($isNetworkDatacenter ? 'Menu CMDB' : ($isCoordenacao ? 'Menu Coordenação' : 'Menu principal')))) }}">
