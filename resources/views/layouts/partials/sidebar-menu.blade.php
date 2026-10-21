@@ -25,10 +25,10 @@
     // continuava sem ver nada.
     $canPainelAdministrativo = $canAdministrativo;
 
-    // Governança e Unidade Digital NÃO pertencem ao Administrativo: Governança
-    // vai virar módulo próprio. Até lá ficam restritas a administrador, para
-    // não entrarem junto com uma permissão que não é a delas.
-    $canGovernanca = $isAdminRole;
+    // Unidade Digital NÃO pertence ao Administrativo: fica restrita a
+    // administrador, para não entrar junto com uma permissão que não é a dela.
+    // (O módulo de Governança foi removido em 2026-10-21.)
+    $canUnidadeDigital = $isAdminRole;
     $temAlgumModulo = $canServiceDesk || $canAplicativos || $isAdminRole
         || $canCoordenacao || $canAdmissao || $canUnidades || $canBancada
         || $canPainelAdministrativo || $canImpressoras;
@@ -288,6 +288,22 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16M4 12h10M4 17h7" />
                 </svg>
                 <span>Rotas de malote</span>
+                <span class="coreti-sidebar-chevron">‹</span>
+            </a>
+
+            <a href="{{ route('bancada-servicos.estoque') }}" class="coreti-sidebar-link {{ request()->routeIs('bancada-servicos.estoque*') ? 'coreti-sidebar-link-active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <span>Estoque de peças</span>
+                <span class="coreti-sidebar-chevron">‹</span>
+            </a>
+
+            <a href="{{ route('bancada-servicos.terceiros') }}" class="coreti-sidebar-link {{ request()->routeIs('bancada-servicos.terceiros') ? 'coreti-sidebar-link-active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m5-1.13a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                </svg>
+                <span>Terceiros</span>
                 <span class="coreti-sidebar-chevron">‹</span>
             </a>
 
@@ -924,7 +940,7 @@
             </a>
             @endif
 
-            @if ($canGovernanca)
+            @if ($canUnidadeDigital)
             <a href="{{ route('unidade-digital') }}" class="coreti-sidebar-link {{ request()->routeIs('unidade-digital*') ? 'coreti-sidebar-link-active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                     <rect width="10" height="14" x="7" y="5" rx="1.8" stroke-width="1.8" />
@@ -941,16 +957,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 17h14M7 17V8h10v9M9 20h6" />
                 </svg>
                 <span>Bancada</span>
-                <span class="coreti-sidebar-chevron">‹</span>
-            </a>
-            @endif
-
-            @if ($canGovernanca)
-            <a href="{{ route('governanca') }}" class="coreti-sidebar-link {{ request()->routeIs('governanca*') ? 'coreti-sidebar-link-active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3 4 7l8 4 8-4-8-4ZM4 12l8 4 8-4M4 17l8 4 8-4" />
-                </svg>
-                <span>Governança</span>
                 <span class="coreti-sidebar-chevron">‹</span>
             </a>
             @endif

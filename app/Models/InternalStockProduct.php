@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class InternalStockProduct extends Model
 {
-    public const CATEGORIAS = ['Monitor', 'Computador', 'SSD', 'Outro'];
+    public const CATEGORIAS = ['Nobreak', 'Computador', 'SSD', 'Outro'];
 
     public const CONTROLE_SERIAL = 'serial';
 
@@ -24,12 +24,14 @@ class InternalStockProduct extends Model
     protected $fillable = [
         'categoria', 'nome', 'controle', 'quantidade_minima', 'quantidade_atual',
         'ativo', 'observacao', 'created_by', 'updated_by',
+        'reposicao_pendente_em', 'reposicao_jira_key', 'reposicao_jira_url',
     ];
 
     protected $casts = [
         'ativo' => 'boolean',
         'quantidade_minima' => 'integer',
         'quantidade_atual' => 'integer',
+        'reposicao_pendente_em' => 'datetime',
     ];
 
     public function units(): HasMany

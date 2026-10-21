@@ -1,7 +1,8 @@
 <x-app-layout>
+    @php $eb = request()->routeIs('bancada-servicos.*') ? 'bancada-servicos.estoque' : 'administrativo.estoque-interno'; @endphp
     <div class="mx-auto max-w-7xl space-y-6">
         <div>
-            <a href="{{ route('administrativo.estoque-interno') }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Estoque interno</a>
+            <a href="{{ route($eb) }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Estoque interno</a>
             <h1 class="mt-2 text-2xl font-bold text-slate-950 dark:text-white">Histórico de movimentações</h1>
         </div>
 

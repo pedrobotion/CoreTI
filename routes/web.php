@@ -626,20 +626,14 @@ Route::middleware(['auth', 'active'])->group(function () {
         });
 
     /*
-     | Governança, Unidade Digital, Indicadores e Monitoramento.
+     | Unidade Digital, Indicadores e Monitoramento.
      |
-     | Saíram do grupo Administrativo: não pertencem àquele módulo, e a
-     | Governança vai virar módulo próprio. Até lá ficam restritas a
-     | administrador — entrar junto com a permissão de Administrativo daria
-     | acesso a quem nunca foi autorizado a ver isso.
+     | Saíram do grupo Administrativo: não pertencem àquele módulo. Ficam
+     | restritas a administrador — entrar junto com a permissão de
+     | Administrativo daria acesso a quem nunca foi autorizado a ver isso.
+     | (O módulo de Governança foi removido em 2026-10-21.)
      */
     Route::middleware('admin')->group(function () {
-        Route::view('/governanca', 'panels.governanca')->name('governanca');
-        Route::view('/governanca/visao-geral', 'panels.governanca.visao-geral')->name('governanca.visao-geral');
-        Route::view('/governanca/politicas', 'panels.governanca.politicas')->name('governanca.politicas');
-        Route::view('/governanca/auditorias', 'panels.governanca.auditorias')->name('governanca.auditorias');
-        Route::view('/governanca/riscos', 'panels.governanca.riscos')->name('governanca.riscos');
-
         Route::get('/unidade-digital', [UnidadeDigitalController::class, 'index'])->name('unidade-digital');
         Route::get('/unidade-digital/status', [UnidadeDigitalController::class, 'status'])->name('unidade-digital.status');
         Route::view('/unidade-digital/visao-geral', 'panels.unidade-digital.visao-geral')->name('unidade-digital.visao-geral');
@@ -713,6 +707,24 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/impressora', [BancadaServicosController::class, 'printer'])->name('printer');
         Route::get('/sla', [BancadaServicosController::class, 'sla'])->name('sla');
         Route::get('/relatorios', [BancadaServicosController::class, 'reports'])->name('reports');
+
+        // Estoque de peças (mesmo controller do Administrativo), em rotas da
+        // Bancada para a tela preservar o menu da Bancada ao navegar.
+        Route::get('/estoque-pecas', [\App\Http\Controllers\InternalStockController::class, 'index'])->name('estoque');
+        Route::get('/estoque-pecas/movimentos', [\App\Http\Controllers\InternalStockController::class, 'movimentos'])->name('estoque.movimentos');
+        Route::get('/estoque-pecas/exportar', [\App\Http\Controllers\InternalStockController::class, 'export'])->name('estoque.exportar');
+        Route::get('/estoque-pecas/produtos/{product}/entrada', [\App\Http\Controllers\InternalStockController::class, 'entradaForm'])->name('estoque.entrada');
+        Route::get('/estoque-pecas/produtos/{product}/baixa', [\App\Http\Controllers\InternalStockController::class, 'baixaForm'])->name('estoque.baixa');
+        Route::middleware('module_access:bancada.manage')->group(function () {
+            Route::post('/estoque-pecas/produtos', [\App\Http\Controllers\InternalStockController::class, 'storeProduct'])->name('estoque.produtos.store');
+            Route::post('/estoque-pecas/produtos/{product}/entrada', [\App\Http\Controllers\InternalStockController::class, 'entrada'])->name('estoque.entrada.store');
+            Route::post('/estoque-pecas/produtos/{product}/baixa', [\App\Http\Controllers\InternalStockController::class, 'baixa'])->name('estoque.baixa.store');
+        });
+
+        // Terceiros (mesmo controller/tela do Administrativo), em rota da Bancada
+        // para preservar o menu da Bancada. As ações do formulário já usam
+        // bancada-servicos.assets.administrative.process (módulo bancada).
+        Route::get('/terceiros', [BancadaServicosController::class, 'administrativeThirdParties'])->name('terceiros');
     });
 
     Route::get('/bancada-servicos/anexos/{attachment}/download', [BancadaServicosController::class, 'downloadAttachment'])
@@ -733,15 +745,10 @@ Route::middleware(['auth', 'active'])->group(function () {
      | o módulo, e cada escrita pede 'manage' — quem recebe só 'view' consulta
      | sem alterar.
      */
+    // Estoque interno de peças pelo Administrativo. A Bancada tem o MESMO
+    // controller em rotas próprias (bancada-servicos.estoque*), para a tela
+    // manter o menu da Bancada ao navegar.
     Route::middleware('module_access:administrativo')->group(function () {
-        // Paineis (atalhos principais)
-        Route::get('/administrativo', [BancadaServicosController::class, 'administrativePanel'])->name('administrativo');
-
-        // Subpaginas Administrativo
-        Route::get('/administrativo/visao-geral', [BancadaServicosController::class, 'administrativeOverview'])->name('administrativo.visao-geral');
-        Route::get('/administrativo/entrada-fiscal', [BancadaServicosController::class, 'administrativeEntryFiscal'])->name('administrativo.entrada-fiscal');
-        Route::get('/administrativo/terceiros', [BancadaServicosController::class, 'administrativeThirdParties'])->name('administrativo.terceiros');
-        Route::get('/administrativo/pecas', [BancadaServicosController::class, 'administrativeParts'])->name('administrativo.pecas');
         Route::get('/administrativo/estoque-interno', [\App\Http\Controllers\InternalStockController::class, 'index'])->name('administrativo.estoque-interno');
         Route::get('/administrativo/estoque-interno/movimentos', [\App\Http\Controllers\InternalStockController::class, 'movimentos'])->name('administrativo.estoque-interno.movimentos');
         Route::get('/administrativo/estoque-interno/exportar', [\App\Http\Controllers\InternalStockController::class, 'export'])->name('administrativo.estoque-interno.exportar');
@@ -752,6 +759,18 @@ Route::middleware(['auth', 'active'])->group(function () {
             Route::post('/administrativo/estoque-interno/produtos/{product}/entrada', [\App\Http\Controllers\InternalStockController::class, 'entrada'])->name('administrativo.estoque-interno.entrada.store');
             Route::post('/administrativo/estoque-interno/produtos/{product}/baixa', [\App\Http\Controllers\InternalStockController::class, 'baixa'])->name('administrativo.estoque-interno.baixa.store');
         });
+    });
+
+    Route::middleware('module_access:administrativo')->group(function () {
+        // Paineis (atalhos principais)
+        Route::get('/administrativo', [BancadaServicosController::class, 'administrativePanel'])->name('administrativo');
+
+        // Subpaginas Administrativo
+        Route::get('/administrativo/visao-geral', [BancadaServicosController::class, 'administrativeOverview'])->name('administrativo.visao-geral');
+        Route::get('/administrativo/entrada-fiscal', [BancadaServicosController::class, 'administrativeEntryFiscal'])->name('administrativo.entrada-fiscal');
+        Route::get('/administrativo/terceiros', [BancadaServicosController::class, 'administrativeThirdParties'])->name('administrativo.terceiros');
+        Route::get('/administrativo/pecas', [BancadaServicosController::class, 'administrativeParts'])->name('administrativo.pecas');
+        Route::patch('/administrativo/pecas/processar-lote', [BancadaServicosController::class, 'processPartsBulk'])->name('administrativo.pecas.bulk')->middleware('module_access:administrativo.manage');
         Route::get('/administrativo/nota-saida', [BancadaServicosController::class, 'administrativeOutboundNote'])->name('administrativo.nota-saida');
         Route::get('/administrativo/empresas-terceirizadas', [BancadaServicosController::class, 'administrativeThirdPartyCompanies'])->name('administrativo.empresas-terceirizadas');
         Route::get('/administrativo/historico', [BancadaServicosController::class, 'administrativeHistory'])->name('administrativo.historico');

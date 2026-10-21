@@ -22,6 +22,12 @@ class InternalStockController extends Controller
 {
     public function __construct(private readonly InternalStockService $estoque) {}
 
+    /** Nome da rota "index" do estoque conforme o contexto (Bancada ou Administrativo). */
+    private function indexRoute(): string
+    {
+        return request()->routeIs('bancada-servicos.*') ? 'bancada-servicos.estoque' : 'administrativo.estoque-interno';
+    }
+
     public function index(Request $request): View
     {
         $categoria = trim((string) $request->string('categoria'));
@@ -109,7 +115,7 @@ class InternalStockController extends Controller
         $data = $this->validarEntrada($request, $product);
         $this->estoque->entrada($product, $data, $request->user()?->id);
 
-        return redirect()->route('administrativo.estoque-interno')->with('success', 'Entrada registrada.');
+        return redirect()->route($this->indexRoute())->with('success', 'Entrada registrada.');
     }
 
     public function baixaForm(InternalStockProduct $product): View
@@ -129,7 +135,7 @@ class InternalStockController extends Controller
             return back()->withInput()->withErrors(['quantidade' => $e->getMessage()]);
         }
 
-        return redirect()->route('administrativo.estoque-interno')->with('success', 'Baixa registrada.');
+        return redirect()->route($this->indexRoute())->with('success', 'Baixa registrada.');
     }
 
     public function movimentos(Request $request): View

@@ -228,10 +228,11 @@ class BancadaServicosController extends Controller
         $unassigned = [];
         foreach ($equipments as $equipment) {
             if (
-                ($equipment->origem_tipo ?? null) === 'sede'
-                || $this->statusFlow->isFiscalExemptUnit($equipment->unidade_setor)
+                ! $this->statusFlow->requiresFiscalFlow($equipment)
                 || str_contains(mb_strtolower((string) $equipment->unidade_setor), 'sede')
             ) {
+                // Não precisa de nota/rota (Sede, centro de custo 01.% ou unidade
+                // isenta): entra no grupo Sede, que tem a ação de entrega direta.
                 $sede[] = $equipment;
                 continue;
             }
@@ -598,6 +599,18 @@ class BancadaServicosController extends Controller
             if ($pecaOrigem === 'dell' && $serviceTag === '') {
                 return back()->with('error', 'Para solicitação Dell, informe a ServiceTag.');
             }
+            if ($pecaOrigem === 'estoque_ti') {
+                $produtoEstoque = \App\Models\InternalStockProduct::query()->ativos()
+                    ->where('controle', \App\Models\InternalStockProduct::CONTROLE_QUANTIDADE)
+                    ->whereRaw('LOWER(nome) = ?', [mb_strtolower($pecaNome)])
+                    ->first();
+                if ($produtoEstoque === null) {
+                    return back()->with('error', 'Peça não encontrada no estoque interno. Cadastre-a no estoque ou escolha outra origem.');
+                }
+                if ($pecaQuantidade > (int) $produtoEstoque->saldo) {
+                    return back()->with('error', 'Quantidade maior que o saldo do estoque interno ('.$produtoEstoque->saldo.' un).');
+                }
+            }
         }
         if ($newStatus === BancadaStatusFlowService::STATUS_TERCEIROS && $terceirosProblema === '') {
             return back()->with('error', 'Para enviar para Terceiros, informe a descrição do problema.');
@@ -607,8 +620,9 @@ class BancadaServicosController extends Controller
         } catch (\DomainException $e) {
             return back()->with('error', $e->getMessage());
         }
+        $produtoConsumido = null;
         try {
-            DB::transaction(function () use ($equipment, $newStatus, $pecaNome, $pecaOrigem, $pecaQuantidade, $pecaLinkCompra, $serviceTag, $terceirosProblema, $confirmPecaRecebida): void {
+            DB::transaction(function () use ($equipment, $newStatus, $pecaNome, $pecaOrigem, $pecaQuantidade, $pecaLinkCompra, $serviceTag, $terceirosProblema, $confirmPecaRecebida, &$produtoConsumido): void {
             if ($newStatus === BancadaStatusFlowService::STATUS_AGUARDANDO_PECA) {
                 $equipment->peca_nome = $pecaNome;
                 $equipment->peca_origem = $pecaOrigem;
@@ -633,7 +647,9 @@ class BancadaServicosController extends Controller
                     ]);
                     // Liga o consumo ao estoque interno: se houver um produto por
                     // quantidade com o mesmo nome e saldo, já registra a baixa.
-                    app(\App\Services\Estoque\InternalStockService::class)->registrarConsumoBancada(
+                    // Guarda o produto para, após o commit, checar o mínimo e
+                    // abrir a reposição se preciso.
+                    $produtoConsumido = app(\App\Services\Estoque\InternalStockService::class)->registrarConsumoBancada(
                         (string) $pecaNome,
                         (int) $pecaQuantidade,
                         'bancada#'.$equipment->id,
@@ -711,17 +727,30 @@ class BancadaServicosController extends Controller
             return back()->with('error', $e->getMessage());
         }
         if ($newStatus === BancadaStatusFlowService::STATUS_AGUARDANDO_PECA) {
-            app(JiraAutomationService::class)->dispatch('bancada_aguardando_peca', [
-                'equipamento_id' => $equipment->id,
-                'tipo' => $equipment->tipo_equipamento,
-                'plaqueta' => $equipment->plaqueta,
-                'unidade_setor' => $equipment->unidade_setor,
-                'peca' => $pecaNome,
-                'quantidade' => $pecaQuantidade,
-                'origem' => $pecaOrigem,
-                'link_compra' => $pecaLinkCompra !== '' ? $pecaLinkCompra : null,
-                'service_tag' => $serviceTag !== '' ? $serviceTag : null,
-            ]);
+            if ($pecaOrigem === 'estoque_ti') {
+                // Peça do estoque interno já foi baixada; não vai ao Administrativo
+                // como pendência. Se o consumo fez o saldo bater no mínimo, abre o
+                // chamado de reposição + cobrança (consolidado por produto).
+                if ($produtoConsumido !== null) {
+                    try {
+                        app(\App\Services\Estoque\ReposicaoEstoqueService::class)->abrirSeNecessario($produtoConsumido, auth()->id());
+                    } catch (\Throwable $e) {
+                        logger()->warning('estoque.reposicao.falha', ['produto' => $produtoConsumido->nome, 'erro' => $e->getMessage()]);
+                    }
+                }
+            } else {
+                app(JiraAutomationService::class)->dispatch('bancada_aguardando_peca', [
+                    'equipamento_id' => $equipment->id,
+                    'tipo' => $equipment->tipo_equipamento,
+                    'plaqueta' => $equipment->plaqueta,
+                    'unidade_setor' => $equipment->unidade_setor,
+                    'peca' => $pecaNome,
+                    'quantidade' => $pecaQuantidade,
+                    'origem' => $pecaOrigem,
+                    'link_compra' => $pecaLinkCompra !== '' ? $pecaLinkCompra : null,
+                    'service_tag' => $serviceTag !== '' ? $serviceTag : null,
+                ]);
+            }
         } elseif ($newStatus === BancadaStatusFlowService::STATUS_TERCEIROS) {
             app(JiraAutomationService::class)->dispatch('bancada_terceiros_emissao_nota', [
                 'equipamento_id' => $equipment->id,
@@ -733,6 +762,68 @@ class BancadaServicosController extends Controller
         }
         return back()->with('success', 'Status atualizado.');
     }
+
+    /**
+     * Marca em lote várias pendências de peça (CD / Internet / Dell) como
+     * requisitadas pelo Administrativo — caso comum de requisitar tudo de uma
+     * vez ao Centro de Distribuição. Pula estoque interno (já baixado) e itens
+     * fora de "Aguardando peça" ou já processados.
+     */
+    public function processPartsBulk(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $processed = 0;
+        $skipped = 0;
+        DB::transaction(function () use ($data, &$processed, &$skipped): void {
+            $itens = BancadaEquipment::query()->whereIn('id', $data['ids'])->lockForUpdate()->get();
+            foreach ($itens as $equipment) {
+                $elegivel = $this->statusFlow->normalizeStatus($equipment->status) === BancadaStatusFlowService::STATUS_AGUARDANDO_PECA
+                    && $equipment->peca_origem !== 'estoque_ti'
+                    && $equipment->peca_fluxo_status !== 'requisicao_realizada';
+                if (! $elegivel) {
+                    $skipped++;
+
+                    continue;
+                }
+                $equipment->peca_admin_realizado_em = now();
+                $equipment->peca_fluxo_status = 'requisicao_realizada';
+                $equipment->save();
+                $action = match ($equipment->peca_origem) {
+                    'cd' => 'requisicao_cd_realizada',
+                    'compra_internet' => 'pedido_internet_realizado',
+                    'dell' => 'pedido_dell_realizado',
+                    default => 'requisicao_peca_realizada',
+                };
+                $this->recordEquipmentEvent(
+                    equipment: $equipment,
+                    action: $action,
+                    previousStatus: $equipment->status,
+                    newStatus: $equipment->status,
+                    module: 'Administrativo',
+                    observation: 'Pendência de peça processada em lote pelo Administrativo (solicitado ao CD).',
+                    metadata: [
+                        'origem_peca' => $equipment->peca_origem,
+                        'peca_nome' => $equipment->peca_nome,
+                        'peca_quantidade' => $equipment->peca_quantidade,
+                        'lote' => true,
+                    ]
+                );
+                $processed++;
+            }
+        });
+
+        $msg = "{$processed} item(ns) marcado(s) como solicitado(s).";
+        if ($skipped > 0) {
+            $msg .= " {$skipped} ignorado(s) (já processados ou não elegíveis).";
+        }
+
+        return back()->with('success', $msg);
+    }
+
     public function markEntryCompleted(BancadaEquipment $equipment)
     {
         if (! $this->isEntryFiscalPending($equipment)) {
@@ -1555,6 +1646,12 @@ class BancadaServicosController extends Controller
             'statusOptions' => $this->statusOptionsGrouped(),
             'unitOptionsByOrigin' => $this->equipmentUnitOptionsByOrigin(),
             'availableTransitions' => $availableTransitions,
+            'stockProducts' => \App\Models\InternalStockProduct::query()->ativos()
+                ->where('controle', \App\Models\InternalStockProduct::CONTROLE_QUANTIDADE)
+                ->orderBy('nome')
+                ->get()
+                ->map(fn ($p) => ['nome' => $p->nome, 'saldo' => (int) $p->saldo])
+                ->values(),
         ]);
     }
     private function administrativePanelData(): array

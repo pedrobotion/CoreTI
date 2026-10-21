@@ -1,7 +1,8 @@
 <x-app-layout>
+    @php $eb = request()->routeIs('bancada-servicos.*') ? 'bancada-servicos.estoque' : 'administrativo.estoque-interno'; @endphp
     <div class="mx-auto max-w-2xl space-y-6">
         <div>
-            <a href="{{ route('administrativo.estoque-interno') }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Estoque interno</a>
+            <a href="{{ route($eb) }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Estoque interno</a>
             <h1 class="mt-2 text-2xl font-bold text-slate-950 dark:text-white">Baixa — {{ $product->nome }}</h1>
             <p class="mt-1 text-sm text-slate-500">{{ $product->categoria }} · saldo atual <strong>{{ $product->saldo }}</strong></p>
         </div>
@@ -16,7 +17,7 @@
             <div class="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">Sem saldo para dar baixa.</div>
         @endif
 
-        <form method="POST" action="{{ route('administrativo.estoque-interno.baixa.store', $product) }}" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <form method="POST" action="{{ route($eb.'.baixa.store', $product) }}" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             @csrf
             @if ($product->ehSerial())
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Unidade
@@ -60,7 +61,7 @@
             </label>
 
             <div class="flex justify-end gap-2 pt-2">
-                <a href="{{ route('administrativo.estoque-interno') }}" class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold leading-10 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Cancelar</a>
+                <a href="{{ route($eb) }}" class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold leading-10 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Cancelar</a>
                 <button @disabled($product->saldo === 0) class="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40">Registrar baixa</button>
             </div>
         </form>

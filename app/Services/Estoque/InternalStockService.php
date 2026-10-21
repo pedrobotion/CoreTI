@@ -45,6 +45,16 @@ class InternalStockService
                 $produto->refresh();
             }
 
+            // Reabasteceu: se o saldo voltou acima do mínimo, limpa a marca de
+            // reposição pendente para permitir um novo chamado numa próxima vez.
+            if (! $produto->abaixo_do_minimo && $produto->reposicao_pendente_em !== null) {
+                $produto->forceFill([
+                    'reposicao_pendente_em' => null,
+                    'reposicao_jira_key' => null,
+                    'reposicao_jira_url' => null,
+                ])->save();
+            }
+
             $this->registrarMovimento($produto, InternalStockMovement::TIPO_ENTRADA, $quantidade, [
                 'internal_stock_unit_id' => $unidade?->id,
                 'motivo' => $dados['motivo'] ?? 'compra',
@@ -110,9 +120,11 @@ class InternalStockService
      * Baixa automática quando a bancada consome uma peça do estoque_ti.
      *
      * É "melhor esforço": tenta casar um produto ativo por quantidade cujo nome
-     * bata com a peça; se achar e houver saldo, dá baixa. Devolve true se baixou.
+     * bata com a peça; se achar e houver saldo, dá baixa. Devolve o produto que
+     * sofreu a baixa (para checar o saldo mínimo e disparar a reposição) ou null
+     * quando não casou/não tinha saldo.
      */
-    public function registrarConsumoBancada(string $pecaNome, int $quantidade, ?string $referencia, ?int $userId = null): bool
+    public function registrarConsumoBancada(string $pecaNome, int $quantidade, ?string $referencia, ?int $userId = null): ?InternalStockProduct
     {
         $produto = InternalStockProduct::query()
             ->ativos()
@@ -121,7 +133,7 @@ class InternalStockService
             ->first();
 
         if ($produto === null || (int) $produto->quantidade_atual < max(1, $quantidade)) {
-            return false;
+            return null;
         }
 
         $this->baixa($produto, [
@@ -132,7 +144,7 @@ class InternalStockService
             'referencia' => $referencia,
         ], $userId);
 
-        return true;
+        return $produto->fresh();
     }
 
     /** @param  array<string, mixed>  $dados */

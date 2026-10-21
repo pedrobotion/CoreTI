@@ -93,6 +93,20 @@ return [
     ],
 
     /*
+    | Reposição do estoque interno da TI: quando o consumo de uma peça da
+    | bancada faz o saldo bater no mínimo, abre 1 chamado pedindo a reposição da
+    | quantidade consumida e informando as unidades/equipamentos/plaquetas (e o
+    | centro de custo) em que as peças foram usadas, para o Administrativo repor
+    | e cobrar a unidade. É uma Requisição (catálogo "ADM - Requisição de
+    | Estoque" 161 = Requisição 10010 no service desk 5).
+    */
+    'estoque_reposicao' => [
+        'jira_equipe' => env('BANCADA_ESTOQUE_REP_JIRA_EQUIPE', 'Time Administrativo de TI'),
+        'jira_request_type' => env('BANCADA_ESTOQUE_REP_JIRA_REQUEST_TYPE', '161'),
+        'jira_issue_type' => env('BANCADA_ESTOQUE_REP_JIRA_ISSUE_TYPE', '10010'),
+    ],
+
+    /*
     | Manutenção: ao concluir a entrada do equipamento (status "Em bancada"),
     | abre no Jira um chamado do catálogo "Configuração e Manutenção de
     | Equipamentos de Informática" (request type 98, issue type 10010 no service

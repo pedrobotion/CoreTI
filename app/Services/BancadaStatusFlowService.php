@@ -36,12 +36,21 @@ class BancadaStatusFlowService
         'Entrada Realizada' => self::ENTRY_DONE,
     ];
 
+    /**
+     * Unidades que ficam alocadas na Sede e NÃO precisam de nota de saída/entrada
+     * (comparadas pelo nome já normalizado — ver normalizeFiscalUnitName). Além
+     * destas, qualquer unidade com centro de custo de Sede (01.%) também é isenta
+     * (ver isSedeCostCenter), o que cobre TRR, AA COCARI, Transcocari etc.
+     */
     private const FISCAL_EXEMPT_UNITS = [
         'e commerce',
-        'cd centro de distribuicao de insumos',
+        'centro de distribuicao de insumos',
         'transcocari',
-        'mandaguari',
-        'ubc unidade de beneficiamento de cafe',
+        'mandaguari i',
+        'ubc sede',
+        'unidades ubc unidade de beneficiamento de cafe',
+        'unidades ubp unidade de beneficiamento de pescado',
+        'departamento e assistencia tecnica',
     ];
 
     public function normalizeStatus(?string $status): ?string
@@ -92,8 +101,16 @@ class BancadaStatusFlowService
 
     public function requiresFiscalFlow(BancadaEquipment $equipment): bool
     {
-        return ($equipment->origem_tipo ?? 'unidade') === 'unidade'
-            && ! $this->isFiscalExemptUnit($equipment->unidade_setor);
+        if (($equipment->origem_tipo ?? 'unidade') !== 'unidade') {
+            return false;
+        }
+
+        // Centro de custo de Sede (01.%) = unidade alocada na Sede: sem nota/rota.
+        if ($this->isSedeCostCenter($equipment->cost_center_code)) {
+            return false;
+        }
+
+        return ! $this->isFiscalExemptUnit($equipment->unidade_setor);
     }
 
     public function isFiscalExemptUnit(?string $unitName): bool
@@ -104,6 +121,12 @@ class BancadaStatusFlowService
         }
 
         return in_array($normalized, self::FISCAL_EXEMPT_UNITS, true);
+    }
+
+    /** Centro de custo de Sede: código no formato 01.xxx. */
+    public function isSedeCostCenter(?string $code): bool
+    {
+        return $code !== null && str_starts_with(trim($code), '01.');
     }
 
     public function isOperationalLocked(BancadaEquipment $equipment): bool

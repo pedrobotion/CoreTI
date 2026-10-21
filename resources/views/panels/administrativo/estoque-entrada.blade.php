@@ -1,7 +1,8 @@
 <x-app-layout>
+    @php $eb = request()->routeIs('bancada-servicos.*') ? 'bancada-servicos.estoque' : 'administrativo.estoque-interno'; @endphp
     <div class="mx-auto max-w-2xl space-y-6">
         <div>
-            <a href="{{ route('administrativo.estoque-interno') }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Estoque interno</a>
+            <a href="{{ route($eb) }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Estoque interno</a>
             <h1 class="mt-2 text-2xl font-bold text-slate-950 dark:text-white">Entrada — {{ $product->nome }}</h1>
             <p class="mt-1 text-sm text-slate-500">{{ $product->categoria }} · {{ $product->ehSerial() ? 'uma unidade por serial' : 'por quantidade' }}</p>
         </div>
@@ -12,7 +13,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('administrativo.estoque-interno.entrada.store', $product) }}" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <form method="POST" action="{{ route($eb.'.entrada.store', $product) }}" class="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             @csrf
             @if ($product->ehSerial())
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -43,7 +44,7 @@
             </label>
 
             <div class="flex justify-end gap-2 pt-2">
-                <a href="{{ route('administrativo.estoque-interno') }}" class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold leading-10 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Cancelar</a>
+                <a href="{{ route($eb) }}" class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold leading-10 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Cancelar</a>
                 <button class="h-10 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Registrar entrada</button>
             </div>
         </form>

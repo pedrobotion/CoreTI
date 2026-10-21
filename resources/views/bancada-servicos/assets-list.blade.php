@@ -288,18 +288,16 @@
                                                 <h3 class="text-lg font-bold text-slate-900">Aguardando peça | {{ $asset->plaqueta }}</h3>
                                                 <button type="button" @click="pecaModalOpen=false" class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Fechar</button>
                                             </div>
-                                            <form x-data="{ origem: '' }" method="POST" action="{{ route('bancada-servicos.assets.status', $asset) }}" class="grid gap-3 px-5 py-4 sm:grid-cols-2">
+                                            <form x-data="{ origem: '', peca: '', produtos: @js($stockProducts ?? []), get saldoSel(){ const p = this.produtos.find(x => x.nome === this.peca); return p ? p.saldo : null } }" method="POST" action="{{ route('bancada-servicos.assets.status', $asset) }}" class="grid gap-3 px-5 py-4 sm:grid-cols-2">
                                                 @csrf @method('PATCH')
                                                 <input type="hidden" name="status" value="Aguardando peça">
                                                 <div class="sm:col-span-2">
                                                     <label class="text-sm font-medium text-slate-700">Unidade/Setor</label>
                                                     <div class="mt-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{{ $asset->unidade_setor }}</div>
                                                 </div>
-                                                <div><label class="text-sm font-medium text-slate-700">Peça necessária</label><input name="peca_nome" required class="mt-1 w-full rounded-md border-slate-300 text-sm"></div>
-                                                <div><label class="text-sm font-medium text-slate-700">Quantidade</label><input type="number" min="1" max="999" name="peca_quantidade" required class="mt-1 w-full rounded-md border-slate-300 text-sm"></div>
-                                                <div>
+                                                <div class="sm:col-span-2">
                                                     <label class="text-sm font-medium text-slate-700">Origem da peça</label>
-                                                    <select name="peca_origem" x-model="origem" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                    <select name="peca_origem" x-model="origem" @change="peca=''" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                                         <option value="">Selecione</option>
                                                         <option value="cd">Estoque do Centro de Distribuição</option>
                                                         <option value="compra_internet">Compra pela internet</option>
@@ -307,13 +305,30 @@
                                                         <option value="dell">Fornecedor Dell</option>
                                                     </select>
                                                 </div>
+                                                <div>
+                                                    <label class="text-sm font-medium text-slate-700">Peça necessária</label>
+                                                    {{-- Estoque interno: escolhe entre as peças cadastradas (com saldo). --}}
+                                                    <select x-show="origem === 'estoque_ti'" x-cloak name="peca_nome" x-model="peca" :disabled="origem !== 'estoque_ti'" :required="origem === 'estoque_ti'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                        <option value="">Selecione a peça do estoque</option>
+                                                        <template x-for="p in produtos" :key="p.nome">
+                                                            <option :value="p.nome" :disabled="p.saldo <= 0" x-text="p.nome + ' (' + p.saldo + ' em estoque)'"></option>
+                                                        </template>
+                                                    </select>
+                                                    {{-- Demais origens: texto livre, como antes. --}}
+                                                    <input x-show="origem !== 'estoque_ti'" name="peca_nome" :disabled="origem === 'estoque_ti'" :required="origem !== 'estoque_ti'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                    <p x-show="origem === 'estoque_ti' && peca" x-cloak class="mt-1 text-xs text-slate-500">Saldo disponível: <span x-text="saldoSel"></span> un</p>
+                                                </div>
+                                                <div>
+                                                    <label class="text-sm font-medium text-slate-700">Quantidade</label>
+                                                    <input type="number" min="1" :max="origem === 'estoque_ti' && saldoSel !== null ? saldoSel : 999" name="peca_quantidade" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                </div>
                                                 <div x-show="origem === 'dell'" x-cloak>
                                                     <label class="text-sm font-medium text-slate-700">ServiceTag (Dell)</label>
-                                                    <input name="service_tag" :required="origem === 'dell'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                    <input name="service_tag" :required="origem === 'dell'" :disabled="origem !== 'dell'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                                 </div>
                                                 <div class="sm:col-span-2" x-show="origem === 'compra_internet'" x-cloak>
                                                     <label class="text-sm font-medium text-slate-700">Link da compra (internet)</label>
-                                                    <input name="peca_link_compra" :required="origem === 'compra_internet'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                                    <input name="peca_link_compra" :required="origem === 'compra_internet'" :disabled="origem !== 'compra_internet'" class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                                 </div>
                                                 <div class="sm:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                     <button type="button" @click="pecaModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
