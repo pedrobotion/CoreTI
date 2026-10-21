@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\CoreTiNotificationMail;
 use App\Models\User;
 use App\Services\ModuleAccessService;
 use App\Support\LegacyModulePermissions;
@@ -9,6 +10,8 @@ use App\Support\ModuleRegistry;
 use App\Support\ScopeRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -156,11 +159,37 @@ class AdminController extends Controller
             'email' => $user->email,
         ]);
 
+        // Envia o link direto ao usuário por e-mail. Se falhar, o modal com o
+        // link (copiar) segue como reserva para o admin enviar manualmente.
+        $emailEnviado = false;
+        try {
+            Mail::to($user->email)->send(new CoreTiNotificationMail([
+                'tipo_mensagem' => 'INFORMAÇÃO',
+                'titulo' => 'Redefinição de senha do CoreTI',
+                'destinatario' => $user->name ?: $user->email,
+                'mensagem_principal' => 'Foi solicitada a redefinição da sua senha de acesso ao CoreTI. Clique no botão abaixo para criar uma nova senha.',
+                'servico' => 'Acesso ao CoreTI',
+                'status' => 'AÇÃO NECESSÁRIA',
+                'orientacao' => 'Se você não reconhece esta solicitação, avise a equipe de Tecnologia da Informação.',
+                'url_acao' => $resetLink,
+                'texto_botao' => 'Redefinir minha senha',
+            ]));
+            $emailEnviado = true;
+        } catch (\Throwable $e) {
+            Log::warning('admin.reset-password.email_falhou', [
+                'user_id' => $user->id,
+                'erro' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()->route('admin.dashboard')
-            ->with('success', 'Reset de senha iniciado com sucesso!')
+            ->with('success', $emailEnviado
+                ? "Reset de senha iniciado — link enviado por e-mail para {$user->email}."
+                : 'Reset de senha iniciado. Não foi possível enviar o e-mail agora; copie o link abaixo e envie manualmente.')
             ->with('password_reset', [
                 'email' => $user->email,
                 'link' => $resetLink,
+                'email_enviado' => $emailEnviado,
             ]);
     }
 

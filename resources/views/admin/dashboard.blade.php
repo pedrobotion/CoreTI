@@ -243,7 +243,14 @@
                 <div x-data="{ open: true }" x-show="open" style="position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:50;">
                     <div class="w-[480px] max-w-[92vw] rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
                         <div class="text-sm font-semibold text-gray-900">Reset de senha iniciado</div>
-                        <div class="mt-2 text-sm text-gray-600">Envie este link para o usuário concluir a troca:</div>
+                        @if (!empty($reset['email_enviado']))
+                            <div class="mt-2 flex items-start gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-200">
+                                <svg viewBox="0 0 24 24" class="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <span>Link enviado por e-mail para <strong>{{ $reset['email'] }}</strong>. Se precisar, você também pode copiar e enviar manualmente:</span>
+                            </div>
+                        @else
+                            <div class="mt-2 text-sm text-amber-700">Não foi possível enviar o e-mail automaticamente. Envie este link para o usuário concluir a troca:</div>
+                        @endif
                         <div class="mt-3 flex items-center gap-2">
                             <input type="text" readonly value="{{ $reset['link'] }}" class="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900" />
                             <button
