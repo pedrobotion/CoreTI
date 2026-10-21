@@ -1,30 +1,26 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">Comparativo entre unidades</h2>
-    </x-slot>
-
-    <div class="mx-auto max-w-7xl space-y-6 px-6 py-8">
+    <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <p class="text-xs uppercase tracking-widest text-slate-500">Telefonia Corporativa · Relatórios</p>
-                <h1 class="text-3xl font-semibold text-slate-900">Comparativo entre unidades</h1>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Telefonia Corporativa · Relatórios</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Comparativo entre unidades</h1>
                 <p class="mt-1 text-sm text-slate-500">Onde está o custo da telefonia, pela unidade de quem usa a linha.</p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="{{ route('administrativo.telefonia.relatorios.unidades.export', ['formato' => 'excel']) }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Excel</a>
-                <a href="{{ route('administrativo.telefonia.relatorios.unidades.export', ['formato' => 'pdf']) }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">PDF</a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('administrativo.telefonia.relatorios.unidades.export', ['formato' => 'excel']) }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Excel</a>
+                <a href="{{ route('administrativo.telefonia.relatorios.unidades.export', ['formato' => 'pdf']) }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">PDF</a>
             </div>
         </div>
 
         @include('partials.modulo-flash')
 
-        <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             A linha não tem unidade própria — quem tem é a pessoa que está com ela. Por isso o rateio abaixo considera
             o vínculo ativo. Linhas sem vínculo aparecem separadas, para o total continuar batendo com o custo mensal.
         </div>
 
         @if ($duplicadas->isNotEmpty())
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p class="font-semibold">{{ $duplicadas->count() }} linha(s) em mais de um vínculo ativo ao mesmo tempo.</p>
                 <p class="mt-1">
                     Vieram assim do gestaoTI — o cadastro do CoreTI não deixa criar. Enquanto o vínculo duplicado não for
@@ -42,8 +38,8 @@
             </div>
         @endif
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 class="text-base font-semibold text-slate-900">Por operação</h2>
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-base font-bold text-slate-900">Por operação</h2>
             <div class="mt-4">
                 @include('telefonia.relatorios._barras', ['itens' => $porOperacao->map(fn ($o) => [
                     'rotulo' => $o->operacao,
@@ -54,8 +50,8 @@
             </div>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 class="text-base font-semibold text-slate-900">Por unidade</h2>
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="text-base font-bold text-slate-900">Por unidade</h2>
             <p class="mt-1 text-xs text-slate-500">Somente linhas com vínculo ativo.</p>
             <div class="mt-4">
                 @include('telefonia.relatorios._barras', ['itens' => $porUnidade->take(15)->map(fn ($u) => [
@@ -71,7 +67,7 @@
 
             <div class="mt-5 overflow-x-auto border-t border-slate-100 pt-4">
                 <table class="w-full min-w-[620px] text-left text-sm">
-                    <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                    <thead class="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr><th class="px-3 py-2">Unidade</th><th class="px-3 py-2">Operação</th><th class="px-3 py-2 text-right">Linhas</th><th class="px-3 py-2 text-right">Custo mensal</th><th class="px-3 py-2 text-right">Média por linha</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">

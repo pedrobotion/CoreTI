@@ -1,19 +1,15 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">Linha {{ $line->numero_formatado }}</h2>
-    </x-slot>
-
-    <div class="mx-auto max-w-6xl space-y-6 px-6 py-8">
+    <div class="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <p class="text-xs uppercase tracking-widest text-slate-500">Telefonia Corporativa</p>
-                <h1 class="font-mono text-3xl font-semibold text-slate-900">{{ $line->numero_formatado }}</h1>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Telefonia Corporativa</p>
+                <h1 class="mt-1 font-mono text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{{ $line->numero_formatado }}</h1>
                 <p class="mt-1 text-sm text-slate-500">{{ $line->operadora }} · {{ $line->scope_label }}</p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="{{ route('administrativo.telefonia.lines.index') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Voltar</a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('administrativo.telefonia.lines.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar</a>
                 @can('module.telefonia.manage')
-                    <a href="{{ route('administrativo.telefonia.lines.edit', $line) }}" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Editar</a>
+                    <a href="{{ route('administrativo.telefonia.lines.edit', $line) }}" style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Editar</a>
                 @endcan
             </div>
         </div>
@@ -21,7 +17,7 @@
         @include('partials.modulo-flash')
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Dados da linha</h2>
                 <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><dt class="text-xs text-slate-500">Operadora</dt><dd class="text-sm font-medium text-slate-900">{{ $line->operadora }}</dd></div>
@@ -67,7 +63,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Com quem está</h2>
                 @if ($vinculoAtivo)
                     <p class="mt-3 text-sm font-semibold text-slate-900">{{ $vinculoAtivo->collaborator?->name }}</p>
@@ -85,14 +81,14 @@
             </section>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Histórico de vínculos</h2>
             @if ($vinculos->isEmpty())
                 <p class="mt-3 text-sm text-slate-500">Esta linha nunca foi vinculada a um colaborador.</p>
             @else
                 <div class="mt-3 overflow-x-auto">
                     <table class="w-full min-w-[720px] text-left text-sm">
-                        <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                        <thead class="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr><th class="px-3 py-2">Colaborador</th><th class="px-3 py-2">Período</th><th class="px-3 py-2">Situação</th><th class="px-3 py-2">Motivo da devolução</th><th class="px-3 py-2"></th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -121,14 +117,14 @@
             @endif
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Histórico de cobrança</h2>
             @if ($faturas->isEmpty())
                 <p class="mt-3 text-sm text-slate-500">Nenhuma fatura importada com esta linha ainda.</p>
             @else
                 <div class="mt-3 overflow-x-auto">
                     <table class="w-full min-w-[620px] text-left text-sm">
-                        <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                        <thead class="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr><th class="px-3 py-2">Competência</th><th class="px-3 py-2">Plano na fatura</th><th class="px-3 py-2 text-right">Valor</th><th class="px-3 py-2 text-right">Variação</th><th class="px-3 py-2"></th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">

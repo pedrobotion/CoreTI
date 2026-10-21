@@ -1,19 +1,15 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">Conferir fatura</h2>
-    </x-slot>
-
-    <div class="mx-auto max-w-6xl space-y-6 px-6 py-8">
+    <div class="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <div>
-            <p class="text-xs uppercase tracking-widest text-slate-500">Telefonia Corporativa · {{ \App\Support\ScopeRegistry::label($scope) }}</p>
-            <h1 class="text-3xl font-semibold text-slate-900">Conferir antes de gravar</h1>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Telefonia Corporativa · {{ \App\Support\ScopeRegistry::label($scope) }}</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Conferir antes de gravar</h1>
             <p class="mt-1 text-sm text-slate-500">{{ $operadora }} · {{ $nomeArquivo }} · lido com {{ $revisao['parser'] }}</p>
         </div>
 
         @include('partials.modulo-flash')
 
         @if ($revisao['avisos'])
-            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p class="font-semibold">A leitura deixou pontos em aberto:</p>
                 <ul class="mt-1 list-disc space-y-0.5 pl-5">
                     @foreach ($revisao['avisos'] as $aviso)
@@ -31,7 +27,7 @@
             ['titulo' => 'Total declarado', 'valor' => (float) $revisao['total_declarado'], 'moeda' => true],
         ]])
 
-        <section class="rounded-lg border {{ $revisao['totais_batem'] ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' }} p-5 shadow-sm">
+        <section class="rounded-2xl border {{ $revisao['totais_batem'] ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' }} p-5 shadow-sm sm:px-6">
             <h2 class="text-sm font-semibold uppercase tracking-wide {{ $revisao['totais_batem'] ? 'text-emerald-800' : 'text-amber-900' }}">Conferência dos totais</h2>
             <div class="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
                 <p>Declarado na fatura: <span class="font-mono font-semibold">R$ {{ number_format((float) $revisao['total_declarado'], 2, ',', '.') }}</span></p>
@@ -46,14 +42,14 @@
         <form method="POST" action="{{ route('administrativo.telefonia.faturas.confirm') }}" class="space-y-6">
             @csrf
 
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 class="text-lg font-semibold text-slate-900">Linhas que conferem <span class="text-sm font-normal text-slate-500">({{ count($revisao['conferidas']) }})</span></h2>
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:px-6">
+                <h2 class="text-base font-bold text-slate-900">Linhas que conferem <span class="text-sm font-normal text-slate-500">({{ count($revisao['conferidas']) }})</span></h2>
                 <p class="mt-1 text-sm text-slate-500">O valor e o plano destas linhas serão atualizados com o que veio na fatura.</p>
 
                 @if ($revisao['conferidas'])
                     <div class="mt-3 max-h-96 overflow-auto">
                         <table class="w-full min-w-[720px] text-left text-sm">
-                            <thead class="sticky top-0 border-b border-slate-200 bg-white text-xs uppercase text-slate-500">
+                            <thead class="sticky top-0 border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-400">
                                 <tr><th class="px-3 py-2">Linha</th><th class="px-3 py-2">Plano na fatura</th><th class="px-3 py-2 text-right">Valor anterior</th><th class="px-3 py-2 text-right">Valor na fatura</th><th class="px-3 py-2 text-right">Variação</th></tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -88,8 +84,8 @@
             </section>
 
             @if ($revisao['novas'])
-                <section class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
-                    <h2 class="text-lg font-semibold text-amber-950">Números cobrados que não estão cadastrados <span class="text-sm font-normal">({{ count($revisao['novas']) }})</span></h2>
+                <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm sm:px-6">
+                    <h2 class="text-base font-bold text-amber-950">Números cobrados que não estão cadastrados <span class="text-sm font-normal">({{ count($revisao['novas']) }})</span></h2>
                     <p class="mt-1 text-sm text-amber-800">Serão gravados no histórico da fatura, mas <span class="font-semibold">não</span> viram linha cadastrada — cadastre cada um pela tela de Linhas se forem legítimos.</p>
                     <div class="mt-3 max-h-72 overflow-auto">
                         <table class="w-full min-w-[520px] text-left text-sm">
@@ -109,12 +105,12 @@
             @endif
 
             @if ($revisao['ausentes'])
-                <section class="rounded-lg border border-slate-300 bg-white p-5 shadow-sm">
-                    <h2 class="text-lg font-semibold text-slate-900">Linhas ativas que não vieram na fatura <span class="text-sm font-normal text-slate-500">({{ count($revisao['ausentes']) }})</span></h2>
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:px-6">
+                    <h2 class="text-base font-bold text-slate-900">Linhas ativas que não vieram na fatura <span class="text-sm font-normal text-slate-500">({{ count($revisao['ausentes']) }})</span></h2>
                     <p class="mt-1 text-sm text-slate-500">Podem ter sido canceladas sem ninguém registrar. Marque as que devem ser dadas como canceladas — as demais ficam como estão.</p>
                     <div class="mt-3 max-h-72 overflow-auto">
                         <table class="w-full min-w-[620px] text-left text-sm">
-                            <thead class="sticky top-0 border-b border-slate-200 bg-white text-xs uppercase text-slate-500"><tr><th class="px-3 py-2">Cancelar</th><th class="px-3 py-2">Linha</th><th class="px-3 py-2">Plano</th><th class="px-3 py-2 text-right">Valor cadastrado</th><th class="px-3 py-2">Situação</th></tr></thead>
+                            <thead class="sticky top-0 border-b border-slate-100 bg-white text-xs font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2">Cancelar</th><th class="px-3 py-2">Linha</th><th class="px-3 py-2">Plano</th><th class="px-3 py-2 text-right">Valor cadastrado</th><th class="px-3 py-2">Situação</th></tr></thead>
                             <tbody class="divide-y divide-slate-100">
                                 @foreach ($revisao['ausentes'] as $item)
                                     <tr>
@@ -131,9 +127,9 @@
                 </section>
             @endif
 
-            <div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-5">
-                <a href="{{ route('administrativo.telefonia.faturas.create') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Descartar</a>
-                <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Gravar fatura</button>
+            <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
+                <a href="{{ route('administrativo.telefonia.faturas.create') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Descartar</a>
+                <button style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Gravar fatura</button>
             </div>
         </form>
     </div>

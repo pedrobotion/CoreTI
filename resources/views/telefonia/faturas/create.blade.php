@@ -1,18 +1,14 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold leading-tight text-gray-800">Importar fatura</h2>
-    </x-slot>
-
-    <div class="mx-auto max-w-3xl space-y-6 px-6 py-8">
+    <div class="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
         <div>
-            <p class="text-xs uppercase tracking-widest text-slate-500">Telefonia Corporativa</p>
-            <h1 class="text-3xl font-semibold text-slate-900">Importar fatura</h1>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Telefonia Corporativa</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Importar fatura</h1>
             <p class="mt-1 text-sm text-slate-500">O PDF é lido e você confere o resultado antes de qualquer gravação.</p>
         </div>
 
         @include('partials.modulo-flash')
 
-        <form method="POST" action="{{ route('administrativo.telefonia.faturas.preview') }}" enctype="multipart/form-data" class="space-y-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <form method="POST" action="{{ route('administrativo.telefonia.faturas.preview') }}" enctype="multipart/form-data" class="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             @csrf
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -50,14 +46,14 @@
                 <x-input-error :messages="$errors->get('arquivo')" class="mt-1" />
             </div>
 
-            <div class="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
                 Depois de ler o PDF, o sistema mostra o que bate com o cadastro, que números são novos e quais linhas cadastradas
                 não vieram na conta. Nada é gravado até você confirmar.
             </div>
 
             <div class="flex justify-end gap-2 border-t border-slate-100 pt-5">
-                <a href="{{ route('administrativo.telefonia.faturas.index') }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</a>
-                <button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Ler fatura</button>
+                <a href="{{ route('administrativo.telefonia.faturas.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</a>
+                <button style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Ler fatura</button>
             </div>
         </form>
     </div>
