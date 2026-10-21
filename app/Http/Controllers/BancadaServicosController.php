@@ -29,6 +29,7 @@ class BancadaServicosController extends Controller
         'Nobreak',
         'Coletor',
         'Notebook',
+        'Projetor',
         'Mi box',
         'Relógio Ponto',
         'Switch',
