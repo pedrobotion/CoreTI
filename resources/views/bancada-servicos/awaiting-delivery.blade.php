@@ -2,11 +2,11 @@
     @include('bancada-servicos.partials.label-printer')
     <div class="mx-auto max-w-7xl space-y-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Bancada de Serviços</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950">Prontos para Entrega</h1>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Bancada de Serviços</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Prontos para Entrega</h1>
             <p class="mt-2 text-sm text-slate-600">Equipamentos liberados para entrega (Sede em Pronto para entrega e Unidade com Nota Fiscal Emitida).</p>
         </div>
-        <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
             <form method="GET" class="bancada-filtros flex flex-wrap items-center gap-2 lg:flex-nowrap">
                 <input name="q" value="{{ $search ?? '' }}" placeholder="Buscar plaqueta, tipo, unidade, TIC..." class="h-10 w-full min-w-[240px] rounded-md border-slate-300 text-sm md:flex-1 md:w-auto">
                 <input name="tipo" value="{{ $tipo ?? '' }}" placeholder="Tipo" class="h-10 w-full min-w-[120px] rounded-md border-slate-300 text-sm md:w-32">
@@ -24,7 +24,7 @@
                     <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
                     <tr><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Origem</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Chegada</th><th class="px-3 py-2">TIC</th><th class="px-3 py-2">Obs</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Ações</th></tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                     @forelse($sedeItems as $item)
                         <tr>
                             <td class="px-3 py-2">{{ $item->tipo_equipamento }}</td><td class="px-3 py-2">{{ $item->plaqueta }}</td><td class="px-3 py-2">Sede</td><td class="px-3 py-2">{{ $item->unidade_setor }}</td><td class="px-3 py-2">{{ optional($item->data_chegada)->format('d/m/Y') }}</td><td class="px-3 py-2">{{ $item->tic ?: '-' }}</td><td class="px-3 py-2">{{ $item->observacao ?: '-' }}</td><td class="px-3 py-2">{{ $item->status }}</td>
@@ -48,7 +48,7 @@
         </section>
             @include('bancada-servicos.partials.documents-modal')
         @forelse($grouped as $bucket)
-            <section x-data="bancadaLabelPrinter()" class="rounded-lg border border-slate-200 bg-white p-5">
+            <section x-data="bancadaLabelPrinter()" class="rounded-2xl border border-slate-200 bg-white p-5">
                 <div class="flex items-center justify-between">
                     <h2 class="text-base font-bold text-slate-900">{{ $bucket['route']->nome }}</h2>
                     <p class="text-xs text-slate-600">Separa: {{ $bucket['route']->dia_separa ?: '-' }} | Carrega: {{ $bucket['route']->dia_carrega ?: '-' }} | Entrega: {{ $bucket['route']->dia_entrega ?: '-' }}</p>
@@ -68,7 +68,7 @@
                             <th class="px-3 py-2">Ações</th>
                         </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody class="divide-y divide-slate-100">
                         @foreach($bucket['items'] as $row)
                             @php($item = $row['equipment'])
                             @php($schedule = $row['schedule'])
@@ -105,7 +105,7 @@
                 </div>
             </section>
         @empty
-            <section class="rounded-lg border border-slate-200 bg-white p-6 text-center text-slate-500">Nenhum equipamento em rotas no momento.</section>
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500">Nenhum equipamento em rotas no momento.</section>
         @endforelse
         <section class="rounded-lg border border-amber-300 bg-amber-50 p-5">
             <h2 class="text-base font-bold text-amber-900">Sem rota mapeada</h2>
@@ -114,7 +114,7 @@
                     <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
                         <tr><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Rota/Malote</th><th class="px-3 py-2">Ações</th></tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200">
+                    <tbody class="divide-y divide-slate-100">
                         @forelse($unassignedItems as $row)
                             @php($item = $row['equipment'])
                             <tr>
@@ -132,7 +132,7 @@
                 </table>
             </div>
         </section>
-        <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 class="text-base font-bold text-slate-900">Equipamentos aguardando envio ao CD</h2>
             <div class="mt-4">
                 <h3 class="text-sm font-semibold text-slate-800">Separar hoje</h3>
@@ -141,7 +141,7 @@
                         <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
                             <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Rota</th><th class="px-3 py-2">Separação</th><th class="px-3 py-2">Carregamento</th><th class="px-3 py-2">Entrega prevista</th><th class="px-3 py-2">Status envio CD</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody class="divide-y divide-slate-100">
                             @forelse($pendingCd['today'] as $row)
                                 <tr>
                                     <td class="px-3 py-2">{{ $row['equipment']->plaqueta }}</td>
@@ -167,7 +167,7 @@
                         <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
                             <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Rota</th><th class="px-3 py-2">Separação</th><th class="px-3 py-2">Carregamento</th><th class="px-3 py-2">Entrega prevista</th><th class="px-3 py-2">Status envio CD</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody class="divide-y divide-slate-100">
                             @forelse($pendingCd['upcoming'] as $row)
                                 <tr>
                                     <td class="px-3 py-2">{{ $row['equipment']->plaqueta }}</td>
@@ -193,7 +193,7 @@
                         <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
                             <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Status</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody class="divide-y divide-slate-100">
                             @forelse($pendingCd['unmapped'] as $row)
                                 <tr>
                                     <td class="px-3 py-2">{{ $row['equipment']->plaqueta }}</td>

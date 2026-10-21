@@ -1,10 +1,10 @@
 <x-app-layout>
     <div class="mx-auto max-w-7xl space-y-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bancada de Serviços</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Chamados do Time Bancada de Serviços</h1>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Bancada de Serviços</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">Chamados do Time Bancada de Serviços</h1>
         </div>
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 p-5 dark:border-slate-800">
                 <form method="GET" class="flex flex-wrap items-center gap-2 lg:flex-nowrap">
                     <select name="status" class="h-10 w-full min-w-[160px] rounded-md border-slate-300 text-sm md:w-40">
@@ -33,7 +33,7 @@
                             <th class="px-4 py-3">Atualizado em</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @forelse($records as $item)
                             <tr class="odd:bg-slate-50 even:bg-white dark:odd:bg-slate-950 dark:even:bg-slate-900">
                                 <td class="px-4 py-3">

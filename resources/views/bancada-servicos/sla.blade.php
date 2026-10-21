@@ -2,8 +2,8 @@
     <div class="mx-auto max-w-7xl space-y-6">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bancada de Serviços</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">SLA da Bancada</h1>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Bancada de Serviços</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">SLA da Bancada</h1>
             </div>
             <form method="GET">
                 <select name="days" onchange="this.form.submit()" class="toolbar-select text-sm">
@@ -17,14 +17,14 @@
         </div>
 
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Chamados abertos</p><p class="mt-2 text-2xl font-bold">{{ $stats['abertos'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">SLA em alerta</p><p class="mt-2 text-2xl font-bold text-amber-700">{{ $stats['em_alerta'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Resolvidos no período</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ $stats['resolvidos_periodo'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Taxa de alerta</p><p class="mt-2 text-2xl font-bold">{{ number_format($stats['taxa_alerta'], 1, ',', '.') }}%</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Chamados abertos</p><p class="mt-2 text-2xl font-bold">{{ $stats['abertos'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">SLA em alerta</p><p class="mt-2 text-2xl font-bold text-amber-700">{{ $stats['em_alerta'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Resolvidos no período</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ $stats['resolvidos_periodo'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Taxa de alerta</p><p class="mt-2 text-2xl font-bold">{{ number_format($stats['taxa_alerta'], 1, ',', '.') }}%</p></div>
         </section>
 
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4 text-sm font-semibold text-slate-800">Status mais frequentes ({{ $days }} dias)</div>
                 <div class="p-5">
                     @forelse($ticketsByStatus as $item)
@@ -43,11 +43,11 @@
                 </div>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 px-5 py-4 text-sm font-semibold text-slate-800">Chamados em alerta</div>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[680px] text-sm">
-                        <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-4 py-3">TIC</th>
                                 <th class="px-4 py-3">Resumo</th>
@@ -55,7 +55,7 @@
                                 <th class="px-4 py-3">Responsável</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody class="divide-y divide-slate-100">
                             @forelse($recentAlerts as $item)
                                 <tr>
                                     <td class="px-4 py-3"><a href="{{ $jiraTicketBaseUrl . '/' . rawurlencode((string) $item->chave) }}" target="_blank" class="text-blue-600 hover:text-blue-800">{{ $item->chave }}</a></td>

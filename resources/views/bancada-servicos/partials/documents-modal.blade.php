@@ -42,7 +42,7 @@
                                 <th class="px-4 py-3 text-center">Ações</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200">
+                        <tbody class="divide-y divide-slate-100">
                             <template x-for="doc in documentsList" :key="doc.id">
                                 <tr class="odd:bg-slate-50 even:bg-white hover:bg-blue-50 transition-colors">
                                     <td class="px-4 py-3">

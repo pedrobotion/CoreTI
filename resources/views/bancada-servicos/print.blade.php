@@ -2,13 +2,13 @@
     <div class="mx-auto max-w-3xl space-y-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bancada de Serviços</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Impressão de Etiqueta</h1>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Bancada de Serviços</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">Impressão de Etiqueta</h1>
             </div>
             <a href="{{ route('bancada-servicos.assets') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">Voltar</a>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" x-data="{
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" x-data="{
             unidade: @js($asset->unidade_setor ?? ''),
             observacao: @js($asset->observacao ?? ''),
             imprimir() {

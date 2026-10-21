@@ -6,11 +6,11 @@
     </datalist>
     <div class="mx-auto max-w-7xl space-y-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Bancada de Serviços</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950">Configuração de Rotas de Malote</h1>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Bancada de Serviços</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Configuração de Rotas de Malote</h1>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 class="text-base font-bold text-slate-900">Nova rota</h2>
             <form method="POST" action="{{ route('bancada-servicos.routes.store') }}" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @csrf
@@ -82,7 +82,7 @@
             </form>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
             <h2 class="text-base font-bold text-slate-900">Rotas cadastradas</h2>
             <div class="mt-4 space-y-4">
                 @forelse($routes as $route)

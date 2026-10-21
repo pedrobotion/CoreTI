@@ -1,11 +1,11 @@
 <x-app-layout>
     <div class="mx-auto max-w-4xl space-y-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bancada de Serviços</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ $mode === 'create' ? 'Adicionar equipamento' : 'Editar equipamento' }}</h1>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Bancada de Serviços</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">{{ $mode === 'create' ? 'Adicionar equipamento' : 'Editar equipamento' }}</h1>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <form method="POST" enctype="multipart/form-data" action="{{ $mode === 'create' ? route('bancada-servicos.assets.store') : route('bancada-servicos.assets.update', $asset) }}" class="grid gap-3 sm:grid-cols-2" x-data="{ origem: @js(old('origem_tipo', $asset->origem_tipo ?: 'unidade')) }">
                 @csrf
                 @if($mode === 'edit') @method('PUT') @endif

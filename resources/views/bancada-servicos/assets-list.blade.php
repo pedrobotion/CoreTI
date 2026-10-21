@@ -3,8 +3,8 @@
     <div class="mx-auto max-w-7xl space-y-6" x-data="{ addModalOpen: {{ old('tipo_equipamento') || old('plaqueta') ? 'true' : 'false' }}, documentsModalOpen: false, documentsList: null, documentEquipmentTag: '', loadingDocuments: false, openDocuments: async function(url, plaqueta) { this.documentsList = null; this.documentEquipmentTag = plaqueta; this.loadingDocuments = true; try { const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }, credentials: 'same-origin' }); if (!res.ok) { const body = await res.text().catch(() => ''); console.error('Erro ao carregar documentos', { status: res.status, statusText: res.statusText, body }); throw new Error(`Erro HTTP ${res.status}`); } const data = await res.json(); this.documentsList = data.documents || []; this.documentsModalOpen = true; } catch (e) { console.error(e); alert('Erro ao carregar documentos do equipamento.'); } finally { this.loadingDocuments = false; } } }">
         <div class="flex items-end justify-between gap-3">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bancada de Serviços</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ $title }}</h1>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Bancada de Serviços</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">{{ $title }}</h1>
             </div>
             <div class="flex items-center gap-2">
                 @if($isBackup)
@@ -36,7 +36,7 @@
                 <a href="{{ request()->fullUrlWithQuery(['status' => null]) }}"
                    class="rounded-lg border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900 {{ ($statusFilter ?? '') === '' ? 'border-slate-900 ring-1 ring-slate-900 dark:border-white dark:ring-white' : 'border-slate-200 dark:border-slate-800' }}">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-                    <p class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{{ number_format($statusCounts->sum(), 0, ',', '.') }}</p>
+                    <p class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">{{ number_format($statusCounts->sum(), 0, ',', '.') }}</p>
                 </a>
                 @foreach($statusCounts as $statusLabel => $qtd)
                     @php $classe = $statusCardClasses[$statusLabel] ?? 'border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900'; @endphp
@@ -49,7 +49,7 @@
             </section>
         @endif
 
-        <section x-data="bancadaLabelPrinter()" class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section x-data="bancadaLabelPrinter()" class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             @php
                 $resetRoute = match($scope) {
                     'entregues' => 'bancada-servicos.assets.delivered',
@@ -107,7 +107,7 @@
                             <th class="sticky right-0 z-20 min-w-[200px] bg-[#033151] px-3 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @forelse($assets as $asset)
                             <tr class="odd:bg-slate-50 even:bg-white dark:odd:bg-slate-950 dark:even:bg-slate-900">
                                 <td class="px-3 py-3 break-words">{{ $asset->tipo_equipamento }}</td>
@@ -277,8 +277,8 @@
                                             "
                                             class="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                         >Atualizar</button>
-                                        <button type="button" x-show="nextStatus === 'Aguardando peça'" @click="pecaModalOpen = true" class="rounded-md border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Continuar</button>
-                                        <button type="button" x-show="nextStatus === 'Terceiros'" @click="terceirosModalOpen = true" class="rounded-md border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Continuar</button>
+                                        <button type="button" x-show="nextStatus === 'Aguardando peça'" @click="pecaModalOpen = true" class="rounded-lg border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Continuar</button>
+                                        <button type="button" x-show="nextStatus === 'Terceiros'" @click="terceirosModalOpen = true" class="rounded-lg border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Continuar</button>
                                     </form>
                                     @endif
                                     </div>
@@ -332,7 +332,7 @@
                                                 </div>
                                                 <div class="sm:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                     <button type="button" @click="pecaModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                    <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Salvar e enviar ao Administrativo</button>
+                                                    <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Salvar e enviar ao Administrativo</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -352,7 +352,7 @@
                                                 </div>
                                                 <div class="flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                     <button type="button" @click="terceirosModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                    <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Salvar e enviar ao Administrativo</button>
+                                                    <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Salvar e enviar ao Administrativo</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -369,7 +369,7 @@
                                             @method('PATCH')
                                             <input type="hidden" name="status" value="Manutenção realizada">
                                             <input type="hidden" name="confirm_peca_recebida" value="1">
-                                            <button class="rounded-md border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Confirmar peça recebida</button>
+                                            <button class="rounded-lg border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Confirmar peça recebida</button>
                                         </form>
                                     @endif
                                     @if($statusNorm === 'Sem conserto')
@@ -377,7 +377,7 @@
                                             @csrf
                                             @method('PATCH')
                                             <input type="hidden" name="status" value="Descarte">
-                                            <button class="rounded-md border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Enviar para descarte</button>
+                                            <button class="rounded-lg border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Enviar para descarte</button>
                                         </form>
                                     @endif
                                     @if($statusNorm === 'Manutenção realizada')
@@ -385,7 +385,7 @@
                                             @csrf
                                             @method('PATCH')
                                             <input type="hidden" name="status" value="Pronto para entrega">
-                                            <button class="rounded-md border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Enviar para Pronto para entrega</button>
+                                            <button class="rounded-lg border border-[#033151] bg-[#033151] px-2 py-1 text-xs font-semibold text-white hover:opacity-90">Enviar para Pronto para entrega</button>
                                         </form>
                                     @endif
                                 </td>
@@ -511,7 +511,7 @@
                                                     </div>
                                                     <div class="flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                         <button type="button" @click="loanModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                        <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Registrar empréstimo</button>
+                                                        <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Registrar empréstimo</button>
                                                     </div>
                                                 </form>
                                             </div>
@@ -548,7 +548,7 @@
                                                     </div>
                                                     <div class="sm:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                     <button type="button" @click="backupModalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                    <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Salvar backup</button>
+                                                    <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Salvar backup</button>
                                                     </div>
                                                 </form>
                                             </div>

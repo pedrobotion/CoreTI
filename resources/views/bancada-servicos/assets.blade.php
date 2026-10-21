@@ -8,7 +8,7 @@
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section x-data="bancadaLabelPrinter()" class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <section x-data="bancadaLabelPrinter()" class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="border-b border-slate-200 p-5 dark:border-slate-800">
                     <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
                         <select name="status" class="toolbar-select text-sm w-full min-w-0">
@@ -20,7 +20,7 @@
                         </select>
                         <input name="q" value="{{ $search }}" placeholder="Buscar tipo, plaqueta, unidade, observação ou TIC" class="toolbar-input rounded-md border-slate-300 text-sm w-full min-w-0 md:col-span-2">
                         <div class="flex gap-2 w-full min-w-0">
-                            <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white w-full">Buscar</button>
+                            <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white w-full">Buscar</button>
                             <a href="{{ route('bancada-servicos.assets') }}" class="toolbar-btn inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 w-full">Limpar</a>
                         </div>
                     </form>
@@ -41,7 +41,7 @@
                             <th class="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @forelse($assets as $asset)
                             <tr class="odd:bg-slate-50 even:bg-white dark:odd:bg-slate-950 dark:even:bg-slate-900">
                                 <td class="px-4 py-3">{{ $asset->tipo_equipamento }}</td>
@@ -102,7 +102,7 @@
                 </div>
             </section>
 
-            <aside class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:sticky xl:top-6 xl:self-start">
+            <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:sticky xl:top-6 xl:self-start">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Adicionar equipamento</h2>
                 <form method="POST" action="{{ route('bancada-servicos.assets.store') }}" class="mt-4 grid gap-3">
                     @csrf
@@ -122,7 +122,7 @@
                     </select>
                     <input name="tic" placeholder="TIC-12345 (opcional)" class="rounded-md border-slate-300 text-sm">
                     <textarea name="observacao" rows="3" placeholder="Observação (opcional)" class="rounded-md border-slate-300 text-sm"></textarea>
-                    <button type="submit" class="mt-1 inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white">Salvar</button>
+                    <button type="submit" class="mt-1 inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white">Salvar</button>
                 </form>
             </aside>
         </div>
