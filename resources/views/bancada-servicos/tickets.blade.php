@@ -23,7 +23,7 @@
             </div>
             <div class="w-full max-w-full overflow-x-auto">
                 <table class="w-full min-w-[850px] text-sm">
-                    <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-4 py-3">Chamado</th>
                             <th class="px-4 py-3">Resumo</th>

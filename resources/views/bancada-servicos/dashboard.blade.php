@@ -51,7 +51,7 @@
                 </div>
                 <div class="mt-4 overflow-x-auto">
                     <table class="w-full min-w-[700px] text-sm">
-                        <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-4 py-3">Tipo</th>
                                 <th class="px-4 py-3">Plaqueta</th>
@@ -81,7 +81,7 @@
                 </div>
                 <div class="mt-4 overflow-x-auto">
                     <table class="w-full min-w-[700px] text-sm">
-                        <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-4 py-3">ID</th>
                                 <th class="px-4 py-3">Resumo</th>

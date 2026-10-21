@@ -83,7 +83,7 @@
             </div>
             <div class="w-full max-w-full overflow-x-auto">
                 <table class="{{ $isBackup ? 'min-w-[1650px]' : 'min-w-[1200px]' }} w-full text-sm">
-                    <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-3 py-3">Tipo</th>
                             <th class="px-3 py-3">Plaqueta</th>

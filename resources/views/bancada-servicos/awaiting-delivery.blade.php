@@ -21,7 +21,7 @@
             <h2 class="text-base font-bold text-emerald-900">Sede (entrega direta)</h2>
             <div class="mt-3 w-full max-w-full overflow-x-auto">
                 <table class="w-full min-w-[980px] text-sm">
-                    <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                     <tr><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Origem</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Chegada</th><th class="px-3 py-2">TIC</th><th class="px-3 py-2">Obs</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Ações</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -55,7 +55,7 @@
                 </div>
                 <div class="mt-3 w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[1280px] text-sm">
-                        <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-3 py-2">Tipo</th>
                             <th class="px-3 py-2">Plaqueta</th>
@@ -111,7 +111,7 @@
             <h2 class="text-base font-bold text-amber-900">Sem rota mapeada</h2>
             <div class="mt-3 w-full max-w-full overflow-x-auto">
                 <table class="w-full min-w-[900px] text-sm">
-                    <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Rota/Malote</th><th class="px-3 py-2">Ações</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -138,7 +138,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Separar hoje</h3>
                 <div class="mt-2 w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[900px] text-sm">
-                        <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Rota</th><th class="px-3 py-2">Separação</th><th class="px-3 py-2">Carregamento</th><th class="px-3 py-2">Entrega prevista</th><th class="px-3 py-2">Status envio CD</th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -164,7 +164,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Próximas separações</h3>
                 <div class="mt-2 w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[900px] text-sm">
-                        <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Rota</th><th class="px-3 py-2">Separação</th><th class="px-3 py-2">Carregamento</th><th class="px-3 py-2">Entrega prevista</th><th class="px-3 py-2">Status envio CD</th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -190,7 +190,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Sem rota cadastrada</h3>
                 <div class="mt-2 w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[700px] text-sm">
-                        <thead style="background-color: #033151;" class="text-left text-xs font-semibold uppercase text-white">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr><th class="px-3 py-2">Plaqueta</th><th class="px-3 py-2">Tipo</th><th class="px-3 py-2">Unidade/Setor</th><th class="px-3 py-2">Status</th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
