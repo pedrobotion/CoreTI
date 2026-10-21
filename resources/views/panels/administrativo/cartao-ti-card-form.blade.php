@@ -50,7 +50,7 @@
 
                 <div class="flex justify-end gap-2 border-t border-slate-200 pt-4">
                     <a href="{{ route('administrativo.cartao-ti.index') }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</a>
-                    <button type="submit" class="inline-flex h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Salvar</button>
+                    <button type="submit" class="inline-flex h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Salvar</button>
                 </div>
             </form>
         </section>

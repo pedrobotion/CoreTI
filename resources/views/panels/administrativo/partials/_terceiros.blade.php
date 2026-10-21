@@ -46,7 +46,7 @@
                         };
                         $actionLabel = match ($thirdPartyStage) {
                             'aguardando_informacoes' => 'Orçamento realizado',
-                            'aguardando_retorno_fisico' => 'Registrar retorno do equipamento',
+                            'aguardando_retorno_fisico' => 'Registrar retorno',
                             default => 'Registrar envio',
                         };
                     @endphp
@@ -62,7 +62,7 @@
                         </td>
                         <td class="px-3 py-2">{{ $item->unidade_setor }}</td>
                         <td class="px-3 py-2">
-                            <button type="button" @click.stop="modalOpen = true" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90">{{ $actionLabel }}</button>
+                            <button type="button" @click.stop="modalOpen = true" class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[#033151] bg-[#033151] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"><svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ $actionLabel }}</button>
 
                             <template x-teleport="body">
                                 <div
@@ -136,7 +136,7 @@
                                                     </div>
                                                     <div class="sm:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                         <button type="button" @click="modalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                        <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Registrar envio</button>
+                                                        <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Registrar envio</button>
                                                     </div>
                                                 </form>
                                             @elseif($thirdPartyStage === 'aguardando_informacoes')
@@ -183,7 +183,7 @@
                                                                     href="{{ route('bancada-servicos.attachments.download', $remessaAttachment) }}"
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-white px-4 text-sm font-semibold text-[#033151] hover:bg-slate-50"
+                                                                    class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-white px-4 text-sm font-semibold text-[#033151] hover:bg-slate-50"
                                                                 >
                                                                     Visualizar nota de remessa
                                                                 </a>
@@ -265,7 +265,7 @@
                                                                 <input type="file" name="terceiros_orcamento_anexo" class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                                             </div>
                                                             <div class="sm:col-span-2 flex justify-end">
-                                                                <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Salvar orçamento</button>
+                                                                <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Salvar orçamento</button>
                                                             </div>
                                                         </form>
                                                     </div>
@@ -314,7 +314,7 @@
                                                                     href="{{ route('bancada-servicos.attachments.download', $remessaAttachment) }}"
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-white px-4 text-sm font-semibold text-[#033151] hover:bg-slate-50"
+                                                                    class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-white px-4 text-sm font-semibold text-[#033151] hover:bg-slate-50"
                                                                 >
                                                                     Visualizar nota de remessa
                                                                 </a>
@@ -354,7 +354,7 @@
                                                             </div>
                                                             <div class="sm:col-span-2 flex justify-end gap-2 border-t border-slate-200 pt-3">
                                                                 <button type="button" @click="modalOpen=false" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-                                                                <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Confirmar retorno na TI</button>
+                                                                <button class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Confirmar retorno na TI</button>
                                                             </div>
                                                         </form>
                                                     </div>

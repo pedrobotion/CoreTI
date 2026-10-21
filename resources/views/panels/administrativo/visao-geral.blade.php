@@ -25,7 +25,7 @@
                         class="h-10 w-full rounded-md border-slate-300 text-sm"
                     >
                     <div class="flex gap-2">
-                        <button type="submit" class="inline-flex h-10 flex-1 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Buscar equipamento</button>
+                        <button type="submit" class="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Buscar equipamento</button>
                         <a href="{{ route('administrativo.visao-geral') }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Limpar</a>
                     </div>
                 </form>
@@ -63,7 +63,7 @@
                                                 <td class="px-3 py-2">{{ $candidate->unidade_setor ?: '-' }}</td>
                                                 <td class="px-3 py-2">{{ optional($candidate->data_chegada)->format('d/m/Y') ?: '-' }}</td>
                                                 <td class="px-3 py-2">
-                                                    <a href="{{ route('administrativo.visao-geral', ['equipment_plaqueta' => $candidate->plaqueta]) }}" class="inline-flex rounded-md border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">Ver detalhes</a>
+                                                    <a href="{{ route('administrativo.visao-geral', ['equipment_plaqueta' => $candidate->plaqueta]) }}" class="inline-flex rounded-lg border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">Ver detalhes</a>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -155,7 +155,7 @@
                                                     <td class="px-3 py-2">{{ optional($attachment->uploaded_at)->format('d/m/Y H:i') ?: '-' }}</td>
                                                     <td class="px-3 py-2">{{ $attachment->uploader?->name ?? 'Sistema' }}</td>
                                                     <td class="px-3 py-2">
-                                                        <a href="{{ route('bancada-servicos.attachments.download', $attachment) }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-md border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">Baixar</a>
+                                                        <a href="{{ route('bancada-servicos.attachments.download', $attachment) }}" target="_blank" rel="noopener noreferrer" class="inline-flex rounded-lg border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">Baixar</a>
                                                     </td>
                                                 </tr>
                                             @empty

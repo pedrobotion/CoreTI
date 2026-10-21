@@ -42,7 +42,7 @@
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <a href="{{ route('administrativo.cartao-ti.cards.create') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Novo cartão</a>
-                        <a href="{{ route('administrativo.cartao-ti.purchases.create') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Novo lançamento</a>
+                        <a href="{{ route('administrativo.cartao-ti.purchases.create') }}" class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Novo lançamento</a>
                     </div>
                 </div>
 
@@ -69,7 +69,7 @@
                         </select>
                     </div>
                     <div class="md:col-span-4 flex gap-2">
-                        <button type="submit" class="inline-flex h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Filtrar</button>
+                        <button type="submit" class="inline-flex h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Filtrar</button>
                         <a href="{{ route('administrativo.cartao-ti.index') }}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Limpar</a>
                     </div>
                 </form>
@@ -113,7 +113,7 @@
                                             <form method="POST" action="{{ route('administrativo.cartao-ti.cards.toggle', $card) }}">
                                                 @csrf
                                                 @method('PATCH')
-                                                <button type="submit" class="inline-flex rounded-md border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">
+                                                <button type="submit" class="inline-flex rounded-lg border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">
                                                     {{ $card->active ? 'Desativar' : 'Ativar' }}
                                                 </button>
                                             </form>
@@ -168,7 +168,7 @@
                                     <td class="px-3 py-2 text-slate-700">{{ $purchase->purchase_date?->format('d/m/Y') ?: '-' }}</td>
                                     <td class="px-3 py-2 text-slate-700">
                                         @if($purchase->invoice_storage_path)
-                                            <a href="{{ route('administrativo.cartao-ti.purchases.invoice.download', $purchase) }}" class="inline-flex rounded-md border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">Baixar</a>
+                                            <a href="{{ route('administrativo.cartao-ti.purchases.invoice.download', $purchase) }}" class="inline-flex rounded-lg border border-[#033151] bg-white px-3 py-1.5 text-xs font-semibold text-[#033151] hover:bg-slate-50">Baixar</a>
                                         @else
                                             <span class="text-xs text-slate-500">Sem fatura</span>
                                         @endif
