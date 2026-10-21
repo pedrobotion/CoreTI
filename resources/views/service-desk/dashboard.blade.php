@@ -1,10 +1,10 @@
 <x-app-layout>
-    <div class="mx-auto max-w-7xl space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">ServiceDesk</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Dashboard Geral</h1>
-                <p class="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Service Desk</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Dashboard Geral</h1>
+                <p class="mt-1 max-w-2xl text-sm text-slate-500">
                     Visão consolidada de E-mail, Office e Jira em uma única tela.
                 </p>
             </div>
@@ -41,8 +41,8 @@
         </div>
 
         <div class="grid gap-4 lg:grid-cols-4">
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">E-mail</p>
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">E-mail</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ $emailStats['total_ativos'] }}</p>
                 <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Sede<br><span class="font-semibold">{{ $emailStats['sede'] }}</span></div>
@@ -51,8 +51,8 @@
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Genéricos<br><span class="font-semibold">{{ $emailStats['genericos'] }}</span></div>
                 </div>
             </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office</p>
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Office</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ $officeStats['total_ativos'] }}</p>
                 <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Apps<br><span class="font-semibold">{{ $officeStats['apps'] }}</span></div>
@@ -61,8 +61,8 @@
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Visio<br><span class="font-semibold">{{ $officeStats['visio'] }}</span></div>
                 </div>
             </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Jira</p>
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Jira</p>
                 <p class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ $jiraGeneralStats['chamados_total'] }}</p>
                 <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200">Abertos<br><span class="font-semibold">{{ $jiraGeneralStats['chamados_abertos'] }}</span></div>
@@ -70,10 +70,10 @@
                     <div class="rounded-md bg-slate-100 px-2 py-2 text-center text-slate-700 dark:bg-slate-800 dark:text-slate-200 col-span-2">SLA em atenção<br><span class="font-semibold text-amber-700 dark:text-amber-300">{{ $jiraGeneralStats['sla_atencao'] }}</span></div>
                 </div>
             </div>
-            <a href="{{ route('service-desk.ad') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+            <a href="{{ route('service-desk.ad') }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Active Directory</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Active Directory</p>
                         <p class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ $adStats['total'] }}</p>
                     </div>
                     <span class="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Consultar</span>
@@ -89,13 +89,13 @@
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                     <h2 class="text-base font-semibold text-slate-950 dark:text-white">Chamados recentes</h2>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[760px] text-sm">
-                        <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-5 py-3">ID</th>
                                 <th class="px-5 py-3">Solicitação</th>
@@ -106,7 +106,7 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                             @forelse ($recentTickets as $ticket)
-                                <tr>
+                                <tr class="transition hover:bg-slate-50">
                                     <td class="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">
                                         @php
                                             $ticketKey = rawurlencode((string) $ticket->chave);
@@ -140,7 +140,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Filas de atendimento</h2>
                 <div class="mt-4 space-y-3">
                     @foreach ($queues as $queue)
@@ -167,7 +167,7 @@
 
     @if ($isAdmin && $workspacePreviewOpen && !empty($workspacePreview) && $workspacePendingSyncCount > 0)
             <div id="workspace-sync-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-3 py-4 sm:px-6">
-                <div class="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-xl sm:p-5">
+                <div class="max-h-[calc(100vh-2rem)] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl sm:p-5">
                     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h2 class="text-lg font-semibold text-slate-900">Sincronização Google Workspace</h2>
                         <button type="button" onclick="closeWorkspaceSyncModal()" class="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">Fechar</button>
@@ -250,7 +250,7 @@
                         <button type="button" onclick="closeWorkspaceSyncModal()" class="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto">Depois</button>
                         <form method="POST" action="{{ route('service-desk.workspace-sync.apply') }}" class="w-full sm:w-auto" x-data="{ loading: false }" @submit="loading = true">
                             @csrf
-                            <button type="submit" class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto" :disabled="loading">
+                            <button type="submit" style="background-color: #033151; border-color: #033151;" class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90 sm:w-auto" :disabled="loading">
                                 <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                     <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.25"></circle>
                                     <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>

@@ -12,7 +12,7 @@
 
         {{-- O escopo precisa ser visível: sem ele, "N contas mudariam" não
              explica o que acontece com as outras. --}}
-        <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
                 <p class="text-sm text-slate-700">
                     A regra alcança <strong class="text-slate-950">{{ $escopo['alcancadas'] }}</strong>
@@ -41,7 +41,7 @@
         @endif
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">OUs mapeadas</p>
                 <p class="mt-2 text-3xl font-bold text-slate-950">{{ $resumo['total'] }}</p>
             </div>
@@ -54,7 +54,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Confirmadas</p>
                 <p class="mt-2 text-3xl font-bold text-emerald-900">{{ $resumo['confirmadas'] }}</p>
             </div>
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Não mexer</p>
                 <p class="mt-2 text-3xl font-bold text-slate-950">{{ $resumo['ignoradas'] }}</p>
             </div>
@@ -74,7 +74,7 @@
         </div>
 
         @if ($trocas->isNotEmpty())
-            <details class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <details class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <summary class="cursor-pointer px-5 py-3 text-sm font-semibold text-slate-800">
                     Ver as {{ $trocas->count() }} trocas de código
                 </summary>
@@ -105,7 +105,7 @@
             </details>
         @endif
 
-        <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 px-5 py-3">
                 <h2 class="text-sm font-semibold text-slate-800">Exceções por conta</h2>
                 <p class="text-xs text-slate-500">
@@ -159,7 +159,7 @@
             @endcan
         </div>
 
-        <form method="GET" class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <form method="GET" class="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div>
                 <label class="block text-xs font-semibold text-slate-600">Situação</label>
                 <select name="situacao" class="mt-1 rounded-md border-slate-300 text-sm">
@@ -193,7 +193,7 @@
             {{-- Serve para o controller detectar corte por max_input_vars. --}}
             <input type="hidden" name="total_enviado" value="{{ $regras->count() }}">
 
-        <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50">

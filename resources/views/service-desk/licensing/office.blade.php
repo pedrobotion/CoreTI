@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Licenciamento</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Licenciamento</p>
                 <h1 class="mt-1 text-2xl font-bold text-slate-950">Office</h1>
                 <p class="mt-2 max-w-2xl text-sm text-slate-600">
                     Cadastro local de licenças com preenchimento automático por matrícula do colaborador.
@@ -31,7 +31,7 @@
                         </button>
                     </form>
                     <a href="{{ route('service-desk.office.change-requests') }}" class="toolbar-btn inline-flex min-h-10 items-center justify-center rounded-md border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-800 hover:bg-amber-100">Alterações pendentes</a>
-                    <button type="button" onclick="openOfficeCreateModal()" class="toolbar-btn-primary inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                    <button type="button" onclick="openOfficeCreateModal()" class="toolbar-btn-primary inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-90">
                         Adicionar licença
                     </button>
                 @endif
@@ -39,14 +39,14 @@
         </div>
 
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Total ativos</p><p class="mt-2 text-2xl font-bold">{{ $stats['total'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Office Apps</p><p class="mt-2 text-2xl font-bold">{{ $stats['office_apps'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Office Business</p><p class="mt-2 text-2xl font-bold">{{ $stats['office_business'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Power BI</p><p class="mt-2 text-2xl font-bold">{{ $stats['powerbi'] }}</p></div>
-            <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Visio</p><p class="mt-2 text-2xl font-bold">{{ $stats['visio'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Total ativos</p><p class="mt-2 text-2xl font-bold">{{ $stats['total'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Office Apps</p><p class="mt-2 text-2xl font-bold">{{ $stats['office_apps'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Office Business</p><p class="mt-2 text-2xl font-bold">{{ $stats['office_business'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Power BI</p><p class="mt-2 text-2xl font-bold">{{ $stats['powerbi'] }}</p></div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-slate-500">Visio</p><p class="mt-2 text-2xl font-bold">{{ $stats['visio'] }}</p></div>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 @foreach(['sede' => 'Sede', 'unidades' => 'Unidades', 'cerrado' => 'Cerrado', 'genericos' => 'Genéricos'] as $divisionKey => $divisionLabel)
                     <a href="{{ route('service-desk.office', array_merge(request()->query(), ['division' => $divisionKey, 'page' => 1])) }}"
@@ -76,7 +76,7 @@
                     <option value="invalid_centro_custo" @selected($status === 'invalid_centro_custo')>CC inválido</option>
                 </select>
                 <input name="q" value="{{ $search }}" placeholder="Buscar e-mail, matrícula, colaborador, centro ou área" class="toolbar-input search-input min-w-[240px] flex-1 rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900 sm:min-w-[300px]">
-                <button class="toolbar-btn-primary inline-flex w-auto items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Buscar</button>
+                <button class="toolbar-btn-primary inline-flex w-auto items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-90">Buscar</button>
                 <a href="{{ route('service-desk.office') }}" class="toolbar-btn inline-flex w-auto items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Limpar</a>
             </form>
             @if($division === 'cerrado')
@@ -85,7 +85,7 @@
         </section>
 
         @if($pendingRateioBatch && $pendingRateioRows->isNotEmpty())
-            <section class="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
+            <section class="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-amber-200 bg-amber-50 p-5 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <h2 class="text-base font-semibold text-amber-950">Pendências do rateio Office</h2>
@@ -124,9 +124,9 @@
             </section>
         @endif
 
-        <section class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+        <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table class="w-full min-w-[1200px] text-sm">
-                <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                     <tr>
                         <th class="px-4 py-3">Nome</th>
                         <th class="px-4 py-3">E-mail</th>
@@ -260,7 +260,7 @@
 
     @if($canManage)
         <div id="office-edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
-            <div class="form-modal-shell max-w-6xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div class="form-modal-shell max-w-6xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
                 <div class="form-modal-header">
                     <h2 class="form-modal-title">Editar licença</h2>
                     <button type="button" onclick="closeOfficeEditModal(true)" class="form-modal-close">Fechar</button>
@@ -316,14 +316,14 @@
                     <label class="inline-flex items-center gap-2 text-sm"><input id="office-edit-visio" type="checkbox" name="visio_plan" value="1"> Visio Plan</label>
                     <div class="sm:col-span-2 lg:col-span-3 flex items-end justify-end gap-2">
                         <button type="button" onclick="closeOfficeEditModal(true)" class="toolbar-btn inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
-                        <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Salvar alterações</button>
+                        <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 py-2 text-sm font-semibold text-white">Salvar alterações</button>
                     </div>
                 </form>
             </div>
         </div>
 
         <div id="office-organization-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
-            <div class="form-modal-shell max-w-2xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div class="form-modal-shell max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
                 <div class="form-modal-header">
                     <div>
                         <h2 class="form-modal-title">Ajuste manual de organização</h2>
@@ -347,14 +347,14 @@
                     <input id="office-area-organization" name="area_office" readonly placeholder="Área" class="toolbar-input rounded-md border-slate-300 bg-slate-50 text-sm">
                     <div class="sm:col-span-2 flex justify-end gap-2">
                         <button type="button" onclick="closeOfficeOrganizationModal(true)" class="toolbar-btn inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
-                        <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Salvar ajuste</button>
+                        <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 py-2 text-sm font-semibold text-white">Salvar ajuste</button>
                     </div>
                 </form>
             </div>
         </div>
 
         <div id="office-create-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
-            <div class="form-modal-shell max-w-6xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div class="form-modal-shell max-w-6xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
                 <div class="form-modal-header">
                     <h2 class="form-modal-title">Adicionar licença</h2>
                     <button type="button" onclick="closeOfficeCreateModal(true)" class="form-modal-close">Fechar</button>
@@ -476,7 +476,7 @@
                     <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="visio_plan" value="1"> Visio Plan</label>
                     <div class="sm:col-span-2 lg:col-span-3 flex items-end justify-end gap-2">
                         <button type="button" onclick="closeOfficeCreateModal(true)" class="toolbar-btn inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
-                        <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Salvar</button>
+                        <button class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 py-2 text-sm font-semibold text-white">Salvar</button>
                     </div>
                 </form>
             </div>

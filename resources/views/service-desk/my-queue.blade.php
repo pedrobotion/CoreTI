@@ -1,14 +1,14 @@
 <x-app-layout>
-    <div class="mx-auto max-w-7xl space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">ServiceDesk</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Minha fila</h1>
-            <p class="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Service Desk</p>
+            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Minha fila</h1>
+            <p class="mt-1 max-w-2xl text-sm text-slate-500">
                 Mostra chamados onde você é solicitante (relator) por e-mail cadastrado ou aparece como responsável.
             </p>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex flex-wrap items-end gap-2">
                 <form
                     method="POST"
@@ -46,7 +46,7 @@
                         class="toolbar-input rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900"
                     >
 
-                    <button type="submit" class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                    <button type="submit" style="background-color: #033151; border-color: #033151;" class="toolbar-btn-primary inline-flex items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">
                         Cadastrar e-mail
                     </button>
 
@@ -79,7 +79,7 @@
             @endif
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-200 p-5 dark:border-slate-800">
                 <form method="GET" action="{{ route('service-desk.my-queue') }}" class="toolbar-search-grid">
                     <select name="status" class="toolbar-select text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
@@ -101,14 +101,14 @@
                         <option value="50" @selected($perPage === 50)>50 por página</option>
                     </select>
                     <input type="text" name="q" value="{{ $search }}" placeholder="Buscar por chave, resumo, solicitante, responsável, unidade ou departamento" class="toolbar-input rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
-                    <button type="submit" class="toolbar-btn-primary inline-flex items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Filtrar</button>
+                    <button type="submit" style="background-color: #033151; border-color: #033151;" class="toolbar-btn-primary inline-flex items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90">Filtrar</button>
                     <a href="{{ route('service-desk.my-queue') }}" class="toolbar-btn inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Limpar</a>
                 </form>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1120px] text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Chave</th>
                             <th class="px-5 py-3">Resumo</th>
@@ -122,7 +122,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @forelse ($tickets as $ticket)
-                            <tr>
+                            <tr class="transition hover:bg-slate-50">
                                 <td class="px-5 py-4 font-semibold text-slate-900 dark:text-slate-100">
                                     @php
                                         $ticketKey = rawurlencode((string) $ticket->chave);

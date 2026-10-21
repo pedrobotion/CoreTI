@@ -10,10 +10,10 @@
     @endphp
 
     <div class="mx-auto max-w-5xl space-y-6">
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Licenciamento</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Licenciamento</p>
                     <h1 class="mt-1 text-2xl font-bold text-slate-950">Configurar custos do Office</h1>
                     <p class="mt-1 text-sm text-slate-600">Informe os valores unitários usados no cálculo do Rateio Office.</p>
                 </div>
@@ -21,7 +21,7 @@
             </div>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <form method="POST" action="{{ route('administrativo.licensing.office-prices.store') }}" class="space-y-5">
                 @csrf
                 <input type="hidden" name="currency" value="BRL">
@@ -50,7 +50,7 @@
                 </div>
 
                 <div class="flex justify-end">
-                    <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Aplicar custos</button>
+                    <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-90">Aplicar custos</button>
                 </div>
             </form>
         </section>

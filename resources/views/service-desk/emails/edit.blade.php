@@ -6,8 +6,8 @@
             : '';
     @endphp
     <div class="mx-auto max-w-3xl">
-        <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">ServiceDesk</p>
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">ServiceDesk</p>
             <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Editar e-mail - {{ $scopeLabel }}</h1>
 
             <form
@@ -190,7 +190,7 @@
                 </div>
 
                 <div class="flex gap-2 sm:col-span-2">
-                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
                         Salvar
                     </button>
                     <a href="{{ route("service-desk.emails.{$scope}") }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-800">

@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">ServiceDesk</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">ServiceDesk</p>
                 <h1 class="mt-1 text-2xl font-bold text-slate-950 dark:text-white">Gerenciamento de E-mails - {{ $scopeLabel }}</h1>
                 <p class="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
                     Cadastro local de e-mails com vínculo principal por matrícula do colaborador.
@@ -12,13 +12,13 @@
                 <button type="button" onclick="openEmailExportModal()" class="toolbar-btn inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
                     Exportar CSV
                 </button>
-                <button type="button" onclick="openEmailCreateModal()" class="toolbar-btn-primary inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                <button type="button" onclick="openEmailCreateModal()" class="toolbar-btn-primary inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
                     Adicionar e-mail
                 </button>
             </div>
         </div>
 
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="border-b border-slate-200 p-5 dark:border-slate-800">
                 @if (($manualCostCenterEmailsCount ?? 0) > 0)
                     <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
@@ -83,14 +83,14 @@
                         <option value="inativos" @selected($status === 'inativos')>Inativos</option>
                     </select>
                     <input name="q" value="{{ $search }}" placeholder="Buscar e-mail, matricula, colaborador, centro ou area" class="toolbar-input search-input min-w-0 flex-1 rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900" style="min-width: 300px;">
-                    <button type="submit" class="toolbar-btn-primary inline-flex w-auto items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Buscar</button>
+                    <button type="submit" class="toolbar-btn-primary inline-flex w-auto items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Buscar</button>
                     <a href="{{ route("service-desk.emails.{$scope}") }}" class="toolbar-btn inline-flex w-auto items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Limpar</a>
                 </form>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1180px] text-sm">
-                    <thead class="bg-slate-900 text-left text-xs font-semibold uppercase text-white">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-4 py-3">E-mail</th>
                             <th class="px-4 py-3">Matricula</th>
@@ -102,7 +102,7 @@
                             <th class="px-4 py-3">Data Desativacao</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3">Observacao</th>
-                            <th class="sticky right-0 z-10 w-44 bg-slate-900 px-4 py-3">Acoes</th>
+                            <th class="sticky right-0 z-10 w-44 bg-white px-4 py-3 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]">Acoes</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -182,7 +182,7 @@
 
     @foreach($manualCostCenterEmails as $manualEmail)
         <div id="coreti-google-email-modal-{{ $manualEmail->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
-            <div class="w-full max-w-xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
                 <div class="mb-4 flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-semibold text-slate-900">Corrigir rateio do e-mail</h2>
@@ -218,7 +218,7 @@
                     <p class="text-xs text-slate-500">As opções são carregadas das unidades e departamentos oficiais. A seleção preserva Unicoop e área.</p>
                     <div class="flex justify-end gap-2">
                         <button type="button" onclick="closeModal('coreti-google-email-modal-{{ $manualEmail->id }}', true)" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
-                        <button type="submit" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Salvar rateio</button>
+                        <button type="submit" class="rounded-md bg-[#033151] px-4 py-2 text-sm font-semibold text-white">Salvar rateio</button>
                     </div>
                 </form>
             </div>
@@ -227,7 +227,7 @@
 
     @foreach($emails as $email)
         <div id="email-edit-modal-{{ $email->id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
-            <div class="w-full max-w-6xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div class="w-full max-w-6xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
                 <div class="mb-4 flex items-center justify-between">
                     <h2 class="text-lg font-semibold text-slate-900">Editar e-mail</h2>
                     <button type="button" onclick="closeModal('email-edit-modal-{{ $email->id }}', true)" class="rounded-md border border-slate-200 px-2 py-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900">Fechar</button>
@@ -377,7 +377,7 @@
                     </div>
                     <div class="sm:col-span-2 lg:col-span-3 flex items-end justify-end gap-2">
                         <button type="button" onclick="closeModal('email-edit-modal-{{ $email->id }}', true)" class="toolbar-btn inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                        <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
                             Salvar
                         </button>
                     </div>
@@ -387,7 +387,7 @@
     @endforeach
 
     <div id="email-create-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 px-4">
-        <div class="form-modal-shell max-w-6xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+        <div class="form-modal-shell max-w-6xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <div class="form-modal-header">
                 <h2 class="form-modal-title">Adicionar e-mail</h2>
                 <button type="button" onclick="closeEmailCreateModal(true)" class="form-modal-close">Fechar</button>
@@ -558,7 +558,7 @@
 
                 <div class="flex items-end justify-end gap-2">
                     <button type="button" onclick="closeEmailCreateModal(true)" class="toolbar-btn inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancelar</button>
-                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
                         Adicionar e-mail
                     </button>
                 </div>
@@ -567,7 +567,7 @@
     </div>
 
     <div id="email-export-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="email-export-modal-title">
-        <div class="w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
                 <div>
                     <h2 id="email-export-modal-title" class="text-lg font-bold text-slate-950 dark:text-white">Exportar e-mails</h2>
@@ -601,7 +601,7 @@
 
                 <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
                     <button type="button" onclick="closeEmailExportModal()" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Cancelar</button>
-                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800">Exportar CSV</button>
+                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:bg-slate-800">Exportar CSV</button>
                 </div>
             </form>
         </div>

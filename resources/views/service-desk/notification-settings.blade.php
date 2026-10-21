@@ -1,12 +1,12 @@
 <x-app-layout>
-    <div class="mx-auto max-w-7xl space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">ServiceDesk</p>
-                <h1 class="mt-1 text-2xl font-bold text-slate-950">Destinatários de notificações</h1>
-                <p class="mt-2 text-sm text-slate-600">Defina quem recebe cada tipo de alerta automático do CoreTI.</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Service Desk</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Destinatários de notificações</h1>
+                <p class="mt-1 text-sm text-slate-500">Defina quem recebe cada tipo de alerta automático do CoreTI.</p>
             </div>
-            <a href="{{ route('service-desk.settings') }}" class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar</a>
+            <a href="{{ route('service-desk.settings') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar</a>
         </div>
 
         @if(session('success'))
@@ -17,7 +17,7 @@
         @endif
 
         <section class="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="text-base font-semibold text-slate-900">Novo destinatário</h2>
                 <p class="mt-1 text-sm text-slate-500">Cadastre uma pessoa ou caixa compartilhada.</p>
                 <form method="POST" action="{{ route('service-desk.notification-settings.recipients.store') }}" class="mt-5 space-y-4">
@@ -28,7 +28,7 @@
                     <label class="block text-sm font-medium text-slate-700">E-mail
                         <input name="email" type="email" required maxlength="255" class="mt-1 w-full rounded-md border-slate-300 text-sm" placeholder="nome@cocari.com.br">
                     </label>
-                    <button class="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Adicionar destinatário</button>
+                    <button style="background-color: #033151; border-color: #033151;" class="w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Adicionar destinatário</button>
                 </form>
 
                 <div class="mt-7 border-t border-slate-200 pt-5">
@@ -54,13 +54,13 @@
                 </div>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h2 class="text-base font-semibold text-slate-900">Roteamento dos avisos</h2>
                         <p class="mt-1 text-sm text-slate-500">Marque os destinatários que devem receber cada evento.</p>
                     </div>
-                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ $rules->count() }} tipos</span>
+                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200">{{ $rules->count() }} tipos</span>
                 </div>
                 @if($recipients->isEmpty())
                     <div class="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Cadastre ao menos um destinatário para configurar o roteamento.</div>
@@ -69,7 +69,7 @@
                         @csrf @method('PUT')
                         <div class="overflow-x-auto rounded-md border border-slate-200">
                             <table class="min-w-full text-left text-sm">
-                                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                                <thead class="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-400">
                                     <tr><th class="px-4 py-3">Evento</th>@foreach($recipients as $recipient)<th class="px-4 py-3 text-center">{{ $recipient->name }}</th>@endforeach</tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200">
@@ -84,7 +84,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="mt-5 flex justify-end"><button class="rounded-md bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Salvar roteamento</button></div>
+                        <div class="mt-5 flex justify-end"><button style="background-color: #033151; border-color: #033151;" class="rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">Salvar roteamento</button></div>
                     </form>
                 @endif
             </div>

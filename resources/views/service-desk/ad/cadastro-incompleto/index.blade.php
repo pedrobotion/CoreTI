@@ -18,7 +18,7 @@
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             @foreach ($campos as $chave => $rotulo)
-                <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Sem {{ mb_strtolower($rotulo) }}</p>
                     <p class="mt-2 text-3xl font-bold {{ $contagens[$chave] > 0 ? 'text-amber-700' : 'text-slate-950' }}">
                         {{ $contagens[$chave] }}
@@ -32,7 +32,7 @@
             </div>
         </div>
 
-        <form method="GET" class="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <form method="GET" class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="flex flex-wrap items-center gap-4">
                 <span class="text-xs font-semibold text-slate-600">Mostrar quem está sem:</span>
                 @foreach ($campos as $chave => $rotulo)
@@ -59,7 +59,7 @@
             </div>
         </form>
 
-        <details class="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <details class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <summary class="cursor-pointer px-5 py-3 text-sm font-semibold text-slate-800">
                 {{ $naoColaboradores->count() }} contas marcadas como "não é colaborador"
             </summary>
@@ -88,7 +88,7 @@
             </div>
         </details>
 
-        <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50">

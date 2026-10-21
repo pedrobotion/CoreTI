@@ -17,10 +17,10 @@
     @endphp
 
     <div class="mx-auto max-w-7xl space-y-5">
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex items-start gap-4">
-                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-slate-900 text-sm font-bold text-white shadow-sm">OF</div>
+                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-blue-50 text-sm font-bold text-blue-700 shadow-sm">OF</div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Licenciamento</p>
                         <h1 class="mt-1 text-2xl font-bold text-slate-900">Rateio Office</h1>
@@ -31,7 +31,7 @@
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     @if($batch)
                         <span class="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold uppercase text-emerald-700">Rateio disponível</span>
-                        <a href="{{ route('administrativo.licensing.office.allocation.export', $batch) }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Exportar Excel</a>
+                        <a href="{{ route('administrativo.licensing.office.allocation.export', $batch) }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-90">Exportar Excel</a>
                     @else
                         <span class="inline-flex min-h-10 items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold uppercase text-amber-700">Aguardando geração</span>
                     @endif
@@ -58,7 +58,7 @@
             </div>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
                     <h2 class="text-base font-semibold text-slate-900">Operação do rateio</h2>
@@ -72,7 +72,7 @@
                             <span class="text-xs font-semibold uppercase text-slate-500">Competência</span>
                             <input type="month" name="competence" value="{{ $competence }}" required class="mt-1 min-h-10 rounded-md border-slate-300 bg-white text-sm shadow-sm focus:border-slate-900 focus:ring-slate-900">
                         </label>
-                        <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">Gerar / atualizar</button>
+                        <button class="inline-flex min-h-10 items-center justify-center rounded-md border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-90">Gerar / atualizar</button>
                     </form>
                     @if($batch)
                         <form method="POST" action="{{ route('administrativo.licensing.office.reprocess', $batch) }}">
@@ -128,7 +128,7 @@
                 </section>
             @endif
 
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-base font-semibold text-slate-900">Resumo por licença</h2>
                     <p class="mt-1 text-sm text-slate-500">Quantidade e custo das quatro licenças faturáveis: valor unitário × quantidade.</p>
@@ -155,7 +155,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-base font-semibold text-slate-900">Resumo por departamento da Sede</h2>
                     <p class="mt-1 text-sm text-slate-500">Licenças e custo mensal estimado dos departamentos classificados como Sede.</p>
@@ -199,7 +199,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-base font-semibold text-slate-900">Resumo por unidade</h2>
                     <p class="mt-1 text-sm text-slate-500">Quantidade de licenças e custo mensal estimado de cada unidade nesta competência.</p>
@@ -241,7 +241,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-3 border-b border-slate-200 p-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <h2 class="text-base font-semibold text-slate-900">Detalhamento por colaborador e licença</h2>
@@ -282,7 +282,7 @@
                 @endif
             </section>
 
-            <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div class="p-5 pb-0">
                         <h2 class="text-base font-semibold text-slate-900">Consolidado para importação</h2>
