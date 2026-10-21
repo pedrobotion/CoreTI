@@ -125,30 +125,31 @@
         @endif
 
         <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table class="w-full min-w-[1200px] text-sm">
+            <table class="w-full min-w-[1040px] text-sm">
                 <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                     <tr>
                         <th class="px-4 py-3">Nome</th>
                         <th class="px-4 py-3">E-mail</th>
                         <th class="px-4 py-3">Matrícula</th>
-                        <th class="px-4 py-3">Centro Custo</th>
-                        <th class="px-4 py-3">Nome Centro Custo</th>
+                        <th class="px-4 py-3">Centro de custo</th>
                         <th class="px-4 py-3">Cargo</th>
                         <th class="px-4 py-3">Atividade M365</th>
                         <th class="px-4 py-3">Match</th>
                         <th class="px-4 py-3">Licenças</th>
-                        <th class="px-4 py-3 text-right whitespace-nowrap">Ações</th>
+                        <th class="sticky right-0 z-10 bg-white px-4 py-3 text-right whitespace-nowrap shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]">Ações</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200">
                     @forelse ($licenses as $item)
-                        <tr>
-                            <td class="px-4 py-3">{{ $item->nome }}</td>
-                            <td class="px-4 py-3">{{ $item->email }}</td>
+                        <tr class="transition hover:bg-slate-50">
+                            <td class="px-4 py-3"><div class="max-w-[170px] truncate" title="{{ $item->nome }}">{{ $item->nome }}</div></td>
+                            <td class="px-4 py-3"><div class="max-w-[220px] truncate" title="{{ $item->email }}">{{ $item->email }}</div></td>
                             <td class="px-4 py-3">{{ $item->matricula ?: '-' }}</td>
-                            <td class="px-4 py-3">{{ $item->centro_custo ?: '-' }}</td>
-                            <td class="px-4 py-3">{{ $item->catalog_cost_center_name ?: $item->centro_custo_nome ?: '-' }}</td>
-                            <td class="px-4 py-3">{{ $item->cargo_nome ?: '-' }}</td>
+                            <td class="px-4 py-3">
+                                <div class="font-mono text-xs text-slate-500">{{ $item->centro_custo ?: '-' }}</div>
+                                <div class="max-w-[160px] truncate text-slate-700" title="{{ $item->catalog_cost_center_name ?: $item->centro_custo_nome }}">{{ $item->catalog_cost_center_name ?: $item->centro_custo_nome ?: '-' }}</div>
+                            </td>
+                            <td class="px-4 py-3"><div class="max-w-[170px] truncate" title="{{ $item->cargo_nome }}">{{ $item->cargo_nome ?: '-' }}</div></td>
                             <td class="px-4 py-3">
                                 @php
                                     $lastSignIn = $item->microsoft_last_sign_in_at ? \Carbon\Carbon::parse($item->microsoft_last_sign_in_at) : null;
@@ -178,7 +179,7 @@
                                 @endphp
                                 {{ $skuLabels->isNotEmpty() ? $skuLabels->implode(', ') : 'Licença não catalogada' }}
                             </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
+                            <td class="sticky right-0 z-10 bg-white px-4 py-3 whitespace-nowrap shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]">
                                 @if($canManage)
                                     @php
                                         $officeEditPayload = [
@@ -248,7 +249,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="10" class="px-4 py-6 text-center text-slate-500">Nenhuma licença cadastrada.</td></tr>
+                        <tr><td colspan="9" class="px-4 py-6 text-center text-slate-500">Nenhuma licença cadastrada.</td></tr>
                     @endforelse
                 </tbody>
             </table>
