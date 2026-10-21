@@ -86,7 +86,7 @@
                 </form>
             </div>
             <div class="w-full max-w-full overflow-x-auto">
-                <table class="{{ $isBackup ? 'min-w-[1650px]' : 'min-w-[1200px]' }} w-full text-sm">
+                <table class="{{ $isBackup ? 'min-w-[1280px]' : 'min-w-[1200px]' }} w-full text-sm">
                     <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-3 py-3">Tipo</th>
@@ -94,8 +94,8 @@
                             <th class="px-3 py-3">Origem</th>
                             <th class="px-3 py-3">Unidade/Setor</th>
                             <th class="px-3 py-3">Chegada</th>
-                            <th class="px-3 py-3">Saída</th>
                             @if(! $isBackup)
+                                <th class="px-3 py-3">Saída</th>
                                 <th class="px-3 py-3">Entrada fiscal</th>
                             @endif
                             <th class="px-3 py-3">Status</th>
@@ -103,8 +103,7 @@
                                 <th class="px-3 py-3">TIC</th>
                             @endif
                             @if($isBackup)
-                                <th class="px-3 py-3">Localização backup</th>
-                                <th class="px-3 py-3">Emprestado para</th>
+                                <th class="px-3 py-3">Localização / Empréstimo</th>
                                 <th class="px-3 py-3">Data backup</th>
                             @endif
                             <th class="px-3 py-3 {{ $isBackup ? 'w-[230px]' : 'w-[200px]' }}">Observação</th>
@@ -121,8 +120,8 @@
                                     {{ $asset->unidade_setor }}
                                 </td>
                                 <td class="px-3 py-3">{{ optional($asset->data_chegada)->format('d/m/Y') }}</td>
-                                <td class="px-3 py-3">{{ optional($asset->data_saida)->format('d/m/Y') ?: '-' }}</td>
                                 @if(! $isBackup)
+                                    <td class="px-3 py-3">{{ optional($asset->data_saida)->format('d/m/Y') ?: '-' }}</td>
                                     <td class="px-3 py-3" x-data="{ editModalOpen: false, editOrigem: @js(old('origem_tipo', $asset->origem_tipo ?: 'unidade')) }">
                                         @if(in_array($asset->entrada_status, ['Aguardando Entrada', 'Aguardando Entrada Fiscal'], true))
                                             <span class="inline-flex rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Aguardando Entrada Fiscal</span>
@@ -401,8 +400,12 @@
                                     </td>
                                 @endif
                                 @if($isBackup)
-                                    <td class="px-3 py-3 break-words">{{ $asset->backup_localizacao ?: '-' }}</td>
-                                    <td class="px-3 py-3 break-words">{{ $asset->backup_emprestado_para ?: '-' }}</td>
+                                    <td class="px-3 py-3 break-words">
+                                        <div class="text-slate-700">{{ $asset->backup_localizacao ?: '-' }}</div>
+                                        @if($asset->backup_emprestado_para)
+                                            <div class="mt-0.5 text-xs text-amber-700">Emprestado: {{ $asset->backup_emprestado_para }}</div>
+                                        @endif
+                                    </td>
                                     <td class="px-3 py-3">{{ optional($asset->backup_data_formatado)->format('d/m/Y') ?: '-' }}</td>
                                 @endif
                                 <td class="{{ $isBackup ? 'max-w-[230px]' : 'max-w-[200px]' }} px-3 py-3 align-top break-words" title="{{ $asset->observacao ?: '' }}">
@@ -638,7 +641,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $showTicColumn ? ($isBackup ? 14 : 11) : ($isBackup ? 13 : 10) }}" class="px-4 py-6 text-center text-slate-500">Nenhum equipamento encontrado.</td></tr>
+                            <tr><td colspan="{{ $showTicColumn ? ($isBackup ? 12 : 11) : ($isBackup ? 11 : 10) }}" class="px-4 py-6 text-center text-slate-500">Nenhum equipamento encontrado.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
