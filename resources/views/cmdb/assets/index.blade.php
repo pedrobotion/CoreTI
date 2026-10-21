@@ -112,15 +112,34 @@
             <a href="{{ route('cmdb.assets.create', request()->only('type', 'asset_type')) }}" class="inline-flex min-h-10 items-center justify-center rounded-md bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">Novo ativo</a>
         </div>
 
-        <form id="bulk-assets-form" method="POST" action="{{ route('cmdb.assets.bulk-update') }}" class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <form id="bulk-assets-form" method="POST" action="{{ route('cmdb.assets.bulk-update') }}" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             @csrf
-            <div><label class="text-xs font-semibold uppercase text-slate-500">Serviço</label><select name="service_id" class="mt-1 h-9 rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach(($services ?? collect()) as $service)<option value="{{ $service->id }}">{{ $service->name }}</option>@endforeach</select></div>
-            <div><label class="text-xs font-semibold uppercase text-slate-500">Criticidade</label><select name="criticality" class="mt-1 h-9 rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach($criticalityLabels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></div>
-            <div><label class="text-xs font-semibold uppercase text-slate-500">Status</label><select name="status" class="mt-1 h-9 rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach($statusLabels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></div>
-            <div><label class="text-xs font-semibold uppercase text-slate-500">Ambiente</label><select name="environment" class="mt-1 h-9 rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach(['production' => 'Produção', 'homologation' => 'Homologação', 'development' => 'Desenvolvimento', 'test' => 'Teste'] as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></div>
-            <div><label class="text-xs font-semibold uppercase text-slate-500">Responsável</label><select name="responsible_user_id" class="mt-1 h-9 rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach(($users ?? collect()) as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select></div>
-            <button type="submit" onclick="return confirm('Aplicar os campos selecionados aos ativos marcados?')" class="h-9 rounded-md border border-[#033151] bg-white px-3 text-xs font-semibold text-[#033151]">Aplicar em lote</button>
-            <span class="text-xs text-slate-500">Marque ativos na tabela. O histórico será registrado individualmente.</span>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <div class="flex flex-col">
+                    <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Serviço</label>
+                    <select name="service_id" class="h-9 w-full rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach(($services ?? collect()) as $service)<option value="{{ $service->id }}">{{ $service->name }}</option>@endforeach</select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Criticidade</label>
+                    <select name="criticality" class="h-9 w-full rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach($criticalityLabels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
+                    <select name="status" class="h-9 w-full rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach($statusLabels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Ambiente</label>
+                    <select name="environment" class="h-9 w-full rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach(['production' => 'Produção', 'homologation' => 'Homologação', 'development' => 'Desenvolvimento', 'test' => 'Teste'] as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Responsável</label>
+                    <select name="responsible_user_id" class="h-9 w-full rounded-md border-slate-300 text-sm"><option value="">Não alterar</option>@foreach(($users ?? collect()) as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach</select>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+                <button type="submit" onclick="return confirm('Aplicar os campos selecionados aos ativos marcados?')" class="inline-flex h-9 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-xs font-semibold text-white transition hover:opacity-90">Aplicar em lote</button>
+                <span class="text-xs text-slate-500">Marque ativos na tabela. O histórico será registrado individualmente.</span>
+            </div>
         </form>
 
         <section class="rounded-lg border border-slate-200 bg-white shadow-sm">
