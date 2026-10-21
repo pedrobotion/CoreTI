@@ -20,10 +20,35 @@
          x-data="{
             tab: 'atendidos',
             fs: false,
+            showTab(t) {
+                // Troca de aba robusta: além do x-show, força o display direto —
+                // assim continua funcionando mesmo depois do reload() trocar o HTML
+                // (quando o re-bind do Alpine às vezes falha e empilha as 4 abas).
+                this.tab = t;
+                document.querySelectorAll('#sd-content [data-sd-tab]').forEach(el => {
+                    el.style.display = (el.getAttribute('data-sd-tab') === t) ? '' : 'none';
+                });
+            },
             toggleFs() {
                 const el = this.$refs.deck;
-                if (!document.fullscreenElement) { (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el); }
-                else { (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); }
+                const req = el.requestFullscreen || el.webkitRequestFullscreen;
+                const exit = document.exitFullscreen || document.webkitExitFullscreen;
+                const emNativa = document.fullscreenElement || document.webkitFullscreenElement;
+                if (!this.fs) {
+                    // Tenta a tela cheia NATIVA; se o navegador não suportar em <div>
+                    // (iOS/Safari), cai na tela cheia por CSS (fixed inset-0).
+                    if (req) {
+                        try {
+                            const p = req.call(el);
+                            if (p && p.catch) { p.catch(() => { this.fs = true; }); }
+                        } catch (e) { this.fs = true; }
+                    } else {
+                        this.fs = true;
+                    }
+                } else {
+                    if (emNativa && exit) { exit.call(document); }
+                    else { this.fs = false; }
+                }
             },
             reload(form) {
                 // Troca os dados sem recarregar a página — assim NÃO sai da tela cheia.
@@ -39,6 +64,7 @@
                         if (!fresh) { window.location = url; return; }
                         cur.innerHTML = fresh.innerHTML;
                         if (window.Alpine) window.Alpine.initTree(cur);
+                        this.showTab(this.tab); // re-afirma a aba ativa no HTML recém-trocado
                         cur.style.opacity = '';
                         try { window.getSelection()?.removeAllRanges(); } catch (e) {}
                         history.replaceState(null, '', url);
@@ -51,20 +77,20 @@
                 this.reload(form);
             }
          }"
-         x-init="document.addEventListener('fullscreenchange', () => fs = !!document.fullscreenElement)">
+         x-init="document.addEventListener('fullscreenchange', () => fs = !!document.fullscreenElement); $nextTick(() => showTab(tab))">
         <a href="{{ route('home') }}" class="text-xs font-semibold uppercase tracking-wide text-slate-500 underline">← Dashboards</a>
 
         <div x-ref="deck"
              class="mt-2 overflow-hidden bg-[#070c17] text-slate-200 shadow-xl ring-1 ring-white/10"
-             :class="fs ? 'rounded-none h-screen overflow-y-auto flex flex-col' : 'rounded-2xl'"
+             :class="fs ? 'fixed inset-0 z-[9999] overflow-y-auto sm:flex sm:flex-col sm:overflow-hidden' : 'rounded-2xl'"
              style="background-image: radial-gradient(1200px 500px at 85% -10%, rgba(37,99,235,.25), transparent 60%);">
 
           <div id="sd-content" class="flex min-h-0 flex-1 flex-col">
             {{-- Cabeçalho --}}
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
                 <h1 class="text-lg font-extrabold text-white sm:text-xl">Apresentação {{ $modo === 'mes' ? 'Mensal' : 'por Período' }} — Infraestrutura TI <span class="text-sky-300/80">· {{ $empresaLabel }}</span></h1>
-                <div class="flex items-center gap-2">
-                    <form method="GET" id="sd-filtros" class="flex items-center gap-2">
+                <div class="flex w-full flex-wrap items-center gap-2 lg:w-auto">
+                    <form method="GET" id="sd-filtros" class="flex flex-wrap items-center gap-2">
                         {{-- Empresa é escolhida pelos botões acima das abas; aqui só
                              preserva o valor nos recarregamentos dos demais filtros. --}}
                         <input type="hidden" name="empresa" value="{{ $empresaSelecionada }}">
@@ -124,24 +150,27 @@
             {{-- Abas --}}
             <div class="flex flex-wrap gap-1 border-b border-white/10 px-3 py-1.5">
                 @foreach ($tabs as $k => $label)
-                    <button type="button" @click="tab = '{{ $k }}'"
+                    <button type="button" @click="showTab('{{ $k }}')"
                             :class="tab === '{{ $k }}' ? 'bg-sky-500/15 text-sky-300 ring-1 ring-sky-400/40' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'"
                             class="rounded-lg px-3 py-1.5 text-sm font-semibold transition">{{ $label }}</button>
                 @endforeach
             </div>
 
-            <div class="flex-1">
+            <div class="flex min-h-0 flex-1 flex-col">
 
             {{-- =================== 1) CHAMADOS ATENDIDOS =================== --}}
-            <div x-show="tab === 'atendidos'" x-cloak :style="fs ? 'height: calc(100vh - 96px)' : ''" class="flex min-h-0 flex-1 flex-col p-4">
+            <div x-show="tab === 'atendidos'" data-sd-tab="atendidos" x-cloak class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
                 <h2 class="text-lg font-extrabold text-white">Chamados Atendidos <span class="text-sm font-medium text-sky-300/80">· {{ $rotuloSemana }}</span></h2>
+                <p class="mt-0.5 text-[11px] text-slate-500">Não contabiliza os catálogos de automação/robô: {{ collect($catalogosExcluidos ?? [])->map(fn($c) => '“'.$c.'”')->implode(' e ') }}.</p>
 
-                <div class="mt-3 grid gap-2.5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
+                <div class="mt-3 grid gap-2.5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-7">
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Chamados Criados','valor'=>$fmt($atendidos['criados']),'nota'=>null])
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Chamados Atendidos','valor'=>$fmt($atendidos['atendidos']),'nota'=>null])
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Requisições','valor'=>$fmt($atendidos['requisicoes']),'nota'=>$fmt($atendidos['pctReq'],1).'% do total'])
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Incidentes','valor'=>$fmt($atendidos['incidentes']),'nota'=>$fmt($atendidos['pctInc'],1).'% do total','cor'=>'text-rose-400'])
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Performance','valor'=>$fmt($atendidos['perf'],1).'%','nota'=>null])
+                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Criados no ano','valor'=>$fmt($acumuladoAno['criados']),'nota'=>$acumuladoAno['periodo']])
+                    @include('dashboards.partials.sd-kpi', ['titulo'=>'Atendidos no ano','valor'=>$fmt($acumuladoAno['atendidos']),'nota'=>$acumuladoAno['periodo']])
                 </div>
 
                 <div class="mt-3 grid gap-3 lg:grid-cols-2">
@@ -164,17 +193,25 @@
                     </div>
                     <div class="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                         <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Índice de Atendimento</div>
-                        <div class="flex items-center justify-between text-sm"><span class="text-slate-300">Atendidos</span><span class="font-bold text-sky-300">{{ $fmt($atendidos['atendidos']) }} de {{ $fmt($atendidos['criados']) }}</span></div>
+                        <div class="flex items-center justify-between text-sm"><span class="text-slate-300">Atendidos no período</span><span class="font-bold text-sky-300">{{ $fmt($atendidos['atendidos']) }} de {{ $fmt($atendidos['criados']) }}</span></div>
                         <div class="mt-2 h-3 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-gradient-to-r from-blue-700 to-sky-400" style="width: {{ min(100,$atendidos['perf']) }}%"></div></div>
-                        <div class="mt-4 text-center">
-                            <div class="text-4xl font-extrabold text-sky-400">{{ $fmt($atendidos['perf'],1) }}%</div>
-                            <div class="mt-0.5 text-xs text-slate-400">de chamados atendidos no período</div>
+                        <div class="mt-3 flex items-center justify-between text-sm"><span class="text-slate-300">Atendidos no ano</span><span class="font-bold text-sky-300">{{ $fmt($acumuladoAno['atendidos']) }} de {{ $fmt($acumuladoAno['criados']) }}</span></div>
+                        <div class="mt-2 h-3 w-full overflow-hidden rounded-full bg-white/10"><div class="h-full rounded-full bg-gradient-to-r from-blue-800 to-sky-500" style="width: {{ min(100,$acumuladoAno['perf']) }}%"></div></div>
+                        <div class="mt-4 grid grid-cols-2 gap-3 text-center">
+                            <div>
+                                <div class="text-3xl font-extrabold text-sky-400 sm:text-4xl">{{ $fmt($atendidos['perf'],1) }}%</div>
+                                <div class="mt-0.5 text-xs text-slate-400">no período</div>
+                            </div>
+                            <div class="border-l border-white/10">
+                                <div class="text-3xl font-extrabold text-sky-300 sm:text-4xl">{{ $fmt($acumuladoAno['perf'],1) }}%</div>
+                                <div class="mt-0.5 text-xs text-slate-400">no ano ({{ $acumuladoAno['ano'] }})</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {{-- Comparativo dos últimos 3 meses --}}
-                <div class="mt-3 flex min-h-[220px] flex-1 flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <div class="mt-3 flex min-h-[160px] flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] p-4">
                     <div class="mb-2 flex items-center justify-between">
                         <div class="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Incidentes — Criados × Resolvidos (3 meses)</div>
                         <div class="flex gap-4 text-[11px] text-slate-300">
@@ -182,40 +219,15 @@
                             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full" style="background-color:#38bdf8"></span>Resolvidos</span>
                         </div>
                     </div>
-                    @php
-                        $cm = array_values($comparativoMensal);
-                        $n = count($cm);
-                        $maxV = max(1, collect($cm)->flatMap(fn($m)=>[$m['incidentes'],$m['incResolvidos']])->max());
-                        $step = max(5, (int) ceil($maxV / 4 / 10) * 10);
-                        $topo = $step * 4;
-                        $W = 820; $H = 200; $padL = 56; $padR = 66; $padT = 18; $padB = 40;
-                        $plotW = $W - $padL - $padR; $plotH = $H - $padT - $padB; $baseY = $padT + $plotH;
-                        $px = fn($i) => round($padL + ($n > 1 ? $i / ($n - 1) * $plotW : $plotW / 2), 1);
-                        $py = fn($v) => round($padT + $plotH - ($v / $topo) * $plotH, 1);
-                        $linha = fn($c) => implode(' ', array_map(fn($i) => $px($i).','.$py($cm[$i][$c]), range(0, $n - 1)));
-                        $areaOf = fn($c) => $linha($c).' '.$px($n - 1).','.$baseY.' '.$px(0).','.$baseY;
-                        $series = [['c'=>'incidentes','cor'=>'#f43f5e','acima'=>true],['c'=>'incResolvidos','cor'=>'#38bdf8','acima'=>false]];
-                    @endphp
-                    <div class="flex min-h-0 flex-1 items-center justify-center">
-                    <svg viewBox="0 0 {{ $W }} {{ $H }}" class="w-full max-h-[46vh]">
-                        @for ($g = 0; $g <= 4; $g++)
-                            @php $gy = round($padT + $plotH - $g / 4 * $plotH, 1); @endphp
-                            <line x1="{{ $padL }}" y1="{{ $gy }}" x2="{{ $W - $padR }}" y2="{{ $gy }}" stroke="#141c2b" stroke-width="1"/>
-                            <text x="{{ $padL - 7 }}" y="{{ $gy + 3 }}" text-anchor="end" fill="#3f4a5e" style="font-size:9px">{{ $g * $step }}</text>
-                        @endfor
-                        <polyline points="{{ $linha('incidentes') }}" fill="none" stroke="#f43f5e" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-                        <polyline points="{{ $linha('incResolvidos') }}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-                        @foreach ($series as $s)
-                            @foreach ($cm as $i => $m)
-                                <circle cx="{{ $px($i) }}" cy="{{ $py($m[$s['c']]) }}" r="2.6" fill="{{ $s['cor'] }}"/>
-                                <text x="{{ $px($i) }}" y="{{ $py($m[$s['c']]) + ($s['acima'] ? -8 : 15) }}" text-anchor="middle" fill="{{ $s['cor'] }}" style="font-size:10px;font-weight:600">{{ $fmt($m[$s['c']]) }}</text>
-                            @endforeach
-                        @endforeach
-                        @foreach ($cm as $i => $m)
-                            <text x="{{ $px($i) }}" y="{{ $H - 18 }}" text-anchor="middle" fill="#e2e8f0" style="font-size:12px;font-weight:700">{{ $m['rotulo'] }}</text>
-                            <text x="{{ $px($i) }}" y="{{ $H - 5 }}" text-anchor="middle" fill="#7dd3fc" style="font-size:10px;font-weight:700">{{ $fmt($m['incPerf'],1) }}% resolv.</text>
-                        @endforeach
-                    </svg>
+                    <div class="flex min-h-0 w-full flex-1">
+                        {{-- Desktop/tablet: gráfico largo (em tela cheia preenche a altura) --}}
+                        <div class="hidden min-h-0 w-full items-center justify-center sm:flex">
+                            @include('dashboards.partials.sd-chart-3m', ['comparativoMensal' => $comparativoMensal, 'fmt' => $fmt, 'W' => 1000, 'H' => 200, 'padL' => 56, 'padR' => 66, 'padT' => 18, 'padB' => 40, 'fsFill' => true, 'maxH' => 'max-h-[40vh]'])
+                        </div>
+                        {{-- Celular: gráfico mais alto e legível --}}
+                        <div class="w-full self-center sm:hidden">
+                            @include('dashboards.partials.sd-chart-3m', ['comparativoMensal' => $comparativoMensal, 'fmt' => $fmt, 'W' => 300, 'H' => 200, 'padL' => 38, 'padR' => 34, 'padT' => 16, 'padB' => 42, 'fsFill' => false, 'maxH' => 'max-h-[46vh]'])
+                        </div>
                     </div>
                 </div>
 
@@ -223,7 +235,7 @@
             </div>
 
             {{-- =================== 2) BACKLOG =================== --}}
-            <div x-show="tab === 'backlog'" x-cloak :style="fs ? 'height: calc(100vh - 96px)' : ''" class="flex min-h-0 flex-1 flex-col p-4">
+            <div x-show="tab === 'backlog'" data-sd-tab="backlog" x-cloak class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
                 <h2 class="text-lg font-extrabold text-white">Backlog de Atendimentos <span class="text-sm font-medium text-sky-300/80">· {{ $rotuloSemana }}</span></h2>
 
                 @php $varPos = $backlog['variacao'] > 0; $corVar = $varPos ? 'text-rose-400' : 'text-emerald-400'; @endphp
@@ -272,7 +284,7 @@
             </div>
 
             {{-- =================== 3) INTERNET =================== --}}
-            <div x-show="tab === 'internet'" x-cloak :style="fs ? 'height: calc(100vh - 96px)' : ''" class="flex min-h-0 flex-1 flex-col p-4">
+            <div x-show="tab === 'internet'" data-sd-tab="internet" x-cloak class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
                 <h2 class="text-lg font-extrabold text-white">Incidentes de Indisponibilidade de Internet <span class="text-sm font-medium text-sky-300/80">· {{ $rotuloSemana }}</span></h2>
 
                 <div class="mt-3 grid gap-2.5 grid-cols-2 xl:grid-cols-4">
@@ -319,8 +331,9 @@
             </div>
 
             {{-- =================== 4) TOP 5 =================== --}}
-            <div x-show="tab === 'top5'" x-cloak :style="fs ? 'height: calc(100vh - 96px)' : ''" class="flex min-h-0 flex-1 flex-col p-4">
+            <div x-show="tab === 'top5'" data-sd-tab="top5" x-cloak class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
                 <h2 class="text-lg font-extrabold text-white">Top 5 Incidentes (Catálogos) <span class="text-sm font-medium text-sky-300/80">· {{ $rotuloSemana }}</span></h2>
+                <p class="mt-0.5 text-[11px] text-slate-500">Não contabiliza os catálogos de automação/robô: {{ collect($catalogosExcluidos ?? [])->map(fn($c) => '“'.$c.'”')->implode(' e ') }}.</p>
 
                 <div class="mt-3 grid gap-2.5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Total de Incidentes','valor'=>$fmt($top5['total']),'nota'=>null,'cor'=>'text-rose-400'])

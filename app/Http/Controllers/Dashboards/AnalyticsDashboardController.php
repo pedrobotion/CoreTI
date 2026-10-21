@@ -93,15 +93,15 @@ class AnalyticsDashboardController extends Controller
         ]);
 
         // Empresas vinculadas à Cocari (filtro por `unidade` em jiras). "todas"
-        // mantém a visão geral; o padrão é Cocari (a cooperativa).
+        // é a visão geral e vem primeiro (padrão).
         $empresas = [
+            'todas' => 'Todas as empresas',
             'cocari' => 'Cocari',
             'tratornew' => 'TratorNew',
             'tratorcase' => 'TratorCase',
             'pivot' => 'Pivot',
-            'todas' => 'Todas as empresas',
         ];
-        $empresaSelecionada = isset($empresas[$filtros['empresa'] ?? '']) ? $filtros['empresa'] : 'cocari';
+        $empresaSelecionada = isset($empresas[$filtros['empresa'] ?? '']) ? $filtros['empresa'] : 'todas';
 
         // Times (squads) disponíveis, do mais ao menos movimentado.
         $times = \Illuminate\Support\Facades\DB::table('jiras')
@@ -177,6 +177,8 @@ class AnalyticsDashboardController extends Controller
             'empresaSelecionada' => $empresaSelecionada,
             'empresaLabel' => $empresas[$empresaSelecionada],
             'atendidos' => $stats->chamadosAtendidos(),
+            'acumuladoAno' => $stats->acumuladoAno(),
+            'catalogosExcluidos' => ServiceDeskApresentacaoStats::catalogosExcluidos(),
             'comparativoMensal' => $stats->comparativoMensal(),
             'backlog' => $stats->backlog(),
             'internet' => $stats->incidentesInternet(),

@@ -44,6 +44,12 @@ class ServiceDeskApresentacaoStats
         'Falha na execução de automação',
     ];
 
+    /** Catálogos de automação/robô NÃO contabilizados (Atendidos e Top 5). */
+    public static function catalogosExcluidos(): array
+    {
+        return self::EXCLUIR_CATALOGOS;
+    }
+
     private const EXCLUIR_TIMES_INCIDENTES = [
         'time ia e automação',
         'time unidade digital',
@@ -213,6 +219,41 @@ class ServiceDeskApresentacaoStats
             'perf' => $perf,
             'pctReq' => $criados > 0 ? round($requisicoes / $criados * 100, 2) : 0,
             'pctInc' => $criados > 0 ? round($incidentes / $criados * 100, 2) : 0,
+        ];
+    }
+
+    /**
+     * Acumulado do ANO: SEMPRE de 1º de janeiro do ano CORRENTE até o mês atual
+     * (hoje), independente do mês selecionado no topo — muda só com o filtro de
+     * empresa/time (via base()). Exclui robôs.
+     *
+     * "Atendido" usa a MESMA régua do BI (e dos cartões mensais): resolvido até o
+     * fim do MÊS em que foi criado (resolução dentro do mês), não depois. Assim o
+     * acumulado do ano = soma do que cada mês resolveu no próprio mês.
+     *
+     * @return array{criados:int,atendidos:int,ano:int,periodo:string}
+     */
+    public function acumuladoAno(): array
+    {
+        $hoje = Carbon::now();
+        $ini = $hoje->copy()->startOfYear();
+        $fim = $hoje->copy()->endOfMonth();
+
+        $criados = $this->semRobos($this->criadosEntre($this->base(), $ini, $fim))->count();
+        $atendidos = $this->semRobos($this->criadosEntre($this->base(), $ini, $fim))
+            ->whereNotNull('data_hora_resolucao')
+            ->whereRaw('data_hora_resolucao < LAST_DAY(data_hora_criacao) + INTERVAL 1 DAY')
+            ->where('data_hora_resolucao', '<=', $fim)
+            ->count();
+
+        $mesFim = ucfirst($hoje->copy()->locale('pt_BR')->translatedFormat('F'));
+
+        return [
+            'criados' => $criados,
+            'atendidos' => $atendidos,
+            'perf' => $criados > 0 ? round($atendidos / $criados * 100, 2) : 0,
+            'ano' => (int) $hoje->format('Y'),
+            'periodo' => 'Janeiro a '.$mesFim.' '.$hoje->format('Y'),
         ];
     }
 
