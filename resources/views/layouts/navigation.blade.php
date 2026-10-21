@@ -131,7 +131,7 @@
                         </div>
                         @if ($user->role === 'admin')
                             <div class="border-t border-slate-100 px-4 pt-2">
-                                <a href="{{ route('service-desk.notification-settings') }}" class="block py-1 text-xs font-semibold text-[#033151] hover:underline">Gerenciar destinatários de avisos →</a>
+                                <a href="{{ route('admin.notifications') }}" class="block py-1 text-xs font-semibold text-[#033151] hover:underline">Gerenciar destinatários de avisos →</a>
                             </div>
                         @endif
                     </div>

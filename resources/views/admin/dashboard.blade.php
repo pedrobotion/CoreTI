@@ -1,12 +1,17 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Painel de Administração') }}
-        </h2>
-    </x-slot>
-
     <div class="py-10">
         <div class="mx-auto max-w-7xl space-y-4 sm:px-6 lg:px-8">
+
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Admin</p>
+                <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Painel de Administração</h1>
+                <p class="mt-1 text-sm text-slate-500">Gestão de usuários, acessos e notificações do CoreTI.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 border-b border-slate-200">
+                <a href="{{ route('admin.dashboard') }}" class="-mb-px border-b-2 border-[#033151] px-3 py-2 text-sm font-semibold text-[#033151]">Usuários</a>
+                <a href="{{ route('admin.notifications') }}" class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Notificações</a>
+            </div>
 
             @if(session('success'))
                 <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>

@@ -461,13 +461,6 @@ Route::middleware(['auth', 'active'])->group(function () {
             'title' => 'Configurações',
             'description' => 'Parâmetros, filas, categorias e permissões do módulo.',
         ])->name('settings');
-        Route::middleware('admin')->group(function () {
-            Route::get('/configuracoes/notificacoes', [CoreTiNotificationSettingsController::class, 'index'])->name('notification-settings');
-            Route::post('/configuracoes/notificacoes/destinatarios', [CoreTiNotificationSettingsController::class, 'storeRecipient'])->name('notification-settings.recipients.store');
-            Route::patch('/configuracoes/notificacoes/destinatarios/{recipient}', [CoreTiNotificationSettingsController::class, 'updateRecipient'])->name('notification-settings.recipients.update');
-            Route::patch('/configuracoes/notificacoes/destinatarios/{recipient}/toggle', [CoreTiNotificationSettingsController::class, 'toggleRecipient'])->name('notification-settings.recipients.toggle');
-            Route::put('/configuracoes/notificacoes/regras', [CoreTiNotificationSettingsController::class, 'updateRules'])->name('notification-settings.rules.update');
-        });
     });
 
     /*
@@ -770,6 +763,15 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::patch('/admin/role/{user}', [AdminController::class, 'updateRole'])->name('admin.update-role')->middleware('module_access:administrativo.manage');
         Route::patch('/admin/module-access/{user}', [AdminController::class, 'updateModuleAccess'])->name('admin.update-module-access')->middleware('module_access:administrativo.manage');
         Route::delete('/admin/delete/{user}', [AdminController::class, 'deleteUser'])->name('admin.delete')->middleware('module_access:administrativo.manage');
+
+        // Notificações do CoreTI — agora dentro do painel Admin (admin-only).
+        Route::middleware('admin')->group(function () {
+            Route::get('/admin/notificacoes', [CoreTiNotificationSettingsController::class, 'index'])->name('admin.notifications');
+            Route::post('/admin/notificacoes/destinatarios', [CoreTiNotificationSettingsController::class, 'storeRecipient'])->name('admin.notifications.recipients.store');
+            Route::patch('/admin/notificacoes/destinatarios/{recipient}', [CoreTiNotificationSettingsController::class, 'updateRecipient'])->name('admin.notifications.recipients.update');
+            Route::patch('/admin/notificacoes/destinatarios/{recipient}/toggle', [CoreTiNotificationSettingsController::class, 'toggleRecipient'])->name('admin.notifications.recipients.toggle');
+            Route::put('/admin/notificacoes/regras', [CoreTiNotificationSettingsController::class, 'updateRules'])->name('admin.notifications.rules.update');
+        });
     });
 
     /*

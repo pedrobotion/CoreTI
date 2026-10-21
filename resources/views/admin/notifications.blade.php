@@ -2,11 +2,16 @@
     <div class="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Service Desk</p>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Admin</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Destinatários de notificações</h1>
                 <p class="mt-1 text-sm text-slate-500">Defina quem recebe cada tipo de alerta automático do CoreTI.</p>
             </div>
-            <a href="{{ route('service-desk.settings') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar</a>
+            <a href="{{ route('dashboard') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar ao CoreTI</a>
+        </div>
+
+        <div class="flex flex-wrap gap-2 border-b border-slate-200">
+            <a href="{{ route('admin.dashboard') }}" class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700">Usuários</a>
+            <a href="{{ route('admin.notifications') }}" class="-mb-px border-b-2 border-[#033151] px-3 py-2 text-sm font-semibold text-[#033151]">Notificações</a>
         </div>
 
         @if(session('success'))
@@ -20,7 +25,7 @@
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="text-base font-semibold text-slate-900">Novo destinatário</h2>
                 <p class="mt-1 text-sm text-slate-500">Cadastre uma pessoa ou caixa compartilhada.</p>
-                <form method="POST" action="{{ route('service-desk.notification-settings.recipients.store') }}" class="mt-5 space-y-4">
+                <form method="POST" action="{{ route('admin.notifications.recipients.store') }}" class="mt-5 space-y-4">
                     @csrf
                     <label class="block text-sm font-medium text-slate-700">Nome
                         <input name="name" required maxlength="120" class="mt-1 w-full rounded-md border-slate-300 text-sm" placeholder="Ex.: Pedro Bottion">
@@ -36,7 +41,7 @@
                     <div class="mt-3 max-h-[520px] space-y-3 overflow-y-auto pr-2">
                         @forelse($recipients as $recipient)
                             <div class="rounded-md border border-slate-200 p-3 {{ $recipient->active ? '' : 'opacity-60' }}">
-                                <form method="POST" action="{{ route('service-desk.notification-settings.recipients.update', $recipient) }}" class="space-y-2">
+                                <form method="POST" action="{{ route('admin.notifications.recipients.update', $recipient) }}" class="space-y-2">
                                     @csrf @method('PATCH')
                                     <input name="name" value="{{ $recipient->name }}" required class="w-full rounded border-slate-300 text-sm">
                                     <input name="email" type="email" value="{{ $recipient->email }}" required class="w-full rounded border-slate-300 text-sm">
@@ -45,7 +50,7 @@
                                         <button type="submit" form="toggle-recipient-{{ $recipient->id }}" class="rounded border {{ $recipient->active ? 'border-amber-300 text-amber-700' : 'border-emerald-300 text-emerald-700' }} px-3 py-1.5 text-xs font-semibold">{{ $recipient->active ? 'Desativar' : 'Ativar' }}</button>
                                     </div>
                                 </form>
-                                <form id="toggle-recipient-{{ $recipient->id }}" method="POST" action="{{ route('service-desk.notification-settings.recipients.toggle', $recipient) }}">@csrf @method('PATCH')</form>
+                                <form id="toggle-recipient-{{ $recipient->id }}" method="POST" action="{{ route('admin.notifications.recipients.toggle', $recipient) }}">@csrf @method('PATCH')</form>
                             </div>
                         @empty
                             <p class="text-sm text-slate-500">Nenhum destinatário cadastrado. O sistema usará o remetente configurado no ambiente.</p>
@@ -65,7 +70,7 @@
                 @if($recipients->isEmpty())
                     <div class="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Cadastre ao menos um destinatário para configurar o roteamento.</div>
                 @else
-                    <form method="POST" action="{{ route('service-desk.notification-settings.rules.update') }}" class="mt-5">
+                    <form method="POST" action="{{ route('admin.notifications.rules.update') }}" class="mt-5">
                         @csrf @method('PUT')
                         <div class="overflow-x-auto rounded-md border border-slate-200">
                             <table class="min-w-full text-left text-sm">

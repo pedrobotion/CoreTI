@@ -12,7 +12,7 @@ class CoreTiNotificationSettingsController extends Controller
 {
     public function index(): View
     {
-        return view('service-desk.notification-settings', [
+        return view('admin.notifications', [
             'recipients' => CoreTiNotificationRecipient::query()->with('rules')->orderBy('name')->get(),
             'rules' => CoreTiNotificationRule::query()->with('recipients')->orderBy('id')->get(),
         ]);

@@ -175,15 +175,6 @@
             @endforeach
 
             @if ($user->role === 'admin')
-                <a href="{{ route('service-desk.notification-settings') }}" class="coreti-sidebar-link {{ request()->routeIs('service-desk.notification-settings*') ? 'coreti-sidebar-link-active' : '' }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5h16v14H4zM8 9h8M8 13h5" />
-                    </svg>
-                    <span>Notificações</span>
-                </a>
-            @endif
-
-            @if ($user->role === 'admin')
                 <p class="coreti-sidebar-heading">Jira</p>
 
                 <a href="{{ route('jira-projects.index') }}" class="coreti-sidebar-link {{ request()->routeIs('jira-projects.*') ? 'coreti-sidebar-link-active' : '' }}">
@@ -939,6 +930,24 @@
                 </svg>
                 <span>Administrativo</span>
                 <span class="coreti-sidebar-chevron">‹</span>
+            </a>
+            @endif
+
+            @if ($isAdminRole)
+            <p class="coreti-sidebar-heading">Admin</p>
+
+            <a href="{{ route('admin.dashboard') }}" class="coreti-sidebar-link {{ request()->routeIs('admin.dashboard') ? 'coreti-sidebar-link-active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>Usuários</span>
+            </a>
+
+            <a href="{{ route('admin.notifications') }}" class="coreti-sidebar-link {{ request()->routeIs('admin.notifications*') ? 'coreti-sidebar-link-active' : '' }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                <span>Notificações</span>
             </a>
             @endif
 
