@@ -2,10 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\AdmissionCase;
 use App\Models\User;
 use App\Support\Database\GuardaDeComandosPerigosos;
-use App\Policies\AdmissionCasePolicy;
 use App\Policies\UserPolicy;
 use App\Support\ModuleRegistry;
 use Illuminate\Support\Carbon;
@@ -28,7 +26,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(User::class, UserPolicy::class);
-        Gate::policy(AdmissionCase::class, AdmissionCasePolicy::class);
 
         $this->registerModuleGates();
         $this->registerDisplayTimezone();

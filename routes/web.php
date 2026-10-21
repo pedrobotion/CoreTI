@@ -7,9 +7,6 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BackupWebhookController;
 use App\Http\Controllers\CmdbBackupTargetController;
 use App\Http\Controllers\CmdbDatabaseBackupController;
-use App\Http\Controllers\AdmissionCaseController;
-use App\Http\Controllers\AdmissionProfileController;
-use App\Http\Controllers\AdmissionTaskController;
 use App\Http\Controllers\CircuitController;
 use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\CorpDeviceController;
@@ -43,7 +40,6 @@ use App\Http\Controllers\CmdbVlanController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Ad\AdPurgeApiController;
 use App\Http\Controllers\Ad\AdPurgeController;
-use App\Http\Controllers\Ad\AdOfficeRuleController;
 use App\Http\Controllers\Ad\AdCadastroIncompletoController;
 use App\Http\Controllers\ServiceDeskController;
 use App\Http\Controllers\ApplicationController;
@@ -189,18 +185,6 @@ Route::middleware(['auth', 'active'])->group(function () {
         });
     });
 
-    Route::prefix('service-desk/ad/centro-custo')->name('service-desk.ad.centro-custo.')->middleware('module_access:servicedesk')->group(function () {
-        Route::get('/', [AdOfficeRuleController::class, 'index'])->name('index');
-
-        Route::middleware('module_access:servicedesk.manage')->group(function () {
-            Route::patch('/', [AdOfficeRuleController::class, 'atualizarLote'])->name('atualizar-lote');
-            Route::post('/excecoes', [AdOfficeRuleController::class, 'adicionarExcecao'])->name('excecoes.store');
-            Route::delete('/excecoes/{excecao}', [AdOfficeRuleController::class, 'removerExcecao'])->name('excecoes.destroy');
-            Route::patch('/{regra}', [AdOfficeRuleController::class, 'update'])->name('update');
-            Route::post('/{regra}/confirmar', [AdOfficeRuleController::class, 'confirmar'])->name('confirmar');
-        });
-    });
-
     Route::prefix('ad/exclusao')->name('ad.exclusao.')->middleware('module_access:ad')->group(function () {
         Route::get('/', [AdPurgeController::class, 'index'])->name('index');
         Route::get('/{lote}', [AdPurgeController::class, 'show'])->name('show');
@@ -243,48 +227,6 @@ Route::middleware(['auth', 'active'])->group(function () {
     });
     Route::get('/aplicativos/{application}/download', [ApplicationController::class, 'download'])->middleware('module_access:aplicativos')->name('applications.download');
 
-    /*
-     | Admissão de colaboradores.
-     |
-     | O RH precisa de 'admissao.request' e nada mais — não recebe 'admin' nem
-     | acesso aos demais módulos. A execução das tarefas exige 'admissao.execute'
-     | (TI e áreas de apoio) e o catálogo de perfis exige 'admissao.manage'.
-     */
-    Route::prefix('admissao')->name('admissao.')->middleware('module_access:admissao')->group(function () {
-        Route::get('/', [AdmissionCaseController::class, 'index'])->name('cases.index');
-
-        Route::get('/fila', [AdmissionTaskController::class, 'board'])->name('tasks.board');
-
-        Route::middleware('module_access:admissao.request')->group(function () {
-            Route::get('/casos/novo', [AdmissionCaseController::class, 'create'])->name('cases.create');
-            Route::post('/casos', [AdmissionCaseController::class, 'store'])->name('cases.store');
-            Route::get('/colaboradores/lookup', [AdmissionCaseController::class, 'lookupCollaborator'])->name('collaborators.lookup');
-        });
-
-        Route::get('/casos/{case}', [AdmissionCaseController::class, 'show'])->name('cases.show');
-
-        Route::middleware('module_access:admissao.request')->group(function () {
-            Route::get('/casos/{case}/editar', [AdmissionCaseController::class, 'edit'])->name('cases.edit');
-            Route::put('/casos/{case}', [AdmissionCaseController::class, 'update'])->name('cases.update');
-            Route::post('/casos/{case}/enviar', [AdmissionCaseController::class, 'submit'])->name('cases.submit');
-        });
-
-        Route::post('/casos/{case}/cancelar', [AdmissionCaseController::class, 'cancel'])->name('cases.cancel');
-
-        Route::middleware('module_access:admissao.execute')->group(function () {
-            Route::post('/casos/{case}/reenviar-chamados', [AdmissionCaseController::class, 'redispatch'])->name('cases.redispatch');
-            Route::post('/tarefas/{task}/concluir', [AdmissionTaskController::class, 'complete'])->name('tasks.complete');
-            Route::post('/tarefas/{task}/bloquear', [AdmissionTaskController::class, 'block'])->name('tasks.block');
-            Route::post('/tarefas/{task}/dispensar', [AdmissionTaskController::class, 'skip'])->name('tasks.skip');
-        });
-
-        Route::middleware('module_access:admissao.manage')->group(function () {
-            Route::get('/perfis', [AdmissionProfileController::class, 'index'])->name('profiles.index');
-            Route::post('/perfis', [AdmissionProfileController::class, 'store'])->name('profiles.store');
-            Route::put('/perfis/{profile}', [AdmissionProfileController::class, 'update'])->name('profiles.update');
-            Route::patch('/perfis/{profile}/toggle', [AdmissionProfileController::class, 'toggle'])->name('profiles.toggle');
-        });
-    });
 
     Route::prefix('coordenacao')->name('coordenacao.')->middleware('module_access:coordenacao')->group(function () {
         Route::get('/', [CoordenacaoController::class, 'dashboard'])->name('dashboard');

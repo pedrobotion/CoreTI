@@ -11,7 +11,6 @@
     $canAdministrativo = $user->hasModuleAccess('administrativo');
     $canNetworkDatacenter = $user->hasModuleAccess('cmdb') || $user->hasModuleAccess('network_datacenter');
     $canCoordenacao = $user->hasModuleAccess('coordenacao');
-    $canAdmissao = $user->hasModuleAccess('admissao') && \App\Models\AdmissionCase::estruturaDisponivel();
     $canExpurgoAd = $user->hasModuleAccess('ad');
     // Telefonia e Equipamentos são módulos próprios: moram no menu do
     // Administrativo e do ServiceDesk, mas não dependem da permissão deles.
@@ -30,7 +29,7 @@
     // (O módulo de Governança foi removido em 2026-10-21.)
     $canUnidadeDigital = $isAdminRole;
     $temAlgumModulo = $canServiceDesk || $canAplicativos || $isAdminRole
-        || $canCoordenacao || $canAdmissao || $canUnidades || $canBancada
+        || $canCoordenacao || $canUnidades || $canBancada
         || $canPainelAdministrativo || $canImpressoras;
 @endphp
 
@@ -156,14 +155,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 12h6M9 16h3" />
                 </svg>
                 <span>Cadastro incompleto</span>
-            </a>
-
-            <a href="{{ route('service-desk.ad.centro-custo.index') }}" class="coreti-sidebar-link coreti-sidebar-link-sub {{ request()->routeIs('service-desk.ad.centro-custo.*') ? 'coreti-sidebar-link-active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 21V7l8-4 8 4v14M9 21v-6h6v6" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 11h.01M12 11h.01M16 11h.01" />
-                </svg>
-                <span>Centro de custo</span>
             </a>
 
             <p class="coreti-sidebar-heading">Licenciamento</p>
@@ -562,16 +553,6 @@
             </a>
             @endif
 
-            @if ($canAdmissao)
-            <a href="{{ route('admissao.cases.index') }}" class="coreti-sidebar-link {{ request()->routeIs('admissao.*') ? 'coreti-sidebar-link-active' : '' }}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                    <circle cx="9" cy="8" r="3" stroke-width="1.8" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 20a6 6 0 0 1 12 0M17 8v6M14 11h6" />
-                </svg>
-                <span style="white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15;">Admissão</span>
-                <span class="coreti-sidebar-chevron">‹</span>
-            </a>
-            @endif
 
             @endif
 

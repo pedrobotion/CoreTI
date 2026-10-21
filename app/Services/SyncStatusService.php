@@ -39,7 +39,7 @@ class SyncStatusService
      */
     private const MODULOS_CMDB = ['cmdb', 'network_datacenter'];
 
-    private const MODULOS_ORGANIZACAO = ['coordenacao', 'admissao', 'administrativo'];
+    private const MODULOS_ORGANIZACAO = ['coordenacao', 'administrativo'];
 
     private const MODULOS_IMPRESSORAS = ['impressoras'];
 

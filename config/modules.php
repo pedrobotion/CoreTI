@@ -142,19 +142,6 @@ return [
             ],
         ],
 
-        'admissao' => [
-            'label' => 'Admissão de Colaboradores',
-            'description' => 'Fluxo único de admissão: RH registra, o sistema distribui as solicitações.',
-            'group' => 'Pessoas',
-            'abilities' => ['view', 'request', 'execute', 'manage'],
-            'ability_labels' => [
-                'view' => 'Consultar admissões',
-                'request' => 'Registrar admissões (RH)',
-                'execute' => 'Executar provisionamento (TI / apoio)',
-                'manage' => 'Configurar perfis de acesso',
-            ],
-        ],
-
         /*
          | Dashboards analíticos — acesso individual, uma permissão POR painel
          | (decisão do usuário 2026-10-09). Ter o módulo de operação do domínio
