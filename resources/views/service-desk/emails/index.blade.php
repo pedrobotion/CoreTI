@@ -99,7 +99,6 @@
                             <th class="px-4 py-3">Unicoop</th>
                             <th class="px-4 py-3">Area</th>
                             <th class="px-4 py-3">Data Inclusao</th>
-                            <th class="px-4 py-3">Data Desativacao</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3">Observacao</th>
                             <th class="sticky right-0 z-10 w-44 bg-white px-4 py-3 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.25)]">Acoes</th>
@@ -115,7 +114,6 @@
                                 <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ $email->unicoop_sede ?? '-' }}</td>
                                 <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ $email->area_sede ?? '-' }}</td>
                                 <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ optional($email->data_inclusao)->format('d/m/Y') ?? '-' }}</td>
-                                <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ optional($email->data_desativacao)->format('d/m/Y') ?? '-' }}</td>
                                 <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ $email->ativo ? 'Ativo' : 'Inativo' }}</td>
                                 <td class="px-4 py-3 text-slate-700 dark:text-slate-300">{{ $email->observacao ?? '-' }}</td>
                                 <td class="sticky right-0 bg-white px-4 py-3 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.65)] group-odd:bg-slate-50 group-even:bg-white dark:bg-slate-900 dark:group-odd:bg-slate-950 dark:group-even:bg-slate-900">
@@ -159,7 +157,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-5 py-8 text-center text-slate-500 dark:text-slate-400">Nenhum e-mail cadastrado.</td>
+                                <td colspan="10" class="px-5 py-8 text-center text-slate-500 dark:text-slate-400">Nenhum e-mail cadastrado.</td>
                             </tr>
                         @endforelse
                     </tbody>

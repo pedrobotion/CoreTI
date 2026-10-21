@@ -132,10 +132,12 @@
                                             default => 'bg-slate-200 text-slate-600',
                                         };
                                     @endphp
-                                    <span class="rounded-full px-2 py-1 text-xs font-medium {{ $cor }}">{{ $equipment->status }}</span>
-                                    @if ($semEntrega)
-                                        <span class="ml-1 rounded-full bg-amber-200 px-2 py-1 text-xs font-semibold text-amber-900" title="Marcado como em uso, mas sem entrega registrada">sem entrega</span>
-                                    @endif
+                                    <div class="flex flex-wrap items-center gap-1">
+                                        <span class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium {{ $cor }}">{{ $equipment->status }}</span>
+                                        @if ($semEntrega)
+                                            <span class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200" title="Marcado como em uso, mas sem entrega registrada">sem entrega</span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td class="px-3 py-3">
                                     <div class="flex justify-end gap-2">
