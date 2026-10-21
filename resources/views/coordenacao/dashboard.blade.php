@@ -12,12 +12,12 @@
         @endphp
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <a href="{{ route('coordenacao.products.index') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400">
+            <a href="{{ route('coordenacao.products.index') }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400">
                 <p class="text-sm font-medium text-slate-500">Produtos de TI ativos</p>
                 <div class="mt-2 text-3xl font-bold text-slate-950">{{ number_format($productsCount ?? 0, 0, ',', '.') }}</div>
                 <p class="mt-1 text-xs text-slate-500">Contratos e serviços configuráveis</p>
             </a>
-            <a href="{{ route('coordenacao.rateio.index') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400">
+            <a href="{{ route('coordenacao.rateio.index') }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400">
                 <p class="text-sm font-medium text-slate-500">Último rateio</p>
                 <div class="mt-2 text-2xl font-bold text-slate-950">{{ $latestClosing?->reference_month?->format('m/Y') ?? 'Não calculado' }}</div>
                 <p class="mt-1 text-xs text-slate-500">{{ $latestClosing ? 'R$ ' . number_format($latestClosing->total_amount, 2, ',', '.') . ' · ' . $latestClosing->status : 'Crie uma competência mensal' }}</p>
@@ -27,7 +27,7 @@
                 <div class="mt-2 text-3xl font-bold text-amber-950">{{ number_format($pendingCount ?? 0, 0, ',', '.') }}</div>
                 <p class="mt-1 text-xs text-amber-800">Itens que precisam de revisão</p>
             </a>
-            <a href="{{ route('coordenacao.closings.index') }}" class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400">
+            <a href="{{ route('coordenacao.closings.index') }}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-400">
                 <p class="text-sm font-medium text-slate-500">Fechamentos</p>
                 <div class="mt-2 text-3xl font-bold text-slate-950">{{ number_format($closingsCount ?? 0, 0, ',', '.') }}</div>
                 <p class="mt-1 text-xs text-slate-500">Competências registradas</p>
@@ -35,37 +35,37 @@
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Colaboradores</p>
                 <div class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ number_format($stats['people_total'], 0, ',', '.') }}</div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">considerados na base do AD</p>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Com Office</p>
                 <div class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ number_format($stats['people_with_office'], 0, ',', '.') }}</div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">licenças ativas ou inativas</p>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Com custo em grupos</p>
                 <div class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ number_format($stats['people_with_group_costs'], 0, ',', '.') }}</div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Citrix, TS, Progress e similares</p>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Regras ativas</p>
                 <div class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ number_format($stats['rules_active'], 0, ',', '.') }}</div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">regras de custo aplicáveis</p>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Custo mensal</p>
                 <div class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ 'R$ ' . number_format($stats['monthly_cost_total'], 2, ',', '.') }}</div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">estimativa recorrente</p>
             </div>
 
-            <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Custo pontual</p>
                 <div class="mt-3 text-3xl font-bold text-slate-950 dark:text-white">{{ 'R$ ' . number_format($stats['one_time_cost_total'], 2, ',', '.') }}</div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">itens não recorrentes</p>
@@ -79,13 +79,13 @@
         @endif
 
         <div class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-100 px-5 py-4 sm:px-6">
                     <h2 class="text-base font-semibold text-slate-950 dark:text-white">Colaboradores com maior custo mensal</h2>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[960px] text-sm">
-                        <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                        <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                             <tr>
                                 <th class="px-5 py-3">Nome</th>
                                 <th class="px-5 py-3">Unidade</th>
@@ -127,13 +127,13 @@
             </section>
 
             <section class="grid gap-6">
-                <div class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="border-b border-slate-100 px-5 py-4 sm:px-6">
                         <h2 class="text-base font-semibold text-slate-950 dark:text-white">Unidades com maior custo</h2>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[520px] text-sm">
-                            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                            <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                                 <tr>
                                     <th class="px-5 py-3">Unidade</th>
                                     <th class="px-5 py-3">Colab.</th>
@@ -157,13 +157,13 @@
                     </div>
                 </div>
 
-                <div class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="border-b border-slate-100 px-5 py-4 sm:px-6">
                         <h2 class="text-base font-semibold text-slate-950 dark:text-white">Regras com maior impacto</h2>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[520px] text-sm">
-                            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                            <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                                 <tr>
                                     <th class="px-5 py-3">Regra</th>
                                     <th class="px-5 py-3">Usuários</th>
@@ -190,13 +190,13 @@
                     </div>
                 </div>
 
-                <div class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                <div class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="border-b border-slate-100 px-5 py-4 sm:px-6">
                         <h2 class="text-base font-semibold text-slate-950 dark:text-white">Grupos AD mais frequentes</h2>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[520px] text-sm">
-                            <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                            <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                                 <tr>
                                     <th class="px-5 py-3">Grupo</th>
                                     <th class="px-5 py-3">Usuários</th>

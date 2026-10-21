@@ -14,4 +14,4 @@
     <div class="md:col-span-2"><label class="text-sm font-medium">Descrição / observações</label><textarea name="description" rows="3" class="mt-1 w-full rounded-md border-slate-300">{{ old('description', $product->description) }}</textarea></div>
     <div class="flex items-center gap-2"><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $product->is_active ?? true))><span class="text-sm">Participa do cálculo mensal</span></div>
 </div>
-<div class="mt-5 flex justify-end"><button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white">{{ $product->exists ? 'Salvar produto' : 'Cadastrar produto' }}</button></div>
+<div class="mt-5 flex justify-end"><button class="rounded-md bg-[#033151] px-4 py-2 text-sm font-semibold text-white">{{ $product->exists ? 'Salvar produto' : 'Cadastrar produto' }}</button></div>

@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl space-y-6">
         @include('coordenacao.partials.nav', ['active' => 'rules'])
 
-        <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <h2 class="text-base font-semibold text-slate-950 dark:text-white">{{ $editingRule ? 'Editar regra de custo' : 'Nova regra de custo' }}</h2>
@@ -73,20 +73,20 @@
                 </div>
 
                 <div class="md:col-span-2 xl:col-span-4 flex justify-end">
-                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800">
+                    <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#033151] bg-[#033151] px-4 text-sm font-semibold text-white hover:opacity-90">
                         {{ $editingRule ? 'Atualizar regra' : 'Salvar regra' }}
                     </button>
                 </div>
             </form>
         </section>
 
-        <section class="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-100 px-5 py-4 sm:px-6">
                 <h2 class="text-base font-semibold text-slate-950 dark:text-white">Regras cadastradas</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[1200px] text-sm">
-                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40 dark:text-slate-400">
+                    <thead class="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
                             <th class="px-5 py-3">Nome</th>
                             <th class="px-5 py-3">Tipo</th>
