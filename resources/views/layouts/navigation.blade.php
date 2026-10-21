@@ -1,5 +1,20 @@
 @php
     $user = Auth::user();
+    // Área atual (p/ o breadcrumb do topo), derivada da rota.
+    $secaoAtual = match (true) {
+        request()->routeIs('bancada-servicos.*') => 'Bancada de Serviços',
+        request()->routeIs('administrativo*') => 'Administrativo',
+        request()->routeIs('service-desk.*') || request()->routeIs('jira-projects.*') => 'Service Desk',
+        request()->routeIs('dashboards.*') => 'Dashboards',
+        request()->routeIs('cmdb.*') || request()->routeIs('network-datacenter.*') => 'CMDB',
+        request()->routeIs('coordenacao.*') => 'Coordenação',
+        request()->routeIs('unidade-digital*') => 'Unidade Digital',
+        request()->routeIs('indicadores*') => 'Indicadores',
+        request()->routeIs('impressoras.*') => 'Impressoras',
+        request()->routeIs('cartao-ti.*') || request()->routeIs('administrativo.cartao-ti.*') => 'Cartão TI',
+        request()->routeIs('dashboard') => 'Início',
+        default => null,
+    };
 @endphp
 
 <nav
@@ -36,6 +51,14 @@
                     >
                 </a>
             </div>
+
+            <nav aria-label="Trilha" class="header-crumb hidden min-w-0 items-center gap-2 pl-3 text-sm md:flex">
+                <a href="{{ route('dashboard') }}" class="font-semibold text-slate-500 transition hover:text-slate-700">CoreTI</a>
+                @if ($secaoAtual)
+                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="truncate font-bold text-[#033151]">{{ $secaoAtual }}</span>
+                @endif
+            </nav>
 
             <div class="nav-actions-fixed ml-auto flex shrink-0 items-center gap-2">
                 <button
