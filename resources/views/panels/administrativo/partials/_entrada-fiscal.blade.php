@@ -38,6 +38,19 @@
                                     <form x-data="notaEntradaForm(@js($item->nota_valor_entrada))" method="POST" enctype="multipart/form-data" action="{{ route('bancada-servicos.assets.administrative.process', $item) }}" class="grid gap-3 px-5 py-4 sm:grid-cols-2" @submit="beforeSubmit()">
                                         @csrf @method('PATCH')
                                         <input type="hidden" name="action" value="entrada">
+                                        <div class="sm:col-span-2">
+                                            <label class="text-sm font-medium">Operação da nota <span class="text-rose-600">*</span></label>
+                                            <div class="mt-1 grid gap-2 sm:grid-cols-2">
+                                                <label class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+                                                    <input type="radio" name="nota_operacao_entrada" value="transferencia_imobilizado" required @checked($item->nota_operacao_entrada === 'transferencia_imobilizado')>
+                                                    <span>Transferência de imobilizado</span>
+                                                </label>
+                                                <label class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+                                                    <input type="radio" name="nota_operacao_entrada" value="remessa_manutencao" required @checked($item->nota_operacao_entrada === 'remessa_manutencao')>
+                                                    <span>Remessa p/ Manutenção</span>
+                                                </label>
+                                            </div>
+                                        </div>
                                         <div><label class="text-sm font-medium">Docto de Entrada</label><input name="nota_documento_entrada" value="{{ $item->nota_documento_entrada }}" class="mt-1 w-full rounded-md border-slate-300 text-sm"></div>
                                         <div><label class="text-sm font-medium">Número da nota</label><input name="nota_numero_entrada" value="{{ $item->nota_numero_entrada }}" class="mt-1 w-full rounded-md border-slate-300 text-sm"></div>
                                         <div><label class="text-sm font-medium">Data de Emissão</label><input type="date" name="data_emissao_entrada" value="{{ optional($item->data_emissao_entrada)->format('Y-m-d') }}" class="mt-1 w-full rounded-md border-slate-300 text-sm"></div>

@@ -72,6 +72,10 @@
                                             <label class="text-sm font-medium">Número da nota de saída</label>
                                             <input name="nota_numero_saida" required class="mt-1 w-full rounded-md border-slate-300 text-sm">
                                         </div>
+                                        <div>
+                                            <label class="text-sm font-medium">Data de emissão</label>
+                                            <input type="date" name="data_emissao_saida" value="{{ optional($item->data_emissao_saida)->format('Y-m-d') }}" class="mt-1 w-full rounded-md border-slate-300 text-sm">
+                                        </div>
                                         <div class="sm:col-span-2">
                                             <label class="text-sm font-medium">Anexo da nota de saída</label>
                                             <input type="file" name="nota_anexo_saida" class="mt-1 w-full rounded-md border-slate-300 text-sm">

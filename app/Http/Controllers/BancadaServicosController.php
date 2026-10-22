@@ -1178,11 +1178,13 @@ class BancadaServicosController extends Controller
             'nota_documento_entrada' => ['nullable', 'string', 'max:255'],
             'nota_numero_entrada' => ['nullable', 'string', 'max:80'],
             'data_emissao_entrada' => ['nullable', 'date'],
+            'nota_operacao_entrada' => ['required_if:action,entrada', 'in:transferencia_imobilizado,remessa_manutencao'],
             'nota_valor_entrada' => ['nullable', 'string', 'max:40'],
             'nota_anexo_entrada' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
             'nota_observacao_entrada' => ['nullable', 'string', 'max:2000'],
             'nota_documento_saida' => ['nullable', 'string', 'max:255'],
             'nota_numero_saida' => ['nullable', 'string', 'max:80'],
+            'data_emissao_saida' => ['nullable', 'date'],
             'nota_anexo_saida' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
             'peca_nome' => ['nullable', 'string', 'max:255'],
             'peca_quantidade' => ['nullable', 'integer', 'min:1', 'max:999'],
@@ -1215,6 +1217,7 @@ class BancadaServicosController extends Controller
                     $equipment->data_emissao_entrada = $data['data_emissao_entrada'] ?? null;
                     $equipment->nota_valor_entrada = $this->parseBrazilianMoney($data['nota_valor_entrada'] ?? null);
                     $equipment->nota_observacao_entrada = trim((string) ($data['nota_observacao_entrada'] ?? '')) ?: null;
+                    $equipment->nota_operacao_entrada = $data['nota_operacao_entrada'] ?? null;
                     $equipment->entrada_status = BancadaStatusFlowService::ENTRY_DONE;
                     $equipment->entrada_realizada_em = now();
                     $event = $this->writeStatusChange(
@@ -1228,6 +1231,7 @@ class BancadaServicosController extends Controller
                             'docto' => $equipment->nota_documento_entrada,
                             'numero_nota' => $equipment->nota_numero_entrada,
                             'data_emissao' => $equipment->data_emissao_entrada?->format('Y-m-d'),
+                            'operacao' => $equipment->nota_operacao_entrada,
                             'valor' => $equipment->nota_valor_entrada,
                             // Vai para o histórico, para a observação não ficar
                             // só no cadastro e sim registrada no evento.
@@ -1457,6 +1461,7 @@ class BancadaServicosController extends Controller
                     if ($equipment->nota_numero_saida === null) {
                         throw new \DomainException('Informe o Número da nota de saída.');
                     }
+                    $equipment->data_emissao_saida = $data['data_emissao_saida'] ?? null;
                     $equipment->nota_saida_emitida_em = now();
                     $event = $this->writeStatusChange(
                         $equipment,
@@ -1467,6 +1472,7 @@ class BancadaServicosController extends Controller
                         'Nota de saída emitida para unidade.',
                         [
                             'numero_nota_saida' => $equipment->nota_numero_saida,
+                            'data_emissao_saida' => $equipment->data_emissao_saida?->format('Y-m-d'),
                             'docto_entrada' => $equipment->nota_documento_entrada,
                             'numero_nota_entrada' => $equipment->nota_numero_entrada,
                             'valor_nota_entrada' => $equipment->nota_valor_entrada,
