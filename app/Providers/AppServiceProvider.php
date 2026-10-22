@@ -30,6 +30,9 @@ class AppServiceProvider extends ServiceProvider
         $this->registerModuleGates();
         $this->registerDisplayTimezone();
 
+        // Espelha cada passo do equipamento no chamado de manutenção do Jira.
+        \App\Models\BancadaEquipmentEvent::observe(\App\Observers\BancadaEquipmentEventObserver::class);
+
         // Enquanto a credencial do banco não for escopada, anota (e
         // opcionalmente recusa) comandos que nenhuma tela emite.
         GuardaDeComandosPerigosos::registrar();

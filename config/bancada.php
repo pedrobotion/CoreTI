@@ -132,6 +132,10 @@ return [
         // 98. É a equipe da bancada, que liga para a unidade e confirma o defeito.
         'jira_equipe' => env('BANCADA_MANUT_JIRA_EQUIPE', 'Time Bancada de Serviços'),
 
+        // Espelha os passos do CoreTI (entrada, terceiros, peças, nota de saída,
+        // mudanças de status) como comentários no chamado de manutenção.
+        'comentar_jira' => (bool) env('BANCADA_MANUT_COMENTAR_JIRA', true),
+
         // Nobreak tem catálogo próprio (85 — "Configuração e Manutenção de
         // Nobreaks - TI"), que exige Modelo da Bateria e Quantidade de Baterias.
         // Esses dados vêm do cadastro do equipamento (nobreak_modelo_bateria /

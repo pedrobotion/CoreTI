@@ -118,6 +118,49 @@ class JiraTicketOpener
         return rtrim((string) config('services.jira.base_url'), '/').'/browse/'.$chave;
     }
 
+    /**
+     * Posta um comentário num chamado existente. Cada linha do texto vira um
+     * parágrafo. Devolve true se postou. Defensivo: nunca lança.
+     */
+    public function comentar(string $chave, string $texto): bool
+    {
+        $chave = trim($chave);
+        $texto = trim($texto);
+        if ($chave === '' || $texto === '' || ! $this->configurado()) {
+            return false;
+        }
+
+        $paragrafos = [];
+        foreach (preg_split('/\r?\n/', $texto) as $linha) {
+            $linha = rtrim($linha);
+            $paragrafos[] = $linha === ''
+                ? ['type' => 'paragraph', 'content' => []]
+                : ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => $linha]]];
+        }
+
+        try {
+            $resposta = $this->client()->post($this->url("/rest/api/3/issue/{$chave}/comment"), [
+                'body' => ['type' => 'doc', 'version' => 1, 'content' => $paragrafos],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('jira.comentario.excecao', ['chave' => $chave, 'erro' => $e->getMessage()]);
+
+            return false;
+        }
+
+        if (! $resposta->successful()) {
+            Log::error('jira.comentario.falha', [
+                'chave' => $chave,
+                'status' => $resposta->status(),
+                'corpo' => mb_substr($resposta->body(), 0, 300),
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
     private function resolverEquipe(?string $nomeOverride = null): ?array
     {
         $campo = (string) config('backups.jira.fields.team');
