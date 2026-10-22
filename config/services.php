@@ -38,18 +38,8 @@ return [
     'jira' => [
         'enabled' => env('JIRA_ENABLED', false),
         'base_url' => env('JIRA_BASE_URL'),
-        // Conta que AUTENTICA a API (autor dos comentários e criador real dos
-        // chamados). 'coreti' (padrão) = conta de sistema coreti@cocari.com.br;
-        // 'jose' = conta pessoal, mantida como reserva. As duas credenciais
-        // ficam no .env (JIRA_CORETI_* e JIRA_JOSE_*) e alterna-se só com
-        // JIRA_AUTH_CONTA, sem trocar valores. Fallback: JIRA_EMAIL/JIRA_API_TOKEN.
-        'auth_conta' => env('JIRA_AUTH_CONTA', 'coreti'),
-        'email' => env('JIRA_AUTH_CONTA', 'coreti') === 'jose'
-            ? env('JIRA_JOSE_EMAIL', env('JIRA_EMAIL'))
-            : env('JIRA_CORETI_EMAIL', env('JIRA_EMAIL')),
-        'api_token' => env('JIRA_AUTH_CONTA', 'coreti') === 'jose'
-            ? env('JIRA_JOSE_API_TOKEN', env('JIRA_API_TOKEN'))
-            : env('JIRA_CORETI_API_TOKEN', env('JIRA_API_TOKEN')),
+        'email' => env('JIRA_EMAIL'),
+        'api_token' => env('JIRA_API_TOKEN'),
         'project_key' => env('JIRA_PROJECT_KEY'),
         'issue_type' => env('JIRA_ISSUE_TYPE'),
         'ticket_base_url' => env('JIRA_TICKET_BASE_URL'),
