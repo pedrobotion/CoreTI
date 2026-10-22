@@ -35,18 +35,11 @@
         profileOpen: false,
         bellOpen: false,
         mobileMenuOpen: false,
-        theme: window.getTheme ? window.getTheme() : 'system',
         circuitsOpen: false,
         adminOpen: false,
         indicadoresOpen: false,
         unidadeDigitalOpen: false,
         monitoramentoOpen: false,
-        setTheme(mode) {
-            this.theme = mode;
-            if (window.setTheme) {
-                window.setTheme(mode);
-            }
-        }
     }"
 >
     <header class="top-header {{ request()->routeIs('cmdb.*') ? 'top-header-cmdb' : '' }} bg-white">
@@ -67,22 +60,6 @@
                 >
                     Menu
                 </button>
-
-                <div class="theme-switcher flex">
-                    <button type="button" class="theme-toggle" :class="{ 'theme-toggle-active': theme === 'light' }" @click="setTheme('light')" aria-label="Ativar tema claro">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v2.2m0 13.6V21m9-9h-2.2M5.2 12H3m14.164 6.164-1.556-1.556M8.392 7.392 6.836 5.836m10.328 0-1.556 1.556M8.392 16.608l-1.556 1.556M15.5 12A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5Z" />
-                        </svg>
-                    </button>
-                    <button type="button" class="theme-toggle" :class="{ 'theme-toggle-active': theme === 'dark' }" @click="setTheme('dark')" aria-label="Ativar tema escuro">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 12.8A8.98 8.98 0 0 1 11.2 3a9 9 0 1 0 9.8 9.8Z" />
-                        </svg>
-                    </button>
-                    <button type="button" class="theme-toggle" :class="{ 'theme-toggle-active': theme === 'system' }" @click="setTheme('system')" aria-label="Usar tema do sistema">
-                        Auto
-                    </button>
-                </div>
 
                 <div class="relative">
                     <button
