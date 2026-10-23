@@ -88,7 +88,7 @@
           <div id="sd-content" class="flex min-h-0 flex-1 flex-col">
             {{-- Cabeçalho --}}
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
-                <h1 class="text-lg font-extrabold text-white sm:text-xl">Apresentação {{ $modo === 'mes' ? 'Mensal' : 'por Período' }} — Infraestrutura TI <span class="text-sky-300/80">· {{ $empresaLabel }}</span></h1>
+                <h1 class="text-lg font-extrabold text-white sm:text-xl">Infraestrutura de TI <span class="text-sky-300/80">· {{ $empresaLabel }}</span></h1>
                 <div class="flex w-full flex-wrap items-center gap-2 lg:w-auto">
                     <form method="GET" id="sd-filtros" class="flex flex-wrap items-center gap-2">
                         {{-- Empresa é escolhida pelos botões acima das abas; aqui só
@@ -294,33 +294,38 @@
                     @include('dashboards.partials.sd-kpi', ['titulo'=>'Unidades Distintas','valor'=>$fmt($internet['unidadesDistintas']),'nota'=>'afetadas'])
                 </div>
 
-                <div class="mt-3 flex min-h-[220px] flex-1 flex-col gap-3 lg:flex-row">
+                @php $jiraBrowse = rtrim((string) config('services.jira.base_url'), '/').'/browse/'; @endphp
+                <div class="mt-3 flex min-h-[220px] flex-1 flex-col gap-3 lg:flex-row"
+                     x-data="{ unidadeSel: @js($internet['unidadeMaisAfetada']), recs: @js($internet['recorrenciaPorUnidade'] ?? []), jira: @js($jiraBrowse) }">
                     <div class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4 lg:flex-1">
-                        <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Top Unidades com Mais Incidentes</div>
+                        <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Top Unidades com Mais Incidentes <span class="ml-auto text-[10px] font-medium normal-case tracking-normal text-slate-400">clique numa barra para ver os TICs</span></div>
                         @php $maxU = max(1, $internet['porUnidade']->max('n') ?? 1); @endphp
-                        <div class="flex min-h-0 flex-1 flex-col gap-2">
+                        <div class="flex min-h-0 flex-1 flex-col gap-1.5">
                             @forelse ($internet['porUnidade'] as $u)
-                                <div class="flex items-center gap-3 text-sm">
+                                <button type="button" @click="unidadeSel = @js($u->u)"
+                                        class="flex items-center gap-3 rounded-lg px-1.5 py-1 text-left text-sm transition hover:bg-white/5"
+                                        :class="unidadeSel === @js($u->u) ? 'bg-white/10 ring-1 ring-rose-400/50' : ''">
                                     <span class="w-36 shrink-0 truncate text-slate-200">{{ $loop->iteration <= 3 ? ['🥇','🥈','🥉'][$loop->index].' ' : '' }}{{ $u->u }}</span>
                                     <div class="h-4 flex-1 overflow-hidden rounded bg-white/5"><div class="h-full rounded bg-gradient-to-r from-rose-800 to-rose-500" style="width: {{ max(6, round($u->n/$maxU*100)) }}%"></div></div>
                                     <span class="w-10 text-right font-bold text-white">{{ $u->n }}</span>
-                                </div>
+                                </button>
                             @empty
                                 <p class="text-sm text-slate-400">Sem incidentes de internet neste período.</p>
                             @endforelse
                         </div>
                     </div>
                     <div class="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4 lg:flex-1">
-                        <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Recorrência em {{ $internet['unidadeMaisAfetada'] }}</div>
+                        <div class="mb-3 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-200"><span class="h-px w-6 bg-sky-400/60"></span>Chamados em <span class="normal-case text-sky-300" x-text="unidadeSel"></span></div>
                         <div class="min-h-0 flex-1 space-y-1.5 overflow-auto pr-1">
-                            @forelse ($internet['recorrencia'] as $r)
-                                <div class="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm">
-                                    <span class="font-semibold text-sky-300">{{ \Illuminate\Support\Carbon::parse($r->data_hora_criacao)->format('d/m') }}</span>
-                                    <span class="font-mono text-slate-200">{{ $r->chave }}</span>
-                                </div>
-                            @empty
-                                <p class="text-sm text-slate-400">Sem recorrência no período.</p>
-                            @endforelse
+                            <template x-for="t in (recs[unidadeSel] || [])" :key="t.chave">
+                                <a :href="jira + t.chave" target="_blank" rel="noopener"
+                                   class="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm transition hover:border-sky-400/40 hover:bg-white/[0.05]">
+                                    <span class="font-semibold text-sky-300" x-text="t.data"></span>
+                                    <span class="font-mono text-sky-300 underline decoration-sky-400/40 underline-offset-2" x-text="t.chave"></span>
+                                    <svg class="ml-auto h-3.5 w-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M8 7h9v9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </a>
+                            </template>
+                            <p x-show="!(recs[unidadeSel] && recs[unidadeSel].length)" class="text-sm text-slate-400">Sem chamados para esta unidade no período.</p>
                         </div>
                     </div>
                 </div>

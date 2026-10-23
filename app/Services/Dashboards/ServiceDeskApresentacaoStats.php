@@ -372,13 +372,20 @@ class ServiceDeskApresentacaoStats
         $topUnidade = $porUnidade->first();
         $pctTop = ($total > 0 && $topUnidade) ? round($topUnidade->n / $total * 100, 2) : 0;
 
+        // Lista de chamados (TIC) por unidade, para o clique na barra mostrar
+        // os TICs daquela unidade (e cada TIC virar link para o Jira).
+        $recorrenciaPorUnidade = $q()
+            ->orderBy('data_hora_criacao')
+            ->get(['unidade', 'chave', 'data_hora_criacao'])
+            ->groupBy(fn ($r) => trim((string) ($r->unidade ?? '')) !== '' ? trim((string) $r->unidade) : '(sem unidade)')
+            ->map(fn ($grupo) => $grupo->map(fn ($r) => [
+                'chave' => $r->chave,
+                'data' => \Illuminate\Support\Carbon::parse($r->data_hora_criacao)->format('d/m'),
+            ])->values()->all())
+            ->all();
+
         $recorrencia = $topUnidade
-            ? $this->criadosNaSemana($this->base())
-                ->where('catalogo', 'Indisponibilidade de Internet')
-                ->where('tipo_requisicao', 'like', '%Incid%')
-                ->where('unidade', $topUnidade->u)
-                ->orderBy('data_hora_criacao')
-                ->get(['chave', 'data_hora_criacao'])
+            ? collect($recorrenciaPorUnidade[$topUnidade->u] ?? [])
             : collect();
 
         return [
@@ -389,6 +396,7 @@ class ServiceDeskApresentacaoStats
             'ocorrenciasTop' => $topUnidade->n ?? 0,
             'pctTop' => $pctTop,
             'recorrencia' => $recorrencia,
+            'recorrenciaPorUnidade' => $recorrenciaPorUnidade,
         ];
     }
 
