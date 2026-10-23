@@ -161,6 +161,66 @@ class JiraTicketOpener
         return true;
     }
 
+    /**
+     * Move o chamado para um status pelo NOME, descobrindo o caminho: tenta a
+     * transição direta e, se não houver, passa por "Em andamento". Defensivo:
+     * nunca lança e nunca exclui/cancela nada.
+     */
+    public function transicionarPara(string $chave, string $statusDestino, int $maxPassos = 3): bool
+    {
+        $chave = trim($chave);
+        $statusDestino = trim($statusDestino);
+        if ($chave === '' || $statusDestino === '' || ! $this->configurado()) {
+            return false;
+        }
+
+        try {
+            for ($passo = 0; $passo < $maxPassos; $passo++) {
+                $atual = (string) ($this->client()->get($this->url("/rest/api/3/issue/{$chave}?fields=status"))->json('fields.status.name') ?? '');
+                if (strcasecmp($atual, $statusDestino) === 0) {
+                    return true;
+                }
+
+                $transicoes = (array) ($this->client()->get($this->url("/rest/api/3/issue/{$chave}/transitions"))->json('transitions') ?? []);
+                $alvo = $this->escolherTransicao($transicoes, $statusDestino)
+                    ?? $this->escolherTransicao($transicoes, 'Em andamento');
+
+                if ($alvo === null) {
+                    Log::warning('jira.transicao.sem_caminho', ['chave' => $chave, 'de' => $atual, 'destino' => $statusDestino]);
+
+                    return false;
+                }
+
+                $r = $this->client()->post($this->url("/rest/api/3/issue/{$chave}/transitions"), ['transition' => ['id' => (string) $alvo['id']]]);
+                if (! $r->successful()) {
+                    Log::error('jira.transicao.falha', ['chave' => $chave, 'status' => $r->status(), 'corpo' => mb_substr($r->body(), 0, 200)]);
+
+                    return false;
+                }
+            }
+
+            $final = (string) ($this->client()->get($this->url("/rest/api/3/issue/{$chave}?fields=status"))->json('fields.status.name') ?? '');
+
+            return strcasecmp($final, $statusDestino) === 0;
+        } catch (\Throwable $e) {
+            Log::error('jira.transicao.excecao', ['chave' => $chave, 'erro' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /** @param array<int, array<string, mixed>> $transicoes */
+    private function escolherTransicao(array $transicoes, string $statusNome): ?array
+    {
+        foreach ($transicoes as $t) {
+            if (strcasecmp((string) ($t['to']['name'] ?? ''), $statusNome) === 0) {
+                return $t;
+            }
+        }
+
+        return null;
+    }
+
     private function resolverEquipe(?string $nomeOverride = null): ?array
     {
         $campo = (string) config('backups.jira.fields.team');

@@ -101,6 +101,11 @@ class VerificarPendenciasBancada extends Command
                     $alerta->jira_issue_key = $chave;
                     $alerta->jira_issue_url = $jira->urlDoChamado($chave);
                     $abertos++;
+
+                    // Chamado de terceiros já nasce em "Aguardando Terceiros".
+                    if (($p['pendencia'] ?? '') === 'terceiros') {
+                        $jira->transicionarPara($chave, 'Aguardando Terceiros');
+                    }
                 }
             }
 
