@@ -136,6 +136,11 @@ return [
         // mudanças de status) como comentários no chamado de manutenção.
         'comentar_jira' => (bool) env('BANCADA_MANUT_COMENTAR_JIRA', true),
 
+        // Sincroniza o status do chamado de manutenção com o status do
+        // equipamento no CoreTI (Em bancada→Em análise, Terceiros→Aguardando
+        // Terceiros, Entregue/Backup/Descarte→Resolvido, etc.).
+        'sincronizar_status_jira' => (bool) env('BANCADA_MANUT_SYNC_STATUS_JIRA', true),
+
         // Nobreak tem catálogo próprio (85 — "Configuração e Manutenção de
         // Nobreaks - TI"), que exige Modelo da Bateria e Quantidade de Baterias.
         // Esses dados vêm do cadastro do equipamento (nobreak_modelo_bateria /

@@ -23,6 +23,25 @@ class BancadaEquipmentEventObserver
         'manutencao_chamado_finalizado',  // já veio do Jira (webhook)
     ];
 
+    /**
+     * Status do equipamento (CoreTI) → status do chamado de manutenção (Jira).
+     * "Aguardando Entrada Fiscal"/"Aguardando Entrada" não entram: ocorrem antes
+     * do chamado existir. Nada mapeia para "Cancelado" (política: nunca cancelar).
+     */
+    private const MAPA_STATUS_JIRA = [
+        'Em bancada' => 'Em análise',
+        'Em manutenção' => 'Em andamento',
+        'Aguardando peça' => 'Em andamento',
+        'Manutenção realizada' => 'Em andamento',
+        'Terceiros' => 'Aguardando Terceiros',
+        'Pronto para entrega' => 'Resolvido',
+        'Nota Fiscal Emitida' => 'Resolvido',
+        'Entregue' => 'Resolvido',
+        'Sem conserto' => 'Resolvido',
+        'Backup' => 'Resolvido',
+        'Descarte' => 'Resolvido',
+    ];
+
     /** Rótulos amigáveis para campos do metadata. */
     private const ROTULOS = [
         'docto' => 'Documento de entrada',
@@ -73,13 +92,6 @@ class BancadaEquipmentEventObserver
 
     public function created(BancadaEquipmentEvent $event): void
     {
-        if (! (bool) config('bancada.manutencao.comentar_jira', true)) {
-            return;
-        }
-        if (in_array($event->action, self::IGNORAR, true)) {
-            return;
-        }
-
         try {
             $equipment = $event->equipment ?? $event->equipment()->first();
         } catch (Throwable $e) {
@@ -91,19 +103,35 @@ class BancadaEquipmentEventObserver
             return;
         }
 
-        $texto = $this->montarComentario($event, $equipment);
-        if ($texto === '') {
-            return;
+        // 1) Comentário espelhando o passo do processo.
+        if ((bool) config('bancada.manutencao.comentar_jira', true) && ! in_array($event->action, self::IGNORAR, true)) {
+            $texto = $this->montarComentario($event, $equipment);
+            if ($texto !== '') {
+                DB::afterCommit(function () use ($tic, $texto): void {
+                    try {
+                        app(JiraTicketOpener::class)->comentar($tic, $texto);
+                    } catch (Throwable $e) {
+                        Log::warning('bancada.jira_comentario.falha', ['tic' => $tic, 'erro' => $e->getMessage()]);
+                    }
+                });
+            }
         }
 
-        // Fora da transação: só posta depois do commit (ou já, se não houver).
-        DB::afterCommit(function () use ($tic, $texto): void {
-            try {
-                app(JiraTicketOpener::class)->comentar($tic, $texto);
-            } catch (Throwable $e) {
-                Log::warning('bancada.jira_comentario.falha', ['tic' => $tic, 'erro' => $e->getMessage()]);
+        // 2) Sincroniza o status do chamado com o status do equipamento.
+        if ((bool) config('bancada.manutencao.sincronizar_status_jira', true)) {
+            $novo = trim((string) $event->new_status);
+            $de = trim((string) $event->previous_status);
+            $jiraStatus = ($novo !== '' && $novo !== $de) ? (self::MAPA_STATUS_JIRA[$novo] ?? null) : null;
+            if ($jiraStatus !== null) {
+                DB::afterCommit(function () use ($tic, $jiraStatus): void {
+                    try {
+                        app(JiraTicketOpener::class)->transicionarPara($tic, $jiraStatus);
+                    } catch (Throwable $e) {
+                        Log::warning('bancada.jira_transicao.falha', ['tic' => $tic, 'erro' => $e->getMessage()]);
+                    }
+                });
             }
-        });
+        }
     }
 
     private function montarComentario(BancadaEquipmentEvent $event, ?BancadaEquipment $equipment): string
