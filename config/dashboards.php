@@ -55,7 +55,7 @@ return [
     ],
 
     'service-desk-apresentacao' => [
-        'titulo' => 'Service Desk — Apresentação Mensal',
+        'titulo' => 'Service Desk — Infraestrutura TI',
         'descricao' => 'Indicadores mensais do Service Desk ao vivo: atendidos, backlog, internet, Top 5 e Pivot.',
         'rota' => 'dashboards.service-desk-apresentacao',
         'modulo' => 'dashboard_sd_apresentacao',
