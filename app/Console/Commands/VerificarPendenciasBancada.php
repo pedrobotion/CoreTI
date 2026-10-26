@@ -71,6 +71,7 @@ class VerificarPendenciasBancada extends Command
         $abrirJira = ! $this->option('sem-jira') && $jira->configurado();
         $tetoJira = (int) config('bancada.pendencias.jira_max_por_execucao');
         $abertos = 0;
+        $pulados = 0;
 
         foreach ($pendencias as $p) {
             $vistos[] = $p['equipment_id'].':'.$p['pendencia'];
@@ -95,7 +96,20 @@ class VerificarPendenciasBancada extends Command
             $alerta->dias = $p['dias'];
             $alerta->ultimo_alerta_em = $agora;
 
-            if ($abrirJira && $novo && ! $alerta->jira_issue_key && $abertos < $tetoJira) {
+            // Anti-duplicação do incidente "Parado no terceiro": se o equipamento
+            // já tem chamado de manutenção (equipment->tic), NÃO abre o incidente
+            // separado — o próprio chamado de manutenção já é sincronizado para
+            // "Aguardando Terceiros" pelo BancadaEquipmentEventObserver. A
+            // pendência continua rastreada (e-mail + Grafana), só não vira um 2º
+            // chamado no Jira sobre o mesmo equipamento. Vale só para 'terceiros'.
+            $jaCobertoPelaManutencao = ($p['pendencia'] ?? '') === 'terceiros'
+                && trim((string) ($p['tic'] ?? '')) !== '';
+
+            if ($abrirJira && $novo && ! $alerta->jira_issue_key && $jaCobertoPelaManutencao) {
+                $pulados++;
+            }
+
+            if ($abrirJira && $novo && ! $alerta->jira_issue_key && ! $jaCobertoPelaManutencao && $abertos < $tetoJira) {
                 $chave = $this->abrirChamado($jira, $servico, $p);
                 if ($chave !== null) {
                     $alerta->jira_issue_key = $chave;
@@ -119,7 +133,7 @@ class VerificarPendenciasBancada extends Command
             $a->update(['situacao' => 'resolvida', 'resolvido_em' => $agora]);
         }
 
-        $this->info("Pendências registradas: ".count($pendencias)." | chamados abertos agora: {$abertos} | resolvidas: ".$resolvidas->count());
+        $this->info("Pendências registradas: ".count($pendencias)." | chamados abertos agora: {$abertos} | terceiros já cobertos pela manutenção (sem 2º chamado): {$pulados} | resolvidas: ".$resolvidas->count());
         if ($abrirJira && $abertos >= $tetoJira) {
             $this->warn("Teto de {$tetoJira} chamados/execução atingido — as demais pendências novas entram nas próximas execuções.");
         }
