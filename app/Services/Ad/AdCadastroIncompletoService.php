@@ -24,9 +24,16 @@ class AdCadastroIncompletoService
     public const CAMPOS = [
         'matricula' => 'Matrícula',
         'unidade_principal' => 'Unidade',
-        'Cargo' => 'Cargo',
         'centro_custo' => 'Centro de custo',
     ];
+
+    /*
+     | O Cargo NÃO entra aqui de propósito: muitos colaboradores têm cargos que
+     | não conseguimos consultar na origem, então conta sem cargo não é cadastro
+     | incompleto nem pendência — cobrá-la geraria linhas que nunca baixam.
+     | O cargo segue aparecendo como coluna de exibição (lido direto de
+     | $conta->Cargo), só não é mais um campo exigido.
+     */
 
     /*
      | Os prefixos de conta que não são de pessoa saíram daqui para

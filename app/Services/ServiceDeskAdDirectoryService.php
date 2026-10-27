@@ -159,7 +159,8 @@ class ServiceDeskAdDirectoryService
             'sem_email' => $pessoas->filter(fn (AdUser $user): bool => blank($user->email))->count(),
             'sem_matricula' => $faltando('matricula'),
             'sem_unidade' => $faltando('unidade_principal'),
-            'sem_cargo' => $faltando('Cargo'),
+            // Cargo em branco não é pendência: muitos colaboradores têm cargos
+            // que não conseguimos consultar na origem. Fica fora da contagem.
             'sem_centro_custo' => $faltando('centro_custo'),
             // Quantas contas ficaram de fora da conta, para a tela poder dizer.
             'fora_da_contagem' => $users->count() - $pessoas->count(),
