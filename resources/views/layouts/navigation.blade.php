@@ -88,17 +88,39 @@
                         <div class="max-h-80 overflow-y-auto">
                             @forelse ($alertas as $alerta)
                                 @php $sevChip = ($alerta['severidade'] ?? 'aviso') === 'critico' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'; @endphp
-                                <a @if(!empty($alerta['url'])) href="{{ $alerta['url'] }}" @endif class="flex items-start gap-2.5 px-4 py-2.5 transition hover:bg-slate-50">
-                                    <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg {{ $sevChip }}">
-                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-slate-800">{{ $alerta['titulo'] }}</p>
-                                        @if (!empty($alerta['descricao']))
-                                            <p class="mt-0.5 text-xs text-slate-500">{{ $alerta['descricao'] }}</p>
-                                        @endif
+                                @if (!empty($alerta['acao_url']))
+                                    {{-- Aviso com ação (ex.: requisição ao CD): texto + botão, sem link externo. --}}
+                                    <div class="flex items-start gap-2.5 px-4 py-2.5">
+                                        <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg {{ $sevChip }}">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm font-semibold text-slate-800">{{ $alerta['titulo'] }}</p>
+                                            @if (!empty($alerta['descricao']))
+                                                <p class="mt-0.5 text-xs text-slate-500">{{ $alerta['descricao'] }}</p>
+                                            @endif
+                                            <form method="POST" action="{{ $alerta['acao_url'] }}" class="mt-2">
+                                                @csrf
+                                                <button type="submit" class="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700">
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                    {{ $alerta['acao_label'] ?? 'Concluir' }}
+                                                </button>
+                                            </form>
+                                        </div>
                                     </div>
-                                </a>
+                                @else
+                                    <a @if(!empty($alerta['url'])) href="{{ $alerta['url'] }}" @endif class="flex items-start gap-2.5 px-4 py-2.5 transition hover:bg-slate-50">
+                                        <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg {{ $sevChip }}">
+                                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-slate-800">{{ $alerta['titulo'] }}</p>
+                                            @if (!empty($alerta['descricao']))
+                                                <p class="mt-0.5 text-xs text-slate-500">{{ $alerta['descricao'] }}</p>
+                                            @endif
+                                        </div>
+                                    </a>
+                                @endif
                             @empty
                                 <div class="px-4 py-8 text-center">
                                     <span class="mx-auto grid h-9 w-9 place-items-center rounded-full bg-emerald-50 text-emerald-600">

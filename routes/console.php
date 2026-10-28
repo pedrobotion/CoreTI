@@ -215,6 +215,30 @@ Schedule::command('bancada:chamados-manutencao')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping();
 
+// Requisição de peças ao Centro de Distribuição: 1 chamado CONSOLIDADO
+// (catálogo "Requisição de Estoque", atribuído à Isabeli) às segundas e quartas
+// 08:00. Itens adicionados após o corte entram no próximo pedido. Trava
+// BANCADA_CD_REQ_ATIVO (default off).
+Schedule::command('bancada:requisitar-pecas-cd')
+    ->mondays()
+    ->at('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();
+Schedule::command('bancada:requisitar-pecas-cd')
+    ->wednesdays()
+    ->at('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();
+
+// Detecta quando a Isabeli resolve o chamado da requisição ao CD e marca as
+// peças como solicitadas (+ aviso no sino até "Produtos Coletados").
+Schedule::command('bancada:cd-sincronizar')
+    ->everyFifteenMinutes()
+    ->weekdays()
+    ->between('07:00', '19:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping();
+
 Artisan::command('cmdb:vcenter-create-servers {--connector=} {--limit=}', function (CmdbVCenterAssetCreationService $service) {
     $connector = $this->option('connector') !== null ? (int) $this->option('connector') : null;
     $limit = $this->option('limit') !== null ? (int) $this->option('limit') : null;

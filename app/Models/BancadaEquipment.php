@@ -50,6 +50,7 @@ class BancadaEquipment extends Model
         'service_tag',
         'peca_fluxo_status',
         'peca_admin_realizado_em',
+        'cd_requisicao_id',
         'peca_recebida_confirmada_em',
         'backup_pronto_emprestimo',
         'backup_data_formatado',
@@ -100,6 +101,7 @@ class BancadaEquipment extends Model
             'entrada_realizada_em' => 'datetime',
             'peca_quantidade' => 'integer',
             'peca_admin_realizado_em' => 'datetime',
+            'cd_requisicao_id' => 'integer',
             'peca_recebida_confirmada_em' => 'datetime',
             'backup_pronto_emprestimo' => 'boolean',
             'backup_data_formatado' => 'date',
@@ -144,6 +146,11 @@ class BancadaEquipment extends Model
     public function deliveryRoute(): BelongsTo
     {
         return $this->belongsTo(BancadaMaloteRoute::class, 'delivery_route_id');
+    }
+
+    public function cdRequisicao(): BelongsTo
+    {
+        return $this->belongsTo(BancadaCdRequisicao::class, 'cd_requisicao_id');
     }
 
     public function sentToCdByUser(): BelongsTo

@@ -638,6 +638,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::patch('/equipamentos/{equipment}/entrada-realizada', [BancadaServicosController::class, 'markEntryCompleted'])->name('assets.entry.completed');
         Route::patch('/equipamentos/{equipment}/administrativo', [BancadaServicosController::class, 'administrativeProcess'])->name('assets.administrative.process');
         Route::patch('/equipamentos/{equipment}/enviar-cd', [BancadaServicosController::class, 'markSentToCd'])->name('assets.send-to-cd');
+        Route::post('/cd-requisicoes/{requisicao}/coletado', [BancadaServicosController::class, 'markCdCollected'])->name('cd-requisicoes.coletado');
         Route::get('/equipamentos/{equipment}/imprimir', [BancadaServicosController::class, 'printLabel'])->name('assets.print');
         Route::get('/impressora', [BancadaServicosController::class, 'printer'])->name('printer');
         Route::get('/sla', [BancadaServicosController::class, 'sla'])->name('sla');

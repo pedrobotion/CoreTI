@@ -1,5 +1,6 @@
 <?php
 namespace App\Http\Controllers;
+use App\Models\BancadaCdRequisicao;
 use App\Models\BancadaEquipment;
 use App\Models\BancadaEquipmentAttachment;
 use App\Models\BancadaEquipmentEvent;
@@ -437,6 +438,43 @@ class BancadaServicosController extends Controller
         );
         return back()->with('success', 'Equipamento marcado como enviado ao CD.');
     }
+
+    /**
+     * Encerra um lote de requisição ao CD marcando "Produtos Coletados": tira o
+     * aviso do sino (fica em vigor até aqui) e registra o evento nos itens.
+     * Acionado pelo próprio aviso do sino (quem tem o módulo da bancada).
+     */
+    public function markCdCollected(BancadaCdRequisicao $requisicao)
+    {
+        if ($requisicao->status !== BancadaCdRequisicao::STATUS_RESOLVIDA) {
+            return back()->with('info', 'Esta requisição não está aguardando coleta.');
+        }
+
+        $requisicao->update([
+            'status' => BancadaCdRequisicao::STATUS_COLETADA,
+            'coletada_em' => now(),
+            'coletada_por' => Auth::id(),
+        ]);
+
+        foreach ($requisicao->equipments as $equipment) {
+            $this->recordEquipmentEvent(
+                equipment: $equipment,
+                action: 'produtos_coletados_cd',
+                previousStatus: $equipment->status,
+                newStatus: $equipment->status,
+                module: 'Bancada',
+                observation: 'Produtos coletados no Centro de Distribuição.',
+                metadata: ['cd_requisicao_id' => $requisicao->id],
+            );
+        }
+
+        // O sino é cacheado por 60s por usuário; limpa ao menos o de quem marcou
+        // (os demais atualizam em até 1 min).
+        \Illuminate\Support\Facades\Cache::forget('user-alerts:' . Auth::id());
+
+        return back()->with('success', 'Produtos marcados como coletados. O aviso foi encerrado.');
+    }
+
     public function createAsset(): View
     {
         return view('bancada-servicos.asset-form', [

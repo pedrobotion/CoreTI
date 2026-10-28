@@ -107,6 +107,34 @@ return [
     ],
 
     /*
+    | Requisição de peças ao Centro de Distribuição (CD).
+    |
+    | Segunda e quarta às 08:00 o CoreTI abre 1 chamado CONSOLIDADO no Jira com
+    | todas as peças de origem CD que estão "Aguardando peça" e ainda não foram
+    | requisitadas. Catálogo "ADM - Requisição de Estoque" (161 = Requisição
+    | 10010 no service desk 5), fila do Administrativo, atribuído à Isabeli,
+    | nascendo em "Em análise". Quando ela faz a requisição de compra no sistema
+    | interno e resolve o chamado, o CoreTI marca as peças como solicitadas ao CD
+    | e avisa no sino (até "Produtos Coletados"). Itens adicionados após o corte
+    | entram no próximo dia de pedido.
+    */
+    'cd_requisicao' => [
+        // Trava de segurança: o agendamento só abre chamado quando ativado
+        // (BANCADA_CD_REQ_ATIVO=true). Fica desligado por padrão para validarmos
+        // o backlog manualmente antes (política de não abrir chamado de teste).
+        'ativo' => (bool) env('BANCADA_CD_REQ_ATIVO', false),
+
+        'jira_equipe' => env('BANCADA_CD_REQ_JIRA_EQUIPE', 'Time Administrativo de TI'),
+        'jira_request_type' => env('BANCADA_CD_REQ_JIRA_REQUEST_TYPE', '161'),
+        'jira_issue_type' => env('BANCADA_CD_REQ_JIRA_ISSUE_TYPE', '10010'),
+
+        // Responsável do chamado (resolve o accountId pelo e-mail no Jira).
+        'responsavel' => env('BANCADA_CD_REQ_RESPONSAVEL', 'isabeli.castro@cocari.com.br'),
+
+        'resumo' => env('BANCADA_CD_REQ_RESUMO', 'CoreTI - Requisição de peças CD'),
+    ],
+
+    /*
     | Manutenção: ao concluir a entrada do equipamento (status "Em bancada"),
     | abre no Jira um chamado do catálogo "Configuração e Manutenção de
     | Equipamentos de Informática" (request type 98, issue type 10010 no service

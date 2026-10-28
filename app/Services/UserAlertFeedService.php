@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AdPurgeBatch;
+use App\Models\BancadaCdRequisicao;
 use App\Models\CoreTiNotificationRecipient;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -83,6 +84,34 @@ class UserAlertFeedService
                 }
             } catch (Throwable $e) {
                 // Ignora.
+            }
+        }
+
+        // 3) Requisições de peças ao CD já resolvidas (Isabeli fez a requisição):
+        //    aviso para quem tem o painel da Bancada, com a data liberada para
+        //    coleta. Fica em vigor até alguém marcar "Produtos Coletados".
+        if ($user->canModule('bancada')) {
+            try {
+                $diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+                $temRota = Route::has('bancada-servicos.cd-requisicoes.coletado');
+
+                foreach (BancadaCdRequisicao::query()->aguardandoColeta()->orderBy('coleta_liberada_em')->get() as $req) {
+                    $data = $req->coleta_liberada_em;
+                    $quando = $data
+                        ? ($diasSemana[(int) $data->dayOfWeek] . ' (' . $data->format('d/m') . ')')
+                        : 'em breve';
+
+                    $alertas[] = [
+                        'titulo' => 'Peças solicitadas ao CD',
+                        'descricao' => $req->total_itens . ' item(ns) — coleta liberada ' . $quando . '.',
+                        'severidade' => 'aviso',
+                        'url' => null,
+                        'acao_label' => 'Produtos coletados',
+                        'acao_url' => $temRota ? route('bancada-servicos.cd-requisicoes.coletado', $req) : null,
+                    ];
+                }
+            } catch (Throwable $e) {
+                // Ignora: o sino não pode quebrar a página.
             }
         }
 
