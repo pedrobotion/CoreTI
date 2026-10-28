@@ -10,33 +10,34 @@
             </div>
 
             <div class="flex flex-wrap gap-2">
-                @if ($isAdmin)
-                    <form method="POST" action="{{ route('service-desk.workspace-sync.now') }}" x-data="{ loading: false }" @submit="loading = true">
-                        @csrf
-                        <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" :disabled="loading">
-                            <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.25"></circle>
-                                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
-                            </svg>
-                            <span x-show="!loading">Sincronizar Google Agora</span>
-                            <span x-show="loading" x-cloak>Sincronizando...</span>
-                        </button>
-                    </form>
-                    <form method="POST" action="{{ route('service-desk.workspace-sync.preview') }}" x-data="{ loading: false }" @submit="loading = true">
-                        @csrf
-                        <button type="submit" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50" :disabled="loading">
-                            <svg x-show="loading" x-cloak class="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.25"></circle>
-                                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
-                            </svg>
-                            <span x-show="!loading">Atualizar Prévia</span>
-                            <span x-show="loading" x-cloak>Atualizando...</span>
-                        </button>
-                    </form>
-                @endif
-                <a href="{{ route('service-desk.tickets') }}" class="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
-                    Ver fila
+                <a href="{{ route('service-desk.emails.sede') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16v12H4zM4 7l8 6 8-6" />
+                    </svg>
+                    E-mails
                 </a>
+                <a href="{{ route('service-desk.ad') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                        <circle cx="12" cy="8" r="3" stroke-width="1.8" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 20a7 7 0 0 1 14 0" />
+                    </svg>
+                    AD
+                </a>
+                <a href="{{ route('service-desk.office') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                        <rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.8" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 8h6M9 12h6M9 16h3" />
+                    </svg>
+                    Office 365
+                </a>
+                @if ($isAdmin)
+                    <a href="{{ route('jira-projects.index') }}" class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16v12H4zM8 10h8M8 14h6" />
+                        </svg>
+                        Jira
+                    </a>
+                @endif
             </div>
         </div>
 

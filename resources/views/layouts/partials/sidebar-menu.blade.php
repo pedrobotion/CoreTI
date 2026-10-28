@@ -157,7 +157,7 @@
                 <span>Cadastro incompleto</span>
             </a>
 
-            <p class="coreti-sidebar-heading">Licenciamento</p>
+            <p class="coreti-sidebar-heading">Office 365</p>
 
             @foreach([
                 'sede' => 'Sede',
@@ -431,7 +431,7 @@
                 </a>
             @endif
 
-            <p class="coreti-sidebar-heading">Licenciamento</p>
+            <p class="coreti-sidebar-heading">Office 365</p>
 
             <a href="{{ route('administrativo.licensing.email') }}" class="coreti-sidebar-link {{ request()->routeIs('administrativo.licensing.email') ? 'coreti-sidebar-link-active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
