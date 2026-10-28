@@ -1254,3 +1254,183 @@ html.dark .filter-control:focus {
         min-width: 0 !important;
     }
 }
+
+/* ===================================================================
+   Tela de login — painel dividido com cena 3D dos módulos do CoreTI
+   =================================================================== */
+.login-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: 1fr;
+}
+@media (min-width: 1024px) {
+    .login-shell { grid-template-columns: 1.05fr 0.95fr; }
+}
+
+/* Painel de marca (sempre escuro, combina com claro e escuro) */
+.login-hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    display: flex;
+    align-items: flex-end;
+    min-height: 240px;
+    padding: 2.5rem 2rem;
+    color: #e8f3fb;
+    background:
+        radial-gradient(120% 90% at 15% 10%, rgba(56, 189, 248, 0.18), transparent 55%),
+        linear-gradient(150deg, #022740 0%, #033151 48%, #0a4a73 100%);
+}
+@media (min-width: 1024px) {
+    .login-hero { min-height: 100dvh; padding: 3.5rem; }
+}
+
+.login-hero__glow {
+    position: absolute;
+    width: 46rem;
+    height: 46rem;
+    right: -14rem;
+    top: -12rem;
+    background: radial-gradient(circle, rgba(56, 189, 248, 0.35), transparent 62%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Cena com perspectiva: piso em grade + tiles dos módulos flutuando */
+/* Camada dos chips de módulo (nós da rede, posicionados pelo JS). */
+.login-nodes {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Canvas da rede de pontos (efeito plexus) — fundo do painel. */
+.login-net {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: -2;
+    pointer-events: none;
+}
+.login-tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    will-change: transform;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #eaf6ff;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    /* Interage com o mouse: só os chips capturam o ponteiro. */
+    pointer-events: auto;
+    cursor: default;
+    /* Começa invisível; o JS posiciona e revela (sem flash no canto). */
+    opacity: 0;
+    transition: opacity 0.4s ease, scale 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.login-tile:hover {
+    scale: 1.09;
+    background: rgba(255, 255, 255, 0.17);
+    border-color: rgba(125, 211, 252, 0.65);
+    box-shadow: 0 26px 52px -18px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(56, 189, 248, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.login-tile:hover .login-tile__dot {
+    box-shadow: 0 0 14px 3px rgba(56, 189, 248, 0.95);
+}
+.login-tile__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: #38bdf8;
+    box-shadow: 0 0 10px 2px rgba(56, 189, 248, 0.75);
+}
+.login-hero__content {
+    position: relative;
+    z-index: 1;
+    max-width: 30rem;
+}
+.login-brandmark {
+    height: 2.6rem;
+    width: auto;
+    margin-bottom: 1.5rem;
+    filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.35));
+}
+.login-title {
+    margin: 0 0 0.6rem;
+    font-size: clamp(1.6rem, 2.6vw, 2.5rem);
+    font-weight: 600;
+    line-height: 1.1;
+}
+.login-subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: rgba(226, 243, 251, 0.82);
+}
+
+/* Painel do formulário */
+.login-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    padding: 2.5rem 1.5rem;
+}
+.login-card {
+    width: 100%;
+    max-width: 25rem;
+    padding: 2rem 1.75rem;
+    background: #ffffff;
+    border: 1px solid #e6edf4;
+    border-radius: 20px;
+    box-shadow: 0 30px 60px -32px rgba(3, 49, 81, 0.45), 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+.login-card__head { margin-bottom: 1.5rem; }
+.login-card__logo-link { display: inline-block; }
+.login-card__logo { height: 2.1rem; width: auto; margin-bottom: 1.1rem; }
+@media (min-width: 1024px) {
+    .login-card__logo-link { display: none; } /* o logo já aparece no painel de marca */
+}
+.login-card__title {
+    margin: 0 0 0.25rem;
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: #033151;
+}
+.login-card__sub {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+.login-foot {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+html.dark .login-card {
+    background: #0b1623;
+    border-color: #1e2a3a;
+    box-shadow: 0 30px 60px -32px rgba(0, 0, 0, 0.7);
+}
+html.dark .login-card__title { color: #e2e8f0; }
+html.dark .login-card__sub { color: #94a3b8; }
+
+@media (prefers-reduced-motion: reduce) {
+    .login-tile { animation: none; }
+}
