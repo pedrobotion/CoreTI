@@ -280,4 +280,114 @@
     }
 })();
 </script>
+<script>
+(function () {
+    // Rede de pontos conectados (plexus) no fundo de cada sidebar — mesma
+    // linguagem da tela de login, porém mais discreta por ficar atrás do menu.
+    // Canvas puro, sem dependências. Um controlador por canvas visível
+    // (desktop + drawer mobile); pausa quando a aba sai de foco ou a sidebar
+    // está oculta (largura/altura ~0). Respeita "reduzir movimento".
+    var canvases = document.querySelectorAll('.coreti-sidebar-net');
+    if (!canvases.length) return;
+
+    var reduz = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    Array.prototype.forEach.call(canvases, function (canvas) {
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        var LINK = 118;   // distância máx. de ligação entre pontos (px)
+        var MLINK = 140;  // distância de ligação até o cursor
+        var w = 0, h = 0, pts = [], raf = null, rodando = false;
+        var mouse = { x: -9999, y: -9999, ativo: false };
+        var host = canvas.closest('.coreti-sidebar-shell') || canvas.parentElement;
+
+        function construir(n) {
+            pts = [];
+            for (var i = 0; i < n; i++) {
+                pts.push({
+                    x: Math.random() * w, y: Math.random() * h,
+                    vx: (Math.random() - 0.5) * 0.22,
+                    vy: (Math.random() - 0.5) * 0.22
+                });
+            }
+        }
+
+        function mover(p) {
+            p.x += p.vx; p.y += p.vy;
+            if (p.x < 0) { p.x = 0; p.vx *= -1; } else if (p.x > w) { p.x = w; p.vx *= -1; }
+            if (p.y < 0) { p.y = 0; p.vy *= -1; } else if (p.y > h) { p.y = h; p.vy *= -1; }
+        }
+
+        function desenhar() {
+            raf = rodando ? requestAnimationFrame(desenhar) : null;
+            ctx.clearRect(0, 0, w, h);
+
+            for (var i = 0; i < pts.length; i++) mover(pts[i]);
+
+            for (var a = 0; a < pts.length; a++) {
+                var pa = pts[a];
+                for (var b = a + 1; b < pts.length; b++) {
+                    var pb = pts[b];
+                    var dx = pa.x - pb.x, dy = pa.y - pb.y;
+                    var d = Math.hypot(dx, dy);
+                    if (d < LINK) {
+                        ctx.strokeStyle = 'rgba(120,175,235,' + ((1 - d / LINK) * 0.33) + ')';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+                    }
+                }
+                if (mouse.ativo) {
+                    var mx = pa.x - mouse.x, my = pa.y - mouse.y;
+                    var md = Math.hypot(mx, my);
+                    if (md < MLINK) {
+                        ctx.strokeStyle = 'rgba(125,211,252,' + ((1 - md / MLINK) * 0.45) + ')';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+                        pa.x -= mx * 0.003; pa.y -= my * 0.003;
+                    }
+                }
+            }
+
+            ctx.fillStyle = 'rgba(150,195,245,0.75)';
+            for (var p = 0; p < pts.length; p++) {
+                ctx.beginPath(); ctx.arc(pts[p].x, pts[p].y, 1.5, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        function iniciar() { if (!rodando && !document.hidden) { rodando = true; if (!raf) raf = requestAnimationFrame(desenhar); } }
+        function parar() { rodando = false; }
+        function umFrame() { var r = rodando; rodando = false; desenhar(); rodando = r; }
+
+        function redimensionar() {
+            var r = canvas.getBoundingClientRect();
+            w = r.width; h = r.height;
+            if (w < 2 || h < 2) { parar(); return; }   // sidebar oculta (drawer fechado)
+            canvas.width = Math.max(1, Math.floor(w * dpr));
+            canvas.height = Math.max(1, Math.floor(h * dpr));
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            construir(Math.round(Math.min(46, (w * h) / 9000)));
+            reduz ? umFrame() : iniciar();
+        }
+
+        host.addEventListener('pointermove', function (e) {
+            var r = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.ativo = true;
+        });
+        host.addEventListener('pointerleave', function () { mouse.ativo = false; mouse.x = -9999; mouse.y = -9999; });
+
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(function () { redimensionar(); }).observe(canvas);
+        } else {
+            window.addEventListener('resize', redimensionar);
+        }
+        document.addEventListener('visibilitychange', function () {
+            document.hidden ? parar() : (reduz ? umFrame() : iniciar());
+        });
+
+        redimensionar();
+    });
+})();
+</script>
 @endpush

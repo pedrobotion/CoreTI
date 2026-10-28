@@ -34,6 +34,11 @@
 @endphp
 
 <div class="{{ $containerClass ?? 'coreti-sidebar-shell' }} {{ $isNetworkDatacenter ? 'cmdb-sidebar-container' : '' }}">
+    {{-- Rede animada (plexus) no fundo da sidebar — mesma linguagem da tela de
+         login. Decorativa; fica atrás de todo o menu. Animada por JS na
+         navigation.blade.php (roda só nas sidebars visíveis). --}}
+    <canvas class="coreti-sidebar-net" aria-hidden="true"></canvas>
+
     <div class="coreti-sidebar-brand">
         <a href="{{ route('dashboard') }}" class="inline-flex items-center">
             <img
